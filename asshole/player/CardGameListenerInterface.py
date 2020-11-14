@@ -3,7 +3,7 @@
 """
 A Card Game Listener is aware of all the goings on in the game, and keeps a history of them
 """
-from asshole.play_history import PlayHistory
+from asshole.PlayHistory import PlayHistory
 
 
 class CardGameListenerInterface:

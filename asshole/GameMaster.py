@@ -5,7 +5,7 @@ import pickle
 
 from asshole.cards.PlayingCard import PlayingCard
 # Needed for deserialization eval function
-from asshole.episode import Episode
+from asshole.Episode import Episode
 
 class GameMaster:
     """A class to control all the action"""
