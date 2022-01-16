@@ -6,9 +6,10 @@ The Play function presents a list of the possible plays, and lets the user decid
 """
 import logging
 from asshole.player.AbstractPlayer import AbstractPlayer
+from asshole.player.HumanPlayer import HumanPlayer
 
 
-class HumanPlayer(AbstractPlayer):
+class HTMLPlayer(HumanPlayer):
     def __init__(self, name):
         AbstractPlayer.__init__(self, name)
         self.opp_status = ['Waiting', 'Waiting', 'Waiting']

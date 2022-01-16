@@ -8,7 +8,7 @@ class PlayHistory:
         self._memory = []
 
     def add_play(self, player, meld):
-        #TODO: This is None if someone played out high, and everyone passed
+        # TODO: This is None if someone played out high, and everyone passed
         # meld.cards throws
         if meld:
             self._memory.append((player, meld.cards))

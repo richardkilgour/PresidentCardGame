@@ -13,24 +13,18 @@ from asshole.cards.PlayingCard import PlayingCard
 
 class AbstractPlayer(CardGameListenerInterface):
     # the listener keeps track of all cards played
-    ranking_names = ["king", "prince", "citizen", "asshole"]
+    ranking_names = ["King", "Prince", "Citizen", "Asshole"]
 
     def __init__(self, name):
         super(AbstractPlayer, self).__init__()
         self.name = name
         self._hand = []
-        #self.position = None
         self.target_meld = None
         self.position_count = [0, 0, 0, 0]
 
     def set_position(self, pos):
-        # Remeber the new position for statistical porpoises
+        # Remember the new position for statistical porpoises
         self.position_count[pos] += 1
-
-    def get_position_name(self):
-        if self.position:
-            return AbstractPlayer.ranking_names[self.position]
-        return ""
 
     def get_score(self):
         return 2 * self.position_count[0] + \
@@ -58,7 +52,7 @@ class AbstractPlayer(CardGameListenerInterface):
     @abstractmethod
     def play(self):
         # Must be implemented by children
-        assert (False)
+        assert False
 
     def report_remaining_cards(self):
         return len(self._hand)
@@ -217,7 +211,7 @@ def main():
     player = AbstractPlayer('')
     # 3♦ 5♥ 5♠ 6♠ 7♦ 8♦ 9♥ 9♠ J♣ J♦ 2♦ Joker
     for card in ([2, 9, 8, 12, 18, 28, 25, 24, 35, 34, 50, 52]):
-        player.card_to_hand(PlayingCard(i))
+        player.card_to_hand(PlayingCard(card))
     player.notify_play(None, Meld(PlayingCard(53)))
     print(player.possible_plays())
 

@@ -37,7 +37,7 @@ class PlayingCard:
         card_str = PlayingCard.rank_str[self._value]
         # Most cards get the suit added (not Joker)
         if self._value < (len(PlayingCard.rank_str) - 1):
-            card_str += PlayingCard.suit_str[self._suit]
+            card_str += self.suit_string()
         if self._suit == 1 or self._suit == 2:
             return colored(card_str, 'red')
         return card_str
@@ -47,3 +47,6 @@ class PlayingCard:
 
     def suit(self):
         return self._suit
+
+    def suit_string(self):
+        return PlayingCard.suit_str[self._suit]

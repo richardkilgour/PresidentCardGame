@@ -27,7 +27,7 @@ class PlayerHolder(PlayerSplitter):
 
         # If pass is the only option, then do that
         if len(selection) == 1 and not candidate.cards:
-            logging.info("{}'s reaction to the {} is a mandantory {}".format(self.name, self.target_meld, candidate))
+            logging.info("{}'s reaction to the {} is a mandatory {}".format(self.name, self.target_meld, candidate))
             return candidate
 
         # Instant winner? Play for sure!

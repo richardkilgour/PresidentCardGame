@@ -7,6 +7,7 @@ from asshole.cards.PlayingCard import PlayingCard
 # Needed for deserialization eval function
 from asshole.Episode import Episode
 
+
 class GameMaster:
     """A class to control all the action"""
 
@@ -41,7 +42,7 @@ class GameMaster:
         serialized = pickle.dumps((player_names, player_types, game_state), protocol=0)  # protocol 0 is printable ASCII
         return serialized
 
-    def resore_state(self, serialized):
+    def restore_state(self, serialized):
         deserialized_a = pickle.loads(serialized)
         # In any case, restore the gm to a blank state
         self.clear()
@@ -73,7 +74,7 @@ class GameMaster:
         return
         state = self.save_state()
         # print("Serialized as {}".format(state))
-        self.resore_state(state)
+        self.restore_state(state)
 
     def add_listener(self, listener):
         self.listener_list.append(listener)

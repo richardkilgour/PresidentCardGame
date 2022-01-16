@@ -1,2 +1,3 @@
 # Asshole
-(No, not you. The game)
+
+python PlayAsshole.py

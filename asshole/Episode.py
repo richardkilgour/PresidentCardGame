@@ -165,6 +165,11 @@ class Episode:
         # Play until we have a winner (everyone else has passed)
         while len(active_players) > 1:
             player = active_players[0]
+            if player.report_remaining_cards() == 0:
+                # This payer has played out, but others have played on their last card
+                active_players.remove(player)
+                continue
+
             logging.info("Currently played highest card = {}".format(self.target_meld))
 
             # =======================
