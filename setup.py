@@ -14,9 +14,7 @@ setup(
     url="https://",
     packages=find_packages(),
     install_requires=[
-        'numpy',
         'termcolor',
-        'tensorflow',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

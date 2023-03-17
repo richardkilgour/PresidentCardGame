@@ -40,7 +40,7 @@ class HTMLPlayer(HumanPlayer):
         super(HumanPlayer, self).notify_played_out(player, pos)
         if player != self:
             print("{} played out, and is ranked {}".format(player.name, pos))
-            self.opp_status[self.opponents.index(player)] = self.ranking_names[pos]
+            self.opp_status[self.opponents.get_index(player)] = self.ranking_names[pos]
 
     def notify_play(self, player, meld):
         super(HumanPlayer, self).notify_play(player, meld)
@@ -48,7 +48,7 @@ class HTMLPlayer(HumanPlayer):
         # TODO: len(meld) should work, not need len(meld.cards)
         if player != self:
             print("{} plays {}, leaving {} cards".format(player.name, meld, len(player._hand) - len(meld.cards)))
-            self.opp_status[self.opponents.index(player)] = meld
+            self.opp_status[self.opponents.get_index(player)] = meld
 
     def show_player(self, index):
         """Report on the last card played, and the total cards of the opposition @ given index"""
@@ -66,7 +66,7 @@ class HTMLPlayer(HumanPlayer):
             self.show_player(i)
         print(self)
 
-        selection = self.possible_plays()
+        selection = possible_plays(self._hand, self.target_meld, self.name)
 
         card_selection_string = "Select card: \n"
         for key, value in enumerate(selection):

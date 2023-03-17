@@ -5,7 +5,7 @@ import pickle
 
 from asshole.cards.PlayingCard import PlayingCard
 # Needed for deserialization eval function
-from asshole.Episode import Episode
+from asshole.Episode import Episode, State
 
 
 class GameMaster:
@@ -15,6 +15,7 @@ class GameMaster:
         self.players = []
         self.positions = []
         # This is a list of all the card objects - they will me moved around
+        self.deck_size = deck_size
         self.deck = [PlayingCard(i) for i in range(deck_size)]
         self.listener_list = []
 
@@ -129,9 +130,11 @@ class GameMaster:
             # Shuffle the cards
             if not preset_hands:
                 shuffle(self.deck)
-            # Do a round
+            # Do an episode
             this_episode = Episode(self.players, self.positions, self.deck, self.listener_list)
-            self.positions = this_episode.play_episode()
+            while this_episode.state != State.FINISHED:
+                this_episode.play()
+            self.positions = this_episode.positions
             assert (len(self.deck) == 54)
             # Keep some stats
             round_count += 1

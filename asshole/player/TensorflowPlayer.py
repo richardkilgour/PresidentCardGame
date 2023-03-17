@@ -61,7 +61,7 @@ class State:
             vector[54] = 1
         else:
             for c in meld.cards:
-                index = 4 * c.value() + c.suit()
+                index = 4 * c.get_value() + c.get_suit()
                 vector[index] = 1
         return vector
 
@@ -109,7 +109,7 @@ class TensorflowPlayer(AbstractPlayer):
             self.old_state = self.state.get_input_vector()
         # Use epsilon to decide on the best action or a random one
         if np.random.rand() <= self._epsilon:
-            possible_plays = self.possible_plays()
+            possible_plays = possible_plays(self._hand, self.target_meld, self.name)
             self.action = random.choice(possible_plays)
         else:
             x = np.reshape(np.array(self.state.get_input_vector(), dtype=np.bool), (1,-1))
@@ -149,7 +149,7 @@ class TensorflowPlayer(AbstractPlayer):
         if player == self:
             self.state.register_meld(0, meld)
         else:
-            self.state.register_meld(self.opponents.index(player)+1, meld)
+            self.state.register_meld(self.opponents.get_index(player) + 1, meld)
 
     def notify_hand_start(self, starter):
         super(TensorflowPlayer, self).notify_hand_start(starter)
@@ -167,7 +167,7 @@ class TensorflowPlayer(AbstractPlayer):
         if index == 54:
             return meld
         for c in self._hand:
-            if c.value() == value:
+            if c.get_value() == value:
                 meld = Meld(c, meld)
                 if count == 0:
                     return meld

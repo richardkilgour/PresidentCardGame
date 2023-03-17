@@ -11,6 +11,49 @@ from asshole.player.CardGameListenerInterface import CardGameListenerInterface
 from asshole.cards.PlayingCard import PlayingCard
 
 
+def possible_plays(hand, target_meld, name = "Unknown Player"):
+    """
+    Make a list of possible melds that may be played given the target minimum meld
+    Will always return the pass option (in last place)
+    Example return value: [[3], [3, 3], [4], ..., []]
+    """
+    # A list of the melds possible to play
+    possible_melds = []
+
+    if not target_meld:
+        # If no minimum, all melds are playable
+        for card in hand:
+            # Check to see if this can make a pair
+            if len(possible_melds) > 0 and card == possible_melds[-1].cards[0]:
+                possible_melds.append(Meld(card, possible_melds[-1]))
+            else:
+                possible_melds.append(Meld(card))
+    else:
+        current_meld = None
+        for card in hand:
+            if current_meld and (card.get_value() == current_meld.cards[0].get_value()):
+                current_meld = Meld(card, current_meld)
+            else:
+                current_meld = Meld(card)
+            if current_meld > target_meld:
+                possible_melds.append(current_meld)
+
+    # The option for Pass
+    possible_melds.append(Meld())
+
+    card_string = f"{name} has:"
+    for s in hand:
+        card_string += " {},".format(s)
+    logging.debug(card_string)
+
+    meld_string = f"Options for {name} to play are:"
+    for s in possible_melds:
+        meld_string += " {},".format(s)
+    logging.debug(meld_string)
+
+    return possible_melds
+
+
 class AbstractPlayer(CardGameListenerInterface):
     # the listener keeps track of all cards played
     ranking_names = ["King", "Prince", "Citizen", "Asshole"]
@@ -19,8 +62,11 @@ class AbstractPlayer(CardGameListenerInterface):
         super(AbstractPlayer, self).__init__()
         self.name = name
         self._hand = []
+        # TODO: ask the GM
         self.target_meld = None
         self.position_count = [0, 0, 0, 0]
+        self.last_played = None
+        self.possible_plays = None
 
     def set_position(self, pos):
         # Remember the new position for statistical porpoises
@@ -34,7 +80,7 @@ class AbstractPlayer(CardGameListenerInterface):
 
     def card_to_hand(self, card):
         self._hand.append(card)
-        self._hand.sort()
+        self._hand.sort(key=lambda c: c.get_index())
 
     def notify_hand_start(self, starter):
         super(AbstractPlayer, self).notify_hand_start(starter)
@@ -51,8 +97,8 @@ class AbstractPlayer(CardGameListenerInterface):
 
     @abstractmethod
     def play(self):
-        # Must be implemented by children
-        assert False
+        # Must be implemented by children - BLOCKING (Don't expect any redraws)
+        self.possible_plays = possible_plays(self._hand, self.target_meld, self.name)
 
     def report_remaining_cards(self):
         return len(self._hand)
@@ -64,7 +110,7 @@ class AbstractPlayer(CardGameListenerInterface):
         """
         count = 0
         for c in self._hand:
-            if c.value == value:
+            if c.get_value == value:
                 count += 1
         return count
 
@@ -88,7 +134,7 @@ class AbstractPlayer(CardGameListenerInterface):
         count_of_value = 0
         # Find the first card of the same value
         for c in self._hand:
-            if c.value() == candidate.cards[0].value():
+            if c.get_value() == candidate.cards[0].get_value():
                 # Count the number of cards of the same value
                 count_of_value += 1
         return len(candidate.cards) < count_of_value
@@ -98,7 +144,7 @@ class AbstractPlayer(CardGameListenerInterface):
         """Encode the hand as a numpy array"""
         h = np.zeros((4, 14), dtype=int)
         for c in hand:
-            h[c.suit(), c.value()] = 1
+            h[c.get_suit(), c.get_value()] = 1
         return h
 
     @staticmethod
@@ -117,7 +163,7 @@ class AbstractPlayer(CardGameListenerInterface):
         """Encode the meld as a numpy array"""
         h = np.zeros((4, 14), dtype=int)
         for c in meld.cards:
-            h[c.suit(), c.value()] = 1
+            h[c.get_suit(), c.get_value()] = 1
         return h
 
     def encode(self):
@@ -135,43 +181,6 @@ class AbstractPlayer(CardGameListenerInterface):
             meld = self.encode_meld(status)
 
         return np.concatenate((hand, meld), axis=1)
-
-    def possible_plays(self):
-        """
-        Make a list of possible melds that may be played given the target minimum meld
-        Will always return the pass option (in last place)
-        Example return value: [[3], [3, 3], [4], ..., []]
-        """
-        # A list of the melds possible to play
-        possible_melds = []
-
-        if not self.target_meld:
-            # If no minimum, all melds are playable
-            for card in self._hand:
-                # Check to see if this can make a pair
-                if len(possible_melds) > 0 and card == possible_melds[-1].cards[0]:
-                    possible_melds.append(Meld(card, possible_melds[-1]))
-                else:
-                    possible_melds.append(Meld(card))
-        else:
-            current_meld = None
-            for card in self._hand:
-                if current_meld and (card.value() == current_meld.cards[0].value()):
-                    current_meld = Meld(card, current_meld)
-                else:
-                    current_meld = Meld(card)
-                if current_meld > self.target_meld:
-                    possible_melds.append(current_meld)
-
-        # The option for Pass
-        possible_melds.append(Meld())
-
-        meld_string = "Options to play are:"
-        for s in possible_melds:
-            meld_string += " {},".format(s)
-        logging.debug(meld_string)
-
-        return possible_melds
 
 
 def main():
@@ -197,10 +206,9 @@ def main():
         # Any double plays can't be responded to except by 2, Joker, or pass
         meld = Meld(PlayingCard(i + 1), meld)
         player.notify_play(None, meld)
-        badger = player.possible_plays()
-        if meld.cards[0].value() < 12:
+        if meld.cards[0].get_value() < 12:
             assert (len(player.possible_plays()) == 3)
-        elif meld.cards[0].value() == 12:
+        elif meld.cards[0].get_value() == 12:
             # Double 2: Joker of pass
             assert (len(player.possible_plays()) == 2)
         else:

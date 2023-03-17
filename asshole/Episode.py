@@ -1,9 +1,47 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# TODO: define responsibilities (this was designed for Reienforcement LEarning)
 """
-Play a single episode
+Class to control a single 'episode':
+Needs the players (and their starting positions), a deck, and listeners
+
+Does this:
+    Shuffles and deals (on behalf of a player)
+    Enforces card swapping
+    Play 'rounds' until everyone is finished
+        Pick a starter
+    Return the new positions
+
+Remembers the current state (including the memory?)
+That makes it a markov thingie
+
+Needs to be told:
+    What was just played
+
+Should report on:
+    Positions at the start of the round (if anyone cares)
+    Who's turn is it?
+    Highest current card played (and who played it)
+    Who's still 'in' (or if they have passed)
+        What everyone's last card was
+    Who's retired (New king...)
+
+Needs to know:
+    How many cards are left in each hand (can query the players)
 """
 import logging
+from enum import Enum
+from random import shuffle
+
+
+class State(Enum):
+    INITIALISED = 1
+    DEALING = 2
+    SWAPPING = 3
+    ROUND_STARTING = 4
+    PLAYING = 5
+    HAND_WON = 6
+    FINISHED = 7
 
 
 class Episode:
@@ -15,7 +53,8 @@ class Episode:
         # None if it's a new game and no positions have been established
         # The Episode will (re) populate this and return after the episode has run
         self.positions = positions
-        # The deck to use (should be shuffled already)
+        # The deck to use (should be shuffled already?)
+        # TODO: decide who owns the deck (and thier responsibilities)
         self.deck = deck
         # List of the players
         self.players = players
@@ -23,6 +62,8 @@ class Episode:
         self.target_meld = None
         # All the listeners
         self.listener_list = listener_list
+        self.state = State.INITIALISED
+        self.active_players = []
 
     def swap_cards(self):
         """Swap cards if necessary"""
@@ -89,9 +130,9 @@ class Episode:
         for player in self.players:
             # Cards are sorted by value, so could do a binary search, but whatever
             for card in player._hand:
-                if card.value() > target_card_value:
+                if card.get_value() > target_card_value:
                     break
-                if card.value() == target_card_value and + card.suit() == target_card_suit:
+                if card.get_value() == target_card_value and + card.get_suit() == target_card_suit:
                     return player
 
     def players_with_cards(self):
@@ -137,12 +178,15 @@ class Episode:
         player.set_position(len(self.positions))
         self.notify_listeners("notify_played_out", player, len(self.positions))
         self.positions.append(player)
+        player_names = ''
+        for x in self.positions:
+            player_names = player_names + ' ' + x.name
+        logging.info(f"Positions: {player_names}")
 
-    def play_one_round(self):
+
+    def player_turn(self):
         """
-        Play one entire round, from initial meld to winning meld
-        Everyone plays in order of self.player
-        Return the winner.
+        Let a player have a go
         Even the Asshole "wins" the last round, and their cards are drained
         """
         # Everyone who has cards is now active
@@ -150,85 +194,104 @@ class Episode:
         #   Players who pass
         #   Players that play are moved to the back
         # Round is over when one player remains active
-        active_players = self.players_with_cards()
+        assert (len(self.active_players) > 0)
 
-        logging.info(f"Players with cards remaining = {active_players}")
+        # TODO: not pythonic
+        player_names = ''
+        for x in self.active_players:
+            player_names = player_names + ' ' + x.name
+        logging.info(f"Players who have not passed = {player_names}")
         # ================
         # Round Starts with some poor, lonely sod.
         # Send the hand finished code!!!
         # ================
-        if len(active_players) == 1:
-            self.set_player_finished(active_players[0])
+        if len(self.active_players) == 1:
+            self.set_player_finished(self.active_players[0])
+            return
 
-        self.target_meld = None
+        # We have more than one active player, so let the current plyer play (or fall-though)
+        player = self.active_players[0]
+        if player.report_remaining_cards() == 0:
+            # This payer has played out, but others have played on their last card
+            self.active_players.remove(player)
+            return
 
-        # Play until we have a winner (everyone else has passed)
-        while len(active_players) > 1:
-            player = active_players[0]
+        logging.info("Currently played highest card = {}".format(self.target_meld))
+
+        # Note: May be BLOCKING!!! if it waits for the player to play
+        # Really it should yield to the main thread while the player thinks about it
+        action = player.play()
+        if action == '␆':
+            # This is the player thinking (noop)
+            return
+        # Check if it's valid
+        if self.target_meld and action.cards and action < self.target_meld:
+            # Punish the player for cheating
+            raise
+
+        self.notify_listeners("notify_play", player, action)
+        if not action.cards:
+            # That's a pass - Inactive for this hand
+            self.active_players.remove(player)
+        else:
+            # Accept the action, and execute
+            for card in action.cards:
+                player._hand.remove(card)
+                self.discards.append(card)
+            # Remember the new highest meld
+            self.target_meld = action
+            logging.debug("{} is left with {}".format(player.name, player))
+            # Did they play out?
             if player.report_remaining_cards() == 0:
-                # This payer has played out, but others have played on their last card
-                active_players.remove(player)
-                continue
+                self.set_player_finished(player)
+            # Get the next player by moving the active player to the end of the queue
+            self.active_players.append(self.active_players.pop(0))
 
-            logging.info("Currently played highest card = {}".format(self.target_meld))
-
-            # =======================
-            # LOCK ON SNAPSHOTS
-            # Snapshottting here has undefined consequences
-            # player state and order are in flux. wait for the meld or other decision
-            # =======================
-            action = player.play()
-            # Check if it's valid
-            if self.target_meld and action.cards and action < self.target_meld:
-                # Punish the player for cheating
-                raise
-            self.notify_listeners("notify_play", player, action)
-            if not action.cards:
-                # That's a pass - Inactive for this hand
-                active_players.remove(player)
-            else:
-                # Accept the action, and execute
-                for card in action.cards:
-                    player._hand.remove(card)
-                    self.discards.append(card)
-                # Remember the new highest meld
-                self.target_meld = action
-                logging.debug("{} is left with {}".format(player.name, player))
-                # Did they play out?
-                if player.report_remaining_cards() == 0:
-                    self.set_player_finished(player)
-                # Get the next player by moving the active player to the end of the queue
-                active_players.append(active_players.pop(0))
-            # =======================
-            # UNLOCK ON SNAPSHOTS
-            # Snapshottting hereforth is OK
-            # =======================
-
-        self.notify_listeners("notify_hand_won", active_players[0])
-        # Winner gets to start the next round
-        self.move_to_front(active_players[0])
-
-    def play_episode(self):
+    def play(self):
         """
         Play an episode with the given deck. All players get their reward
         Use the callback to inform of progress
         return new rankings
         """
-        self.deal()
-
-        for player in self.players:
-            logging.debug("{} has {}".format(player.name, player))
-
-        # Swap cards and decide who starts
-        self.swap_cards()
-        self.pick_round_starter()
-
-        # All privileges have been actioned, so reset positions and play until they are established anew
-        self.positions = []
-
-        while len(self.positions) < 4:
-            self.play_one_round()
-
-        self.post_episode_checks()
+        if self.state == State.INITIALISED:
+            # Do an episode - We need 4 players and a deck of cards.
+            shuffle(self.deck)
+            self.state = State.DEALING
+            self.deal()
+        elif self.state == State.DEALING:
+            while self.state == State.DEALING:
+                # TODO: Time delay the dealing, and notify callbacks?
+                self.state = State.SWAPPING
+            # init the swapping state
+            # Swap cards and decide who starts
+            for player in self.players:
+                logging.debug("{} has {}".format(player.name, player))
+            self.swap_cards()
+        elif self.state == State.SWAPPING:
+            while self.state == State.SWAPPING:
+                # TODO: Time delay the swapping, and notify callbacks?
+                self.state = State.ROUND_STARTING
+            self.pick_round_starter()
+            self.positions = []
+        elif self.state == State.ROUND_STARTING:
+            # All privileges have been actioned, so reset positions and play until they are established anew
+            self.active_players = self.players_with_cards()
+            self.target_meld = None
+            self.state = State.PLAYING
+        elif self.state == State.PLAYING:
+            # Play until the round is won (only one player remaining)
+            self.player_turn()
+            if len(self.active_players) == 1:
+                self.state = State.HAND_WON
+        elif self.state == State.HAND_WON:
+            if len(self.positions) == 4:
+                self.post_episode_checks()
+                self.state = State.FINISHED
+            else:
+                assert(len(self.active_players)==1)
+                self.notify_listeners("notify_hand_won", self.active_players[0])
+                # Winner gets to start the next round
+                self.move_to_front(self.active_players[0])
+                self.state = State.ROUND_STARTING
 
         return self.positions

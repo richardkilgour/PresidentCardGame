@@ -26,7 +26,7 @@ class PlayHistory:
             num_remaining = 4
         for m in self._memory:
             if m[1]:
-                if m[1][0].value() == value:
+                if m[1][0].get_value() == value:
                     num_remaining -= len(m[1])
         return num_remaining
 

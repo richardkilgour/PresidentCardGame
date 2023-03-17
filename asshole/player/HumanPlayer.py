@@ -39,7 +39,7 @@ class HumanPlayer(AbstractPlayer):
         super(HumanPlayer, self).notify_played_out(player, pos)
         if player != self:
             print("{} played out, and is ranked {}".format(player.name, pos))
-            self.opp_status[self.opponents.index(player)] = self.ranking_names[pos]
+            self.opp_status[self.opponents.get_index(player)] = self.ranking_names[pos]
 
     def notify_play(self, player, meld):
         super(HumanPlayer, self).notify_play(player, meld)
@@ -65,7 +65,7 @@ class HumanPlayer(AbstractPlayer):
             self.show_player(i)
         print(self)
 
-        selection = self.possible_plays()
+        selection = possible_plays(self._hand, self.target_meld, self.name)
 
         card_selection_string = "Select card: \n"
         for key, value in enumerate(selection):

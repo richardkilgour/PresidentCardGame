@@ -7,6 +7,7 @@ class Meld:
     """
     Meld is a glorified list of cards
     All are the same value, but there can be up to 4 of them
+    They should be in ascending order based on card._index
     """
     def __init__(self, card=None, meld=None):
         self.cards = []
@@ -14,6 +15,8 @@ class Meld:
             self.cards = [card]
         if meld:
             self.cards = meld.cards + [card]
+            # Sort by card index
+            self.cards.sort(key=lambda c: c.get_index())
 
     def __gt__(self, other):
         """self <= other"""
@@ -36,14 +39,14 @@ class Meld:
             return len(self.cards) == 1
         elif len(other.cards) == 2:
             # Special case for 3 and joker
-            if self.cards[0].value() >= 12:
+            if self.cards[0].get_value() >= 12:
                 return len(self.cards) == 1
             return len(self.cards) == 2
         elif len(other.cards) == 3:
             # Special case for 3 and joker
-            if self.cards[0].value() == 12:
+            if self.cards[0].get_value() == 12:
                 return len(self.cards) == 2
-            if self.cards[0].value() == 13:
+            if self.cards[0].get_value() == 13:
                 if other.cards[0] == 12:
                     # Triple 2 needs 2 Jokers
                     return len(self.cards) == 2
@@ -53,9 +56,9 @@ class Meld:
             return len(self.cards) == 3
         elif len(other.cards) == 4:
             # Special case for 3 and joker
-            if self.cards[0].value() == 12:
+            if self.cards[0].get_value() == 12:
                 return len(self.cards) == 3
-            if self.cards[0].value() == 13:
+            if self.cards[0].get_value() == 13:
                 if other.cards[0] == 12:
                     # Three jokers? Cheat!!!
                     assert False
