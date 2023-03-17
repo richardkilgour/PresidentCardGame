@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # TODO: define responsibilities (this was designed for Reienforcement LEarning)
 """
-Class to control a single 'episode':
+Class to control a single 'Episode':
 Needs the players (and their starting positions), a deck, and listeners
 
 Does this:

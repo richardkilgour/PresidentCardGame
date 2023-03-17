@@ -5,7 +5,7 @@ Human player is a Player with console output (overloading the callbacks)
 The Play function presents a list of the possible plays, and lets the user decide the move
 """
 import logging
-from asshole.player.AbstractPlayer import AbstractPlayer
+from asshole.player.AbstractPlayer import AbstractPlayer, possible_plays
 
 
 class HumanPlayer(AbstractPlayer):
@@ -37,16 +37,18 @@ class HumanPlayer(AbstractPlayer):
 
     def notify_played_out(self, player, pos):
         super(HumanPlayer, self).notify_played_out(player, pos)
-        if player != self:
-            print("{} played out, and is ranked {}".format(player.name, pos))
-            self.opp_status[self.opponents.get_index(player)] = self.ranking_names[pos]
+        if player == self:
+            print(f'You ({player.name}) played out, and is ranked {self.ranking_names[pos]}')
+        else:
+            print(f'{player.name} played out, and is ranked {self.ranking_names[pos]}')
+            self.opp_status[self.opponents.index(player)] = self.ranking_names[pos]
 
     def notify_play(self, player, meld):
         super(HumanPlayer, self).notify_play(player, meld)
         # TODO: for some reason the we get notified before the cards are taken from the hand
         # TODO: len(meld) should work, not need len(meld.cards)
         if player != self:
-            print("{} plays {}, leaving {} cards".format(player.name, meld, len(player._hand) - len(meld.cards)))
+            print(f'{player.name} plays {meld}, leaving {len(player._hand)- len(meld.cards1)} cards')
             self.opp_status[self.opponents.index(player)] = meld
 
     def show_player(self, index):

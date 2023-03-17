@@ -23,8 +23,6 @@ class PlayerSplitter(PlayerSimple):
             return candidate
 
         # Find the possible melds, and play the lowest one, unless we have a double
-        # GM knows the current target
-
         for candidate in self.possible_plays:
             if not candidate.cards:
                 # If pass is the remaining option, take it

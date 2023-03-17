@@ -11,7 +11,6 @@ from asshole.player.HumanPlayer import HumanPlayer
 from asshole.player.PlayerSimple import PlayerSimple
 from asshole.player.PlayerHolder import PlayerHolder
 from asshole.player.PlayerSplitter import PlayerSplitter
-# from asshole.player.TensorflowPlayer import TensorflowPlayer
 
 
 def main():
@@ -20,9 +19,8 @@ def main():
     gm = GameMaster()
     # Players can be player_simple, player_splitter, player_holder, human_player
     gm.make_player(PlayerHolder, "Richard")
-    # gm.make_player(TensorflowPlayer, "Silvia")
-    gm.make_player(PlayerSplitter, "Silvia")
-    #gm.make_player(HumanPlayer, "Silvia")
+    # gm.make_player(PlayerSplitter, "Silvia")
+    gm.make_player(HumanPlayer, "Silvia")
     gm.make_player(PlayerSplitter, "Sara")
     gm.make_player(PlayerSimple, "snAkbar")
     gm.play(number_of_rounds=1000)
