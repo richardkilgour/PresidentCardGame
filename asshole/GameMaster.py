@@ -44,6 +44,7 @@ class GameMaster:
         return serialized
 
     def restore_state(self, serialized):
+        # TODO in any case serialization should be in the episode
         deserialized_a = pickle.loads(serialized)
         # In any case, restore the gm to a blank state
         self.clear()
@@ -52,7 +53,6 @@ class GameMaster:
         player_names = deserialized_a[0]
         player_types = deserialized_a[1]
         game_state = deserialized_a[2]
-        self.next_to_play = []
         for i, name in enumerate(player_names):
             # TODO: Nasty - turn the name into a class
             player_class = eval(player_types[i])
@@ -116,6 +116,12 @@ class GameMaster:
         return self.players[-1]
 
     def play(self, number_of_rounds=100, preset_hands=None):
+        """
+        Play a bunch of hands, after which a player leaves and the game stops
+        Some basics stats on the game are then printed
+        number_of_rounds = None will never stop
+        preset_hands is a prepared deck (for testing purposes or tourniment play)
+        """
         if len(self.players) != 4:
             raise Exception("Not enough Players")
         round_count = 0
@@ -138,19 +144,14 @@ class GameMaster:
             assert (len(self.deck) == 54)
             # Keep some stats
             round_count += 1
-            if round_count > number_of_rounds:
+            if number_of_rounds and round_count > number_of_rounds:
                 self.report_position_stats()
                 self.remove_worst_player()
 
     def report_position_stats(self):
         """ Print the total times in each position"""
         for p in self.players:
-            print("{} was King {}; Prince {}; Citizen {} and Asshole {}. Score = {}".format(p.name,
-                                                                                            p.position_count[0],
-                                                                                            p.position_count[1],
-                                                                                            p.position_count[2],
-                                                                                            p.position_count[3],
-                                                                                            p.get_score()))
+            print(f'{p.name} was King {p.position_count[0]}; Prince {p.position_count[1]}; Citizen {p.position_count[2]} and Asshole {p.position_count[3]}. Score = {p.get_score()}')
 
     def remove_worst_player(self):
         """Worst player quits the game!!!"""
