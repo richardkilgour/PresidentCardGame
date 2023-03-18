@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# TODO: define responsibilities (this was designed for Reienforcement LEarning)
 """
 Class to control a single 'Episode':
 Needs the players (and their starting positions), a deck, and listeners
@@ -32,6 +31,8 @@ Needs to know:
 import logging
 from enum import Enum
 from random import shuffle
+import numpy as np
+import pickle
 
 
 class State(Enum):
@@ -53,10 +54,7 @@ class Episode:
         # None if it's a new game and no positions have been established
         # The Episode will (re) populate this and return after the episode has run
         self.positions = positions
-        # The deck to use (should be shuffled already?)
-        # TODO: decide who owns the deck (and thier responsibilities)
         self.deck = deck
-        # List of the players
         self.players = players
         # The highest current play
         self.target_meld = None
@@ -69,7 +67,7 @@ class Episode:
         """Swap cards if necessary"""
         if self.positions:
             # Asshole swaps 2 cards with King
-            print("{} must give {} 2 cards".format(self.positions[3].name, self.positions[0].name))
+            print(f'{self.positions[3].name} must give {self.positions[0].name} 2 cards')
             tribute = [self.positions[3]._hand[-2], self.positions[3]._hand[-1]]
             self.positions[3].surrender_cards(tribute, self.positions[0])
             discard = [self.positions[0]._hand[0], self.positions[0]._hand[1]]
@@ -183,7 +181,6 @@ class Episode:
             player_names = player_names + ' ' + x.name
         logging.info(f"Positions: {player_names}")
 
-
     def player_turn(self):
         """
         Let a player have a go
@@ -251,7 +248,7 @@ class Episode:
         """
         Play an episode with the given deck. All players get their reward
         Use the callback to inform of progress
-        return new rankings
+        return current rankings
         """
         if self.state == State.INITIALISED:
             # Do an episode - We need 4 players and a deck of cards.
@@ -288,10 +285,63 @@ class Episode:
                 self.post_episode_checks()
                 self.state = State.FINISHED
             else:
-                assert(len(self.active_players)==1)
+                assert (len(self.active_players) == 1)
                 self.notify_listeners("notify_hand_won", self.active_players[0])
                 # Winner gets to start the next round
                 self.move_to_front(self.active_players[0])
                 self.state = State.ROUND_STARTING
 
         return self.positions
+
+    # State is a list of INT16. Each player is 7 ints, which are a bit-mask for:
+    # The Hand (54 bits), the state (2 bits), the position (4 bits) and the meld (54 bits)
+    def save_state(self):
+        """"Encode each hand, each (current) meld, state an positions for each player"""
+        # List of np arrays
+        game_state = []
+        player_names = []
+        player_types = []
+        for player in self.players:
+            game_state.append(player.encode())
+            player_names.append(player.name)
+            player_types.append(player.__class__.__name__)
+
+        # Who is active? Always player 0!!!
+        # active_index = gm.player.index(gm.active_players[0])
+        game_state[0][2, 27] = 1
+        serialized = pickle.dumps((player_names, player_types, game_state), protocol=0)  # protocol 0 is printable ASCII
+        return serialized
+
+    def restore_state(self, serialized):
+        # TODO in any case serialization should be in the episode
+        deserialized_a = pickle.loads(serialized)
+        # In any case, restore the gm to a blank state
+        self.clear()
+        # TODO: Dear god fix this.
+        # first comes names, then class names, then the hand nad meld
+        player_names = deserialized_a[0]
+        player_types = deserialized_a[1]
+        game_state = deserialized_a[2]
+        for i, name in enumerate(player_names):
+            # TODO: Nasty - turn the name into a class
+            player_class = eval(player_types[i])
+            player = self.make_player(player_class, name)
+            # print("shape of the player {}".format(game_state[i].shape))
+            hand_meld = np.split(game_state[1], 2, axis=1)
+            hand = hand_meld[0]
+            meld = hand_meld[0]
+            player._hand = player.decode_hand(hand)
+            if game_state[i][2, 13] == 1:
+                player.set_status("passed")
+            elif game_state[i][3, 13] == 1:
+                player.set_status("waiting")
+            else:
+                player.set_status(player.decode_hand(meld))
+        return self
+
+    def snapshot(self):
+        # TODO: Something is broken here - all the cards and the current meld is messed up
+        return
+        state = self.save_state()
+        # print("Serialized as {}".format(state))
+        self.restore_state(state)
