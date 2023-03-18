@@ -1,0 +1,16 @@
+player1:
+    name: Richard
+    type: PlayerHolder
+player2:
+    name: Silvia
+    type_: PlayerSplitter
+    type: HumanPlayer
+player3:
+    name: Sara
+    type: PlayerSplitter
+player4:
+    name: snAkbar
+    type: PlayerSimple
+screen:
+  width: 900
+  height: 600
