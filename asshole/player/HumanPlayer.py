@@ -48,7 +48,7 @@ class HumanPlayer(AbstractPlayer):
         # TODO: for some reason the we get notified before the cards are taken from the hand
         # TODO: len(meld) should work, not need len(meld.cards)
         if player != self:
-            print(f'{player.name} plays {meld}, leaving {len(player._hand)- len(meld.cards1)} cards')
+            print(f'{player.name} plays {meld}, leaving {len(player._hand)- len(meld.cards)} cards')
             self.opp_status[self.opponents.index(player)] = meld
 
     def show_player(self, index):
