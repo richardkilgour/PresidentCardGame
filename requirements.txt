@@ -1,0 +1,6 @@
+asshole~=0.0.1
+termcolor~=1.1.0
+numpy~=1.21.4
+tensorflow~=2.7.0
+PyYAML~=6.0
+setuptools~=57.0.0
