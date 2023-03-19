@@ -25,10 +25,10 @@ class PlayerSimple(AbstractPlayer):
             return self.possible_plays[0]
 
         for s in self.possible_plays[:-1]:
-            # If this is not a set, just play it
-            if self.number_of_cards_of_value(s.cards[0].get_value) == len(s.cards):
+            # If this is not a set, just play it (use will_split()?)
+            if self.number_of_cards_of_value(s.cards[0].get_value()) == len(s.cards):
                 return s
-            logging.info("Found a set of {} x {}, so not playing {}".format(len(s.cards), s.cards[0], s.cards))
+            logging.info(f'Found a set of {len(s.cards)} x {s.cards[0]}, so not playing {s.cards}')
 
         # Will get here is all the possible plays are doubles - pass
         return self.possible_plays[-1]

@@ -18,7 +18,7 @@ class PlayerHolder(PlayerSplitter):
         If no minimum, just play the lowest card(s)
         Return a list of cards, or None if the desire is to pass
         """
-        # The car we would play if boing by the parent strategy
+        # The card we would play if boing by the parent strategy
         candidate = super().play()
 
         if not self.target_meld:

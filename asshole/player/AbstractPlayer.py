@@ -114,7 +114,7 @@ class AbstractPlayer(CardGameListenerInterface):
         """
         count = 0
         for c in self._hand:
-            if c.get_value == value:
+            if c.get_value() == value:
                 count += 1
         return count
 
