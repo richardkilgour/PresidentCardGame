@@ -56,12 +56,21 @@ class Episode:
         self.positions = positions
         self.deck = deck
         self.players = players
-        # The highest current play
-        self.target_meld = None
+        # The highest current play (Meld) for each player
+        # None is pass, and '␆' is not played yet
+        self.current_melds = ['␆', '␆', '␆', '␆']
         # All the listeners
         self.listener_list = listener_list
         self.state = State.INITIALISED
         self.active_players = []
+
+    def target_meld(self):
+        """Find the highest set of cards currently played"""
+        highest_meld = None
+        for m in self.current_melds:
+            if m and m != '␆' and (not highest_meld or m > highest_meld):
+                highest_meld = m
+        return highest_meld
 
     def swap_cards(self):
         """Swap cards if necessary"""
@@ -72,21 +81,19 @@ class Episode:
             self.positions[3].surrender_cards(tribute, self.positions[0])
             discard = [self.positions[0]._hand[0], self.positions[0]._hand[1]]
             self.positions[0].surrender_cards(discard, self.positions[3])
-            logging.debug(
-                "{} swapped {} and {} for {} cards {} and {}".format(self.positions[3].name, tribute[0], tribute[1],
-                                                                     self.positions[0].name, discard[0], discard[1]))
+            logging.debug(f'{self.positions[3].name} swapped {tribute[0]} and {tribute[1]} for '
+                          f"{self.positions[0].name}'s cards {discard[0]} and {discard[1]}")
             # Prince swaps 1 card with Citizen
-            print("{} must give {} 1 card".format(self.positions[2].name, self.positions[1].name))
+            print(f'{self.positions[2].name} must give {self.positions[1].name} 1 card')
             tribute = [self.positions[2]._hand[-1]]
             self.positions[2].surrender_cards(tribute, self.positions[1])
             discard = [self.positions[1]._hand[0]]
             self.positions[1].surrender_cards(discard, self.positions[2])
             logging.debug(
-                "{} swapped {} for {} cards {}".format(self.positions[2].name, tribute[0], self.positions[1].name,
-                                                       discard[0]))
+                f'{self.positions[2].name} swapped {tribute[0]} for {self.positions[1].name} cards {discard[0]}')
             for player in self.players:
                 # Log everyone's hands after teh swap
-                logging.debug("{} has {}".format(player.name, player))
+                logging.debug(f'{player.name} has {player}')
 
     def pick_round_starter(self):
         """Decide who is the first player for the first round"""
@@ -147,7 +154,7 @@ class Episode:
 
     def post_episode_checks(self):
         asshole = self.positions[-1]
-        logging.info("{} is the Asshole!!! Left with {}".format(asshole.name, asshole._hand))
+        logging.info(f'{asshole.name} is the Asshole!!! Left with {asshole._hand}')
         # Flush the Asshole's hand
         while len(asshole._hand) > 0:
             self.discards.append(asshole._hand.pop())
@@ -213,7 +220,7 @@ class Episode:
             self.active_players.remove(player)
             return
 
-        logging.info("Currently played highest card = {}".format(self.target_meld))
+        logging.info(f'Currently played highest card = {self.target_meld()}')
 
         # Note: May be BLOCKING!!! if it waits for the player to play
         # Really it should yield to the main thread while the player thinks about it
@@ -222,7 +229,7 @@ class Episode:
             # This is the player thinking (noop)
             return
         # Check if it's valid
-        if self.target_meld and action.cards and action < self.target_meld:
+        if self.target_meld() and action.cards and action < self.target_meld():
             # Punish the player for cheating
             raise
 
@@ -235,9 +242,9 @@ class Episode:
             for card in action.cards:
                 player._hand.remove(card)
                 self.discards.append(card)
-            # Remember the new highest meld
-            self.target_meld = action
-            logging.debug("{} is left with {}".format(player.name, player))
+            # Remember the new highest meld from that player
+            self.current_melds[self.players.index(player)] = action
+            logging.debug(f'{player.name} is left with {player}')
             # Did they play out?
             if player.report_remaining_cards() == 0:
                 self.set_player_finished(player)
@@ -262,7 +269,7 @@ class Episode:
             # init the swapping state
             # Swap cards and decide who starts
             for player in self.players:
-                logging.debug("{} has {}".format(player.name, player))
+                logging.debug(f'{player.name} has {player}')
             self.swap_cards()
         elif self.state == State.SWAPPING:
             while self.state == State.SWAPPING:
@@ -273,7 +280,7 @@ class Episode:
         elif self.state == State.ROUND_STARTING:
             # All privileges have been actioned, so reset positions and play until they are established anew
             self.active_players = self.players_with_cards()
-            self.target_meld = None
+            self.current_melds = ['␆', '␆', '␆', '␆']
             self.state = State.PLAYING
         elif self.state == State.PLAYING:
             # Play until the round is won (only one player remaining)
@@ -296,7 +303,7 @@ class Episode:
     # State is a list of INT16. Each player is 7 ints, which are a bit-mask for:
     # The Hand (54 bits), the state (2 bits), the position (4 bits) and the meld (54 bits)
     def save_state(self):
-        """"Encode each hand, each (current) meld, state an positions for each player"""
+        """"Encode each hand, each (current) meld, state and positions for each player"""
         # List of np arrays
         game_state = []
         player_names = []
@@ -326,7 +333,6 @@ class Episode:
             # TODO: Nasty - turn the name into a class
             player_class = eval(player_types[i])
             player = self.make_player(player_class, name)
-            # print("shape of the player {}".format(game_state[i].shape))
             hand_meld = np.split(game_state[1], 2, axis=1)
             hand = hand_meld[0]
             meld = hand_meld[0]
@@ -343,5 +349,5 @@ class Episode:
         # TODO: Something is broken here - all the cards and the current meld is messed up
         return
         state = self.save_state()
-        # print("Serialized as {}".format(state))
+        # print(f'Serialized as {state}')
         self.restore_state(state)
