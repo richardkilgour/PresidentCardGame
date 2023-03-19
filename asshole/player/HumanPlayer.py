@@ -15,12 +15,12 @@ class HumanPlayer(AbstractPlayer):
 
     def surrender_cards(self, cards, receiver):
         # Call super function, but also report on the interaction
-        print("Must give {} to {}".format(", ".join(c.__str__() for c in cards), receiver.name))
+        print(f'Must give {", ".join(c.__str__() for c in cards)} to {receiver.name}')
         super().surrender_cards(cards, receiver)
 
     def award_cards(self, cards, giver):
         # Call super function, but also report on the interaction
-        print("Just got {} from {}".format(", ".join(c.__str__() for c in cards), giver.name))
+        print(f'Just got {", ".join(c.__str__() for c in cards)} from {giver.name}')
         super().award_cards(cards, giver)
 
     # Special card_game_listener behaviour
@@ -29,11 +29,11 @@ class HumanPlayer(AbstractPlayer):
         if starter == self:
             print("YOU get to start the round")
         else:
-            print("{} gets to start the round".format(starter.name))
+            print(f'{starter.name} gets to start the round')
 
     def notify_hand_won(self, winner):
         super(HumanPlayer, self).notify_hand_won(winner)
-        print("--{} wins the round--".format(winner.name))
+        print(f'--{winner.name} wins the round--')
 
     def notify_played_out(self, player, pos):
         super(HumanPlayer, self).notify_played_out(player, pos)
@@ -46,7 +46,6 @@ class HumanPlayer(AbstractPlayer):
     def notify_play(self, player, meld):
         super(HumanPlayer, self).notify_play(player, meld)
         # TODO: for some reason the we get notified before the cards are taken from the hand
-        # TODO: len(meld) should work, not need len(meld.cards)
         if player != self:
             print(f'{player.name} plays {meld}, leaving {len(player._hand)- len(meld.cards)} cards')
             self.opp_status[self.opponents.index(player)] = meld
@@ -55,9 +54,8 @@ class HumanPlayer(AbstractPlayer):
         """Report on the last card played, and the total cards of the opposition @ given index"""
         opp = self.opponents[index]
         tabs = "\t" * ((index - 1) * (3 * index - 4))
-        print("{}{} has {} cards".format(tabs, opp.name, opp.report_remaining_cards()))
-        # TODO: Remember other player's status
-        print(f"{tabs}\t{self.opp_status[index]}")
+        print(f'{tabs}{opp.name} has {opp.report_remaining_cards()} cards')
+        print(f'{tabs}\t{self.opp_status[index]}')
 
     def play(self):
         """Must return a meld (set of cards). Pass is an empty set"""
@@ -76,26 +74,25 @@ class HumanPlayer(AbstractPlayer):
             split_string = ""
             if len(value.cards) > 0 and self.will_split(value):
                 split_string = " - split"
-            card_selection_string += "[{}] : {}{}\n".format(key, value, split_string)
+            card_selection_string += f'[{key}] : {value}{split_string}\n'
 
-        # INPUT HERE
-        valid_input = False
-        card_index = -1
+        # INPUT HERE (Blocking)
         user_input = input(card_selection_string)
-        while not valid_input:
-            try:
-                if not user_input:
-                    card_index = 0
-                else:
-                    card_index = int(user_input)
-                if card_index < len(selection):
-                    valid_input = True
-                else:
-                    user_input = "<error>"
-            except IndexError:
-                user_input = input("Oops. Enter number from 0 to {}".format(len(selection) - 1))
-            except ValueError:
-                user_input = input("Oops. Enter number (from 0 to {})".format(len(selection) - 1))
+        # Send noop on input error, and repeat next loop
+        try:
+            # None just return option 0
+            if not user_input:
+                card_index = 0
+            else:
+                card_index = int(user_input)
+            if card_index > len(selection):
+                return '␆'
+        except IndexError:
+            print(f'Oops. Enter number from _0 to {len(selection) - 1}_')
+            return '␆'
+        except ValueError:
+            print(f'Oops. Enter _number_ (from 0 to {len(selection) - 1}')
+            return '␆'
 
-        logging.info("{} tries to play option {} which is a {}".format(self.name, card_index, selection[card_index]))
+        logging.info(f'{self.name} tries to play option {card_index} which is a {selection[card_index]}')
         return selection[card_index]
