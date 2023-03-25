@@ -8,7 +8,7 @@ import logging
 from asshole.player.AbstractPlayer import AbstractPlayer, possible_plays
 
 
-class HumanPlayer(AbstractPlayer):
+class ConsolePlayer(AbstractPlayer):
     def __init__(self, name):
         AbstractPlayer.__init__(self, name)
         self.opp_status = ['Waiting', 'Waiting', 'Waiting']
@@ -25,18 +25,18 @@ class HumanPlayer(AbstractPlayer):
 
     # Special card_game_listener behaviour
     def notify_hand_start(self, starter):
-        super(HumanPlayer, self).notify_hand_start(starter)
+        super(ConsolePlayer, self).notify_hand_start(starter)
         if starter == self:
             print("YOU get to start the round")
         else:
             print(f'{starter.name} gets to start the round')
 
     def notify_hand_won(self, winner):
-        super(HumanPlayer, self).notify_hand_won(winner)
+        super(ConsolePlayer, self).notify_hand_won(winner)
         print(f'--{winner.name} wins the round--')
 
     def notify_played_out(self, player, pos):
-        super(HumanPlayer, self).notify_played_out(player, pos)
+        super(ConsolePlayer, self).notify_played_out(player, pos)
         if player == self:
             print(f'You ({player.name}) played out, and is ranked {self.ranking_names[pos]}')
         else:
@@ -44,7 +44,7 @@ class HumanPlayer(AbstractPlayer):
             self.opp_status[self.opponents.index(player)] = self.ranking_names[pos]
 
     def notify_play(self, player, meld):
-        super(HumanPlayer, self).notify_play(player, meld)
+        super(ConsolePlayer, self).notify_play(player, meld)
         # TODO: for some reason the we get notified before the cards are taken from the hand
         if player != self:
             print(f'{player.name} plays {meld}, leaving {len(player._hand)- len(meld.cards)} cards')

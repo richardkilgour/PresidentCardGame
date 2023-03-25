@@ -6,10 +6,10 @@ The Play function presents a list of the possible plays, and lets the user decid
 """
 import logging
 from asshole.player.AbstractPlayer import AbstractPlayer
-from asshole.player.HumanPlayer import HumanPlayer
+from asshole.player.ConsolePlayer import ConsolePlayer
 
 
-class HTMLPlayer(HumanPlayer):
+class HTMLPlayer(ConsolePlayer):
     def __init__(self, name):
         AbstractPlayer.__init__(self, name)
         self.opp_status = ['Waiting', 'Waiting', 'Waiting']
@@ -26,24 +26,24 @@ class HTMLPlayer(HumanPlayer):
 
     # Special card_game_listener behaviour
     def notify_hand_start(self, starter):
-        super(HumanPlayer, self).notify_hand_start(starter)
+        super(ConsolePlayer, self).notify_hand_start(starter)
         if starter == self:
             print("YOU get to start the round")
         else:
             print("{} gets to start the round".format(starter.name))
 
     def notify_hand_won(self, winner):
-        super(HumanPlayer, self).notify_hand_won(winner)
+        super(ConsolePlayer, self).notify_hand_won(winner)
         print("--{} wins the round--".format(winner.name))
 
     def notify_played_out(self, player, pos):
-        super(HumanPlayer, self).notify_played_out(player, pos)
+        super(ConsolePlayer, self).notify_played_out(player, pos)
         if player != self:
             print("{} played out, and is ranked {}".format(player.name, pos))
             self.opp_status[self.opponents.get_index(player)] = self.ranking_names[pos]
 
     def notify_play(self, player, meld):
-        super(HumanPlayer, self).notify_play(player, meld)
+        super(ConsolePlayer, self).notify_play(player, meld)
         # TODO: for some reason the we get notified before the cards are taken from the hand
         # TODO: len(meld) should work, not need len(meld.cards)
         if player != self:

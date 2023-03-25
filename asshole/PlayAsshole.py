@@ -10,7 +10,7 @@ import sys
 
 
 from asshole.GameMaster import GameMaster
-from asshole.player.HumanPlayer import HumanPlayer
+from asshole.player.ConsolePlayer import ConsolePlayer
 from asshole.player.PlayerSimple import PlayerSimple
 from asshole.player.PlayerHolder import PlayerHolder
 from asshole.player.PlayerSplitter import PlayerSplitter

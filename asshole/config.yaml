@@ -4,7 +4,7 @@ player1:
 player2:
     name: Silvia
     type_: PlayerSplitter
-    type: HumanPlayer
+    type: ConsolePlayer
 player3:
     name: Sara
     type: PlayerSplitter
