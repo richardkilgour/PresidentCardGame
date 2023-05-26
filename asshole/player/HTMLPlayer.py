@@ -5,7 +5,7 @@ Human player is a Player with console output (overloading the callbacks)
 The Play function presents a list of the possible plays, and lets the user decide the move
 """
 import logging
-from asshole.player.AbstractPlayer import AbstractPlayer
+from asshole.player.AbstractPlayer import AbstractPlayer, possible_plays
 from asshole.player.ConsolePlayer import ConsolePlayer
 
 
