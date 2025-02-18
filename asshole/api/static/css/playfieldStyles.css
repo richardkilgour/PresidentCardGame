@@ -1,0 +1,111 @@
+/******************************************************************************
+* Styles for play field.                                                   *
+******************************************************************************/
+
+.container {
+    display: grid;
+    grid-template-columns: 20% auto 20%;
+}
+
+.header_row {
+  grid-column: 1 / 4;
+  grid-row: 1;
+  background-color: #F1C1A1;
+}
+
+.playfield_left {
+  grid-column: 1;
+  grid-row: 2 / 5;
+  background-color: #C1C1F1;
+  text-align: center;
+  padding: 5px;
+}
+
+.playfield_center {
+  grid-column: 2;
+  grid-row: 2;
+  background-color: #F1F1F1;
+  text-align: center;
+  padding: 20px;
+}
+
+.arena {
+  grid-column: 2;
+  grid-row: 3;
+  background-color: #F1C1F1;
+  height: 10em;
+  padding: 15px;
+}
+
+.playfield_right {
+  grid-column: 3;
+  grid-row: 2 / 5;
+  background-color: #C1F1C1;
+  text-align: center;
+  width: 15em;
+  padding: 5px;
+}
+
+.playfield_bottom {
+  grid-column: 2;
+  grid-row: 4;
+  background-color: #F1C1C1;
+  text-align: center;
+  padding: 15px;
+}
+
+.arena_play_area_0 {
+  position: relative;
+  left: 0%;
+  top: 50%;
+  transform: translate(0%, -50%) rotate(90deg);
+}
+
+.arena_play_area_1 {
+  position: relative;
+  left: 50%;
+  top: 0%;
+  transform: translate(-50%, 0%) rotate(180deg);
+}
+
+.arena_play_area_2 {
+  position: relative;
+  left: 0%;
+  top: 50%;
+  transform: translate(50%, -50%) rotate(270deg);
+}
+
+.arena_play_area_3 {
+  position: relative;
+  left: 50%;
+  top: 0%;
+  transform: translate(-50%, 50%);
+}
+
+.player_left {
+  position: relative;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.player_opposite {
+  position: relative;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(180deg);
+}
+
+.player_right {
+  position: relative;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(270deg);
+}
+
+.player_you {
+  position: relative;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}

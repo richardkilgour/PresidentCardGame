@@ -1,0 +1,723 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Asshole Card Game</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<link href="{{ url_for('static', filename='css/playfieldStyles.css') }}" rel="stylesheet" type="text/css" />
+<link href="{{ url_for('static', filename='css/cardStyles.css') }}" rel="stylesheet" type="text/css" />
+
+<script>
+function moveCardUp(x) {
+  card = document.getElementById(x);
+  card.style.top = "0%";
+  card.style.transform = "translateY(0%)";  
+
+}
+
+function moveCardDown(x) {
+  card = document.getElementById(x);
+  card.style.top = "100%";
+  card.style.transform = "translateY(-100%)";  
+}
+
+function rotate(x, deg) {
+  card = document.getElementById(x);
+  card.style.transform = "rotate(" + deg + "deg)";
+  /* -webkit-transform: rotate(90deg);  /* to support Safari and Android browser */
+  /* -ms-transform: rotate(90deg);      /* to support IE 9 */
+
+}
+
+</script>
+
+
+</head>
+<body>
+
+<!-- Normal page content. -->
+<h1>Asshole. Ass. Hole. asshole</h1>
+
+<div class="player_opposite">
+	<h1>Player 2 "Richard"</h1>
+	<div class="hand_play_area" id="opposite_play_area">
+        <div class="card_hit_area"  style="left:0em;top:0em;">
+            <div class="card_small" id="3_0">
+                <div class="front">
+                    <div class="index">3<br />&spades;</div>
+                    <div class="spotB1">&spades;</div>
+                    <div class="spotB3">&spades;</div>
+                    <div class="spotB5">&spades;</div>
+                </div>
+            </div>
+        </div>
+        <div class="card_hit_area"  style="left:1em;top:0em;">
+            <div class="card_small" id="4_3">
+                <div class="front">
+                    <div class="index">4<br />&clubs;</div>
+                    <div class="spotA1">&clubs;</div>
+                    <div class="spotA5">&clubs;</div>
+                    <div class="spotC1">&clubs;</div>
+                    <div class="spotC5">&clubs;</div>
+                </div>
+            </div>
+        </div>
+        <div class="card_hit_area"  style="left:2em;top:0em;">
+            <div class="card_small" id="5_0">
+                <div class="front">
+                    <div class="index">5<br />&spades;</div>
+                    <div class="spotA1">&spades;</div>
+                    <div class="spotA5">&spades;</div>
+                    <div class="spotB3">&spades;</div>
+                    <div class="spotC1">&spades;</div>
+                    <div class="spotC5">&spades;</div>
+                </div>
+            </div>
+        </div>
+        <div class="card_hit_area"  style="left:3em;top:0em;">
+        <div class="card_small" id="5_3">
+        <div class="front">
+        <div class="index">5<br />&clubs;</div>
+        <div class="spotA1">&clubs;</div>
+        <div class="spotA5">&clubs;</div>
+        <div class="spotB3">&clubs;</div>
+        <div class="spotC1">&clubs;</div>
+        <div class="spotC5">&clubs;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:4em;top:0em;">
+        <div class="card_small" id="6_1">
+        <div class="front red">
+        <div class="index">6<br />&hearts;</div>
+        <div class="spotA1">&hearts;</div>
+        <div class="spotA3">&hearts;</div>
+        <div class="spotA5">&hearts;</div>
+        <div class="spotC1">&hearts;</div>
+        <div class="spotC3">&hearts;</div>
+        <div class="spotC5">&hearts;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:5em;top:0em;">
+        <div class="card_small" id="7_3">
+        <div class="front">
+        <div class="index">7<br />&clubs;</div>
+        <div class="spotA1">&clubs;</div>
+        <div class="spotA3">&clubs;</div>
+        <div class="spotA5">&clubs;</div>
+        <div class="spotB2">&clubs;</div>
+        <div class="spotC1">&clubs;</div>
+        <div class="spotC3">&clubs;</div>
+        <div class="spotC5">&clubs;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:6em;top:0em;">
+        <div class="card_small" id="7_2">
+        <div class="front red">
+        <div class="index">7<br />&diams;</div>
+        <div class="spotA1">&diams;</div>
+        <div class="spotA3">&diams;</div>
+        <div class="spotA5">&diams;</div>
+        <div class="spotB2">&diams;</div>
+        <div class="spotC1">&diams;</div>
+        <div class="spotC3">&diams;</div>
+        <div class="spotC5">&diams;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:7em;top:0em;">
+        <div class="card_small" id="10_2">
+        <div class="front red">
+        <div class="index">10<br />&diams;</div>
+        <div class="spotA1">&diams;</div>
+        <div class="spotA2">&diams;</div>
+        <div class="spotA4">&diams;</div>
+        <div class="spotA5">&diams;</div>
+        <div class="spotB2">&diams;</div>
+        <div class="spotB4">&diams;</div>
+        <div class="spotC1">&diams;</div>
+        <div class="spotC2">&diams;</div>
+        <div class="spotC4">&diams;</div>
+        <div class="spotC5">&diams;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:8em;top:0em;">
+        <div class="card_small" id="10_3">
+        <div class="front">
+        <div class="index">10<br />&clubs;</div>
+        <div class="spotA1">&clubs;</div>
+        <div class="spotA2">&clubs;</div>
+        <div class="spotA4">&clubs;</div>
+        <div class="spotA5">&clubs;</div>
+        <div class="spotB2">&clubs;</div>
+        <div class="spotB4">&clubs;</div>
+        <div class="spotC1">&clubs;</div>
+        <div class="spotC2">&clubs;</div>
+        <div class="spotC4">&clubs;</div>
+        <div class="spotC5">&clubs;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:9em;top:0em;">
+        <div class="card_small" id="J_1">
+        <div class="front red">
+        <div class="index">J<br />&hearts;</div>
+        <img class="face" src="{{url_for('static', filename='img/jack_hearts.jpg') }}" alt="" width="80" height="130"  />
+        <div class="spotA1">&hearts;</div>
+        <div class="spotC5">&hearts;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:10em;top:0em;">
+        <div class="card_small" id="J_0">
+        <div class="front">
+        <div class="index">J<br />&spades;</div>
+        <img class="face" src="{{url_for('static', filename='img/jack_spades.jpg') }}" alt="" width="80" height="130"  />
+        <div class="spotA1">&spades;</div>
+        <div class="spotC5">&spades;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:11em;top:0em;">
+        <div class="card_small" id="K_1">
+        <div class="front red">
+        <div class="index">K<br />&hearts;</div>
+        <img class="face" src="{{url_for('static', filename='img/king_hearts.jpg') }}" alt="" width="80" height="130"  />
+        <div class="spotA1">&hearts;</div>
+        <div class="spotC5">&hearts;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:12em;top:0em;">
+        <div class="card_small" id="A_0">
+        <div class="front">
+        <div class="index">A<br />&spades;</div>
+        <div class="ace">&spades;</div>
+        </div>
+        </div>
+        </div>
+        <div class="card_hit_area"  style="left:13em;top:0em;">
+        <div class="card_small" id="2_2">
+        <div class="front red">
+        <div class="index">2<br />&diams;</div>
+        <div class="spotB2">&diams;</div>
+        <div class="spotB4">&diams;</div>
+        </div>
+        </div>
+        </div>
+
+	</div>
+</div>
+<script>
+	element = document.getElementById("opposite_play_area");
+	element.style.width = "16em";element.style.height = "2em";element.style.transform = "rotate(180deg)";
+</script>
+<div class="row">
+	<div class="player_left">
+	<h1>Player 1 "Akbar"</h1>
+	<div class="hand_play_area" id="left_play_area">
+	<div class="card_hit_area"  style="left:0em;top:0em;">
+<div class="card_small" id="3_3">
+<div class="front">
+<div class="index">3<br />&clubs;</div>
+<div class="spotB1">&clubs;</div>
+<div class="spotB3">&clubs;</div>
+<div class="spotB5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:1em;top:0em;">
+<div class="card_small" id="4_1">
+<div class="front red">
+<div class="index">4<br />&hearts;</div>
+<div class="spotA1">&hearts;</div>
+<div class="spotA5">&hearts;</div>
+<div class="spotC1">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:2em;top:0em;">
+<div class="card_small" id="4_0">
+<div class="front">
+<div class="index">4<br />&spades;</div>
+<div class="spotA1">&spades;</div>
+<div class="spotA5">&spades;</div>
+<div class="spotC1">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:3em;top:0em;">
+<div class="card_small" id="6_2">
+<div class="front red">
+<div class="index">6<br />&diams;</div>
+<div class="spotA1">&diams;</div>
+<div class="spotA3">&diams;</div>
+<div class="spotA5">&diams;</div>
+<div class="spotC1">&diams;</div>
+<div class="spotC3">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:4em;top:0em;">
+<div class="card_small" id="6_0">
+<div class="front">
+<div class="index">6<br />&spades;</div>
+<div class="spotA1">&spades;</div>
+<div class="spotA3">&spades;</div>
+<div class="spotA5">&spades;</div>
+<div class="spotC1">&spades;</div>
+<div class="spotC3">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:5em;top:0em;">
+<div class="card_small" id="9_0">
+<div class="front">
+<div class="index">9<br />&spades;</div>
+<div class="spotA1">&spades;</div>
+<div class="spotA2">&spades;</div>
+<div class="spotA4">&spades;</div>
+<div class="spotA5">&spades;</div>
+<div class="spotB3">&spades;</div>
+<div class="spotC1">&spades;</div>
+<div class="spotC2">&spades;</div>
+<div class="spotC4">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:6em;top:0em;">
+<div class="card_small" id="9_2">
+<div class="front red">
+<div class="index">9<br />&diams;</div>
+<div class="spotA1">&diams;</div>
+<div class="spotA2">&diams;</div>
+<div class="spotA4">&diams;</div>
+<div class="spotA5">&diams;</div>
+<div class="spotB3">&diams;</div>
+<div class="spotC1">&diams;</div>
+<div class="spotC2">&diams;</div>
+<div class="spotC4">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:7em;top:0em;">
+<div class="card_small" id="9_3">
+<div class="front">
+<div class="index">9<br />&clubs;</div>
+<div class="spotA1">&clubs;</div>
+<div class="spotA2">&clubs;</div>
+<div class="spotA4">&clubs;</div>
+<div class="spotA5">&clubs;</div>
+<div class="spotB3">&clubs;</div>
+<div class="spotC1">&clubs;</div>
+<div class="spotC2">&clubs;</div>
+<div class="spotC4">&clubs;</div>
+<div class="spotC5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:8em;top:0em;">
+<div class="card_small" id="Q_0">
+<div class="front">
+<div class="index">Q<br />&spades;</div>
+<img class="face" src="{{url_for('static', filename='img/queen_spades.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:9em;top:0em;">
+<div class="card_small" id="K_3">
+<div class="front">
+<div class="index">K<br />&clubs;</div>
+<img class="face" src="{{url_for('static', filename='img/king_clubs.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&clubs;</div>
+<div class="spotC5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:10em;top:0em;">
+<div class="card_small" id="K_2">
+<div class="front red">
+<div class="index">K<br />&diams;</div>
+<img class="face" src="{{url_for('static', filename='img/king_diamonds.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:11em;top:0em;">
+<div class="card_small" id="A_1">
+<div class="front red">
+<div class="index">A<br />&hearts;</div>
+<div class="ace">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:12em;top:0em;">
+<div class="card_small" id="Joker_1">
+<div class="front red">
+<div class="index">Joker<br />&hearts;</div>
+<img class="face" src="{{url_for('static', filename='img/red_joker.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+
+	</div>
+</div>
+<script>
+	element = document.getElementById("left_play_area");
+	element.style.width = "15em";element.style.height = "2em";element.style.transform = "rotate(90deg)";</script>
+<div class="center_playfield">
+	<h2>Whats been played</h2>
+<td></td><td></td><td></td>
+</div><div class="player_right">
+	<h1>Player 3 "Sara "</h1>
+	<div class="hand_play_area" id = "right_play_area">
+	<div class="card_hit_area"  style="left:0em;top:0em;">
+<div class="card_small" id="3_2">
+<div class="front red">
+<div class="index">3<br />&diams;</div>
+<div class="spotB1">&diams;</div>
+<div class="spotB3">&diams;</div>
+<div class="spotB5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:1em;top:0em;">
+<div class="card_small" id="3_1">
+<div class="front red">
+<div class="index">3<br />&hearts;</div>
+<div class="spotB1">&hearts;</div>
+<div class="spotB3">&hearts;</div>
+<div class="spotB5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:2em;top:0em;">
+<div class="card_small" id="4_2">
+<div class="front red">
+<div class="index">4<br />&diams;</div>
+<div class="spotA1">&diams;</div>
+<div class="spotA5">&diams;</div>
+<div class="spotC1">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:3em;top:0em;">
+<div class="card_small" id="5_2">
+<div class="front red">
+<div class="index">5<br />&diams;</div>
+<div class="spotA1">&diams;</div>
+<div class="spotA5">&diams;</div>
+<div class="spotB3">&diams;</div>
+<div class="spotC1">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:4em;top:0em;">
+<div class="card_small" id="6_3">
+<div class="front">
+<div class="index">6<br />&clubs;</div>
+<div class="spotA1">&clubs;</div>
+<div class="spotA3">&clubs;</div>
+<div class="spotA5">&clubs;</div>
+<div class="spotC1">&clubs;</div>
+<div class="spotC3">&clubs;</div>
+<div class="spotC5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:5em;top:0em;">
+<div class="card_small" id="7_0">
+<div class="front">
+<div class="index">7<br />&spades;</div>
+<div class="spotA1">&spades;</div>
+<div class="spotA3">&spades;</div>
+<div class="spotA5">&spades;</div>
+<div class="spotB2">&spades;</div>
+<div class="spotC1">&spades;</div>
+<div class="spotC3">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:6em;top:0em;">
+<div class="card_small" id="8_2">
+<div class="front red">
+<div class="index">8<br />&diams;</div>
+<div class="spotA1">&diams;</div>
+<div class="spotA3">&diams;</div>
+<div class="spotA5">&diams;</div>
+<div class="spotB2">&diams;</div>
+<div class="spotB4">&diams;</div>
+<div class="spotC1">&diams;</div>
+<div class="spotC3">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:7em;top:0em;">
+<div class="card_small" id="9_1">
+<div class="front red">
+<div class="index">9<br />&hearts;</div>
+<div class="spotA1">&hearts;</div>
+<div class="spotA2">&hearts;</div>
+<div class="spotA4">&hearts;</div>
+<div class="spotA5">&hearts;</div>
+<div class="spotB3">&hearts;</div>
+<div class="spotC1">&hearts;</div>
+<div class="spotC2">&hearts;</div>
+<div class="spotC4">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:8em;top:0em;">
+<div class="card_small" id="10_1">
+<div class="front red">
+<div class="index">10<br />&hearts;</div>
+<div class="spotA1">&hearts;</div>
+<div class="spotA2">&hearts;</div>
+<div class="spotA4">&hearts;</div>
+<div class="spotA5">&hearts;</div>
+<div class="spotB2">&hearts;</div>
+<div class="spotB4">&hearts;</div>
+<div class="spotC1">&hearts;</div>
+<div class="spotC2">&hearts;</div>
+<div class="spotC4">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:9em;top:0em;">
+<div class="card_small" id="J_3">
+<div class="front">
+<div class="index">J<br />&clubs;</div>
+<img class="face" src="{{url_for('static', filename='img/jack_clubs.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&clubs;</div>
+<div class="spotC5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:10em;top:0em;">
+<div class="card_small" id="A_3">
+<div class="front">
+<div class="index">A<br />&clubs;</div>
+<div class="ace">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:11em;top:0em;">
+<div class="card_small" id="2_3">
+<div class="front">
+<div class="index">2<br />&clubs;</div>
+<div class="spotB1">&clubs;</div>
+<div class="spotB5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:12em;top:0em;">
+<div class="card_small" id="2_0">
+<div class="front">
+<div class="index">2<br />&spades;</div>
+<div class="spotB1">&spades;</div>
+<div class="spotB5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area"  style="left:13em;top:0em;">
+<div class="card_small" id="2_1">
+<div class="front red">
+<div class="index">2<br />&hearts;</div>
+<div class="spotB1">&hearts;</div>
+<div class="spotB5">&hearts;</div>
+</div>
+</div>
+</div>
+
+	</div>
+	</div>
+	</div><script>
+	element = document.getElementById("right_play_area");
+	element.style.width = "16em";element.style.height = "2em";element.style.transform = "rotate(270deg)";</script>
+<div>
+	<h1>Player you!!! Fuck yeah!</h1>
+	<div class="hand_play_area" id="player_play_area">
+	<div class="card_hit_area" onmouseover="moveCardUp('5_1');" onmouseout="moveCardDown('5_1')" style="left:0em;top:0em;">
+<div class="card" id="5_1">
+<div class="front red">
+<div class="index">5<br />&hearts;</div>
+<div class="spotA1">&hearts;</div>
+<div class="spotA5">&hearts;</div>
+<div class="spotB3">&hearts;</div>
+<div class="spotC1">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('7_1');" onmouseout="moveCardDown('7_1')" style="left:1em;top:0em;">
+<div class="card" id="7_1">
+<div class="front red">
+<div class="index">7<br />&hearts;</div>
+<div class="spotA1">&hearts;</div>
+<div class="spotA3">&hearts;</div>
+<div class="spotA5">&hearts;</div>
+<div class="spotB2">&hearts;</div>
+<div class="spotC1">&hearts;</div>
+<div class="spotC3">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('8_1');" onmouseout="moveCardDown('8_1')" style="left:2em;top:0em;">
+<div class="card" id="8_1">
+<div class="front red">
+<div class="index">8<br />&hearts;</div>
+<div class="spotA1">&hearts;</div>
+<div class="spotA3">&hearts;</div>
+<div class="spotA5">&hearts;</div>
+<div class="spotB2">&hearts;</div>
+<div class="spotB4">&hearts;</div>
+<div class="spotC1">&hearts;</div>
+<div class="spotC3">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('8_0');" onmouseout="moveCardDown('8_0')" style="left:3em;top:0em;">
+<div class="card" id="8_0">
+<div class="front">
+<div class="index">8<br />&spades;</div>
+<div class="spotA1">&spades;</div>
+<div class="spotA3">&spades;</div>
+<div class="spotA5">&spades;</div>
+<div class="spotB2">&spades;</div>
+<div class="spotB4">&spades;</div>
+<div class="spotC1">&spades;</div>
+<div class="spotC3">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('8_3');" onmouseout="moveCardDown('8_3')" style="left:4em;top:0em;">
+<div class="card" id="8_3">
+<div class="front">
+<div class="index">8<br />&clubs;</div>
+<div class="spotA1">&clubs;</div>
+<div class="spotA3">&clubs;</div>
+<div class="spotA5">&clubs;</div>
+<div class="spotB2">&clubs;</div>
+<div class="spotB4">&clubs;</div>
+<div class="spotC1">&clubs;</div>
+<div class="spotC3">&clubs;</div>
+<div class="spotC5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('10_0');" onmouseout="moveCardDown('10_0')" style="left:5em;top:0em;">
+<div class="card" id="10_0">
+<div class="front">
+<div class="index">10<br />&spades;</div>
+<div class="spotA1">&spades;</div>
+<div class="spotA2">&spades;</div>
+<div class="spotA4">&spades;</div>
+<div class="spotA5">&spades;</div>
+<div class="spotB2">&spades;</div>
+<div class="spotB4">&spades;</div>
+<div class="spotC1">&spades;</div>
+<div class="spotC2">&spades;</div>
+<div class="spotC4">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('J_2');" onmouseout="moveCardDown('J_2')" style="left:6em;top:0em;">
+<div class="card" id="J_2">
+<div class="front red">
+<div class="index">J<br />&diams;</div>
+<img class="face" src="{{url_for('static', filename='img/jack_diamonds.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('Q_1');" onmouseout="moveCardDown('Q_1')" style="left:7em;top:0em;">
+<div class="card" id="Q_1">
+<div class="front red">
+<div class="index">Q<br />&hearts;</div>
+<img class="face" src="{{url_for('static', filename='img/queen_hearts.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&hearts;</div>
+<div class="spotC5">&hearts;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('Q_3');" onmouseout="moveCardDown('Q_3')" style="left:8em;top:0em;">
+<div class="card" id="Q_3">
+<div class="front">
+<div class="index">Q<br />&clubs;</div>
+<img class="face" src="{{url_for('static', filename='img/queen_clubs.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&clubs;</div>
+<div class="spotC5">&clubs;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('Q_2');" onmouseout="moveCardDown('Q_2')" style="left:9em;top:0em;">
+<div class="card" id="Q_2">
+<div class="front red">
+<div class="index">Q<br />&diams;</div>
+<img class="face" src="{{url_for('static', filename='img/queen_diamonds.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&diams;</div>
+<div class="spotC5">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('K_0');" onmouseout="moveCardDown('K_0')" style="left:10em;top:0em;">
+<div class="card" id="K_0">
+<div class="front">
+<div class="index">K<br />&spades;</div>
+<img class="face" src="{{url_for('static', filename='img/king_spades.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('A_2');" onmouseout="moveCardDown('A_2')" style="left:11em;top:0em;">
+<div class="card" id="A_2">
+<div class="front red">
+<div class="index">A<br />&diams;</div>
+<div class="ace">&diams;</div>
+</div>
+</div>
+</div>
+<div class="card_hit_area" onmouseover="moveCardUp('Joker_0');" onmouseout="moveCardDown('Joker_0')" style="left:12em;top:0em;">
+<div class="card" id="Joker_0">
+<div class="front">
+<div class="index">Joker<br />&spades;</div>
+<img class="face" src="{{url_for('static', filename='img/black_joker.jpg') }}" alt="" width="80" height="130"  />
+<div class="spotA1">&spades;</div>
+<div class="spotC5">&spades;</div>
+</div>
+</div>
+</div>
+
+	</div>
+	</div>
+<script>
+	element = document.getElementById("player_play_area");
+	element.style.width = "15em";element.style.height = "2em";element.style.transform = "rotate(0deg)";</script>
+</div>
+</body>
+</html>

@@ -9,11 +9,7 @@ import yaml
 import sys
 
 
-from asshole.GameMaster import GameMaster
-from asshole.player.ConsolePlayer import ConsolePlayer
-from asshole.player.PlayerSimple import PlayerSimple
-from asshole.player.PlayerHolder import PlayerHolder
-from asshole.player.PlayerSplitter import PlayerSplitter
+from asshole.core.GameMaster import GameMaster
 
 
 def main():
@@ -22,7 +18,7 @@ def main():
 
     gm = GameMaster()
 
-    config = yaml.safe_load(open("./config.yaml"))
+    config = yaml.safe_load(open("utils/config.yaml"))
     players = [config['player1'], config['player2'], config['player3'], config['player4'], ]
     for i, p in enumerate(players):
         player_class = getattr(sys.modules[__name__], p['type'])
