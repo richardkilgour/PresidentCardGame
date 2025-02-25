@@ -1,13 +1,11 @@
 from random import shuffle
 
-from asshole.gym_env.Episode import Episode
-from asshole.GameMaster import GameMaster
-from asshole.player.HTMLPlayer import HTMLPlayer
-from asshole.player.PlayerSimple import PlayerSimple
-from asshole.player.PlayerHolder import PlayerHolder
-from asshole.player.PlayerSplitter import PlayerSplitter
-from asshole.player.TensorflowPlayer import TensorflowPlayer
+from asshole.core.Episode import Episode
 from flask import Flask, render_template, request
+
+from asshole.core.GameMaster import GameMaster
+from asshole.players import PlayerSimple, PlayerHolder, PlayerSplitter, TensorflowPlayer
+from asshole.ui import HTMLPlayer
 
 app = Flask(__name__)
 
@@ -20,7 +18,7 @@ def index():
 
 @app.route('/playfield')
 def play_static():
-    return render_template("playfield.html")
+    return render_template("game.html")
 
 
 @app.route('/play', methods = ['POST', 'GET'])
@@ -76,7 +74,7 @@ def play():
         allCards.append([[6, '&clubs;']])
         allCards.append([[0, '&clubs;']])
 
-        return render_template("playfield_dynamic.html", allCards=allCards)
+        return render_template("game.html", allCards=allCards)
 
 
 if __name__ == '__main__':
