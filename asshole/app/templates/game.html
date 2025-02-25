@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Asshole Card Game</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/playfieldStyles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cardStyles.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script type="text/javascript" src="{{ url_for('static', filename='js/gameplay.js') }}"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="header_row">
+        <h1>Asshole Card Game</h1>
+    </div>
+
+    <!-- Left Player -->
+    <div class="playfield_left">
+        <div class="player_left">
+            <div class="hand_play_area">
+             <div id="opponent-1-hand">
+            </div>
+            <h1>{{ players[1] if players|length > 1 else 'Waiting...' }}</h1>
+        </div>
+        </div>
+    </div>
+
+    <!-- Opposite Player -->
+    <div class="playfield_center">
+        <div class="player_opposite">
+            <div class="hand_play_area">
+              <div id="opponent-2-hand">
+            </div>
+            <h1>{{ players[2] if players|length > 2 else 'Waiting...' }}</h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Player -->
+    <div class="playfield_right">
+        <div class="player_right">
+            <div class="hand_play_area">
+            <div id="opponent-3-hand">
+        </div>
+            <h1>{{ players[3] if players|length > 3 else 'Waiting...' }}</h1>
+        </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- Center Play Area -->
+    <div class="arena">
+        <h2>Cards in Play</h2>
+        {% for i in range(4) %}
+            <div class="arena_play_area_{{ i }}">
+                <H1> ARENA </H1>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Bottom: Current Player -->
+    <div class="playfield_bottom">
+        <div class="player_you">
+            <div class="hand_play_area">
+                <div id="player-hand">
+        </div>
+
+            </div>
+            <h1>{{ current_player }}</h1>
+            <h2>Player ID: {{ player_id }}</h2>
+
+            <button onclick="play_cards('pass')">Pass</button>
+            <button onclick="leave_game()">Leave Game</button>
+            <button id="start_game_button" onclick="readyToStart()">Start Game</button>
+            <a id="logout-btn" href="#" onclick="log_out(); return false;">Logout</a>
+        </div>
+    </div>
+
+</body>
+</html>
