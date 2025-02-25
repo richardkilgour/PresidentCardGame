@@ -17,6 +17,8 @@ class GameMaster:
         self.deck_size = deck_size
         self.deck = [PlayingCard(i) for i in range(deck_size)]
         self.listener_list = []
+        self.number_of_rounds = None
+        self.round_number = 0
 
     def clear(self):
         self.players = []
@@ -63,7 +65,16 @@ class GameMaster:
         # return the new guy
         return self.players[-1]
 
-    def play(self, number_of_rounds=100, preset_hands=None):
+    def reset(self, preset_hands=None):
+        logging.info(f"--- Start of a new Game ---{self.positions=}")
+        # A client can shuffle the cards themselves (for testing... or cheating?)
+        # Shuffle the cards
+        if not preset_hands:
+            shuffle(self.deck)
+        self.episode = Episode(self.players, self.positions, self.deck, self.listener_list)
+
+
+    def start(self, number_of_rounds=100, preset_hands=None):
         """
         Play a bunch of hands, after which a player leaves and the game stops
         Some basics stats on the game are then printed
@@ -72,30 +83,29 @@ class GameMaster:
         """
         if len(self.players) != 4:
             raise Exception("Not enough Players")
-        round_count = 0
+        self.round_number = 0
+        self.number_of_rounds = number_of_rounds
+        # The initial hand has no positions
+        self.reset(preset_hands=preset_hands)
 
-        # Play an initial hand, with no positions
-        print("NEW GAME - no positions")
-
-        # loop until someone leaves the game
-        while len(self.players) == 4:
-            logging.info("--- Start of a new Hand ---")
-            # A client can shuffle the cards themselves (for testing... or cheating?)
-            # Shuffle the cards
-            if not preset_hands:
-                shuffle(self.deck)
-            # Do an episode
-            this_episode = Episode(self.players, self.positions, self.deck, self.listener_list)
-            while this_episode.state != State.FINISHED:
-                # May be blocking if a player does not play
-                this_episode.play()
-            self.positions = this_episode.positions
+    def step(self) -> bool:
+        # Return True if finished all rounds, else False
+        if self.episode.state == State.FINISHED:
+            # Set up a new round
+            self.positions = self.episode.positions
+            logging.info(f"--- Round Finished with positions {self.positions} ---")
+            self.reset()
             assert (len(self.deck) == 54)
-            # Keep some stats
-            round_count += 1
-            if number_of_rounds and round_count > number_of_rounds:
+            # Keep some stats?
+            self.round_number += 1
+            if self.number_of_rounds and self.round_number > self.number_of_rounds:
                 print(self.position_stats_str())
                 self.remove_worst_player()
+                return True
+        else:
+            # May be blocking if a player does not play
+            self.episode.step()
+        return False
 
     def position_stats_str(self):
         """ Return the total times in each position as a string"""

@@ -269,7 +269,7 @@ class Episode:
                 self.set_player_finished(player)
             self.active_players.append(self.active_players.pop(0))
 
-    def play(self) -> list[AbstractPlayer]:
+    def step(self) -> list[AbstractPlayer]:
         """
         Run the episode state machine until the episode is finished.
 
