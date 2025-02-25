@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-A Card Game Listener is aware of all the goings on in the game, and keeps a history of them
+A Card Game Listener is aware of all the goings-on in the game, and keeps a history of them
 """
 from asshole.core.PlayHistory import PlayHistory
 
 
-class CardGameListenerInterface:
+class CardGameListener:
     def __init__(self):
         self.memory = PlayHistory()
         self.opponents = []

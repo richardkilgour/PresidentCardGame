@@ -1,9 +1,10 @@
 import logging
 from random import shuffle
 
+from asshole.core.AbstractPlayer import AbstractPlayer
 from asshole.core.PlayingCard import PlayingCard
 # Needed for deserialization eval function
-from asshole.gym_env.Episode import Episode, State
+from asshole.core.Episode import Episode, State
 
 
 class GameMaster:
@@ -12,7 +13,7 @@ class GameMaster:
     def __init__(self, deck_size=54):
         self.players = []
         self.positions = []
-        # This is a list of all the card objects - they will me moved around
+        # This is a list of all the card objects - they will be moved around
         self.deck_size = deck_size
         self.deck = [PlayingCard(i) for i in range(deck_size)]
         self.listener_list = []
@@ -39,33 +40,35 @@ class GameMaster:
         """
         return self.players[index].get_status()
 
+    def add_player(self, player: AbstractPlayer, name=None):
+        if len(self.players) < 4:
+            # Notify everyone of the new players
+            # This includes the players itself, since it's now registered as a listener
+            self.notify_listeners("notify_player_joined", player)
+            # Notify the new players of the other players
+            for p in self.players:
+                player.notify_player_joined(p)
+            self.players.append(player)
+            self.add_listener(player)
+        else:
+            raise Exception("Too many Players")
+
     def make_player(self, player_type, name=None):
         # print("Making a {} players names {}".format(player_type,name))
         # player_type is a class or a string (for a saved / serialised players)
         if not name:
             name = f'Player {len(self.players)}'
-
-        if len(self.players) < 4:
-            new_player = player_type(name)
-            # Notify everyone of the new players
-            # This includes the players itself, since it's now registered as a listener
-            self.notify_listeners("notify_player_joined", new_player)
-            # Notify the new players of the other players
-            for p in self.players:
-                new_player.notify_player_joined(p)
-            self.players.append(new_player)
-        else:
-            raise Exception("Too many Players")
+        new_player = player_type(name)
+        self.add_player(new_player, name)
         # return the new guy
-        self.add_listener(self.players[-1])
         return self.players[-1]
 
     def play(self, number_of_rounds=100, preset_hands=None):
         """
-        Play a bunch of hands, after which a players leaves and the game stops
+        Play a bunch of hands, after which a player leaves and the game stops
         Some basics stats on the game are then printed
         number_of_rounds = None will never stop
-        preset_hands is a prepared deck (for testing purposes or tourniment play)
+        preset_hands is a prepared deck (for loading a game, testing purposes or tournament play)
         """
         if len(self.players) != 4:
             raise Exception("Not enough Players")
@@ -84,6 +87,7 @@ class GameMaster:
             # Do an episode
             this_episode = Episode(self.players, self.positions, self.deck, self.listener_list)
             while this_episode.state != State.FINISHED:
+                # May be blocking if a player does not play
                 this_episode.play()
             self.positions = this_episode.positions
             assert (len(self.deck) == 54)

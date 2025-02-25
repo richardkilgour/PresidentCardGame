@@ -5,13 +5,13 @@ from abc import abstractmethod
 import numpy as np
 
 from asshole.core.Meld import Meld
-from asshole.core.CardGameListenerInterface import CardGameListenerInterface
+from asshole.core.CardGameListener import CardGameListener
 
 # Only for card encoding (TODO: Abstract that)
 from asshole.core.PlayingCard import PlayingCard
 
 
-def possible_plays(hand, target_meld, name = "Unknown Player"):
+def possible_plays(hand, target_meld, name="Unknown Player"):
     """
     Make a list of possible melds that may be played given the target minimum meld
     Will always return the pass option (in last place)
@@ -54,7 +54,7 @@ def possible_plays(hand, target_meld, name = "Unknown Player"):
     return possible_melds
 
 
-class AbstractPlayer(CardGameListenerInterface):
+class AbstractPlayer(CardGameListener):
     # the listener keeps track of all cards played
     ranking_names = ["King", "Prince", "Citizen", "Asshole"]
 
@@ -74,9 +74,9 @@ class AbstractPlayer(CardGameListenerInterface):
 
     def get_score(self):
         return 2 * self.position_count[0] + \
-               self.position_count[1] - \
-               self.position_count[2] - \
-               2 * self.position_count[3]
+            self.position_count[1] - \
+            self.position_count[2] - \
+            2 * self.position_count[3]
 
     def card_to_hand(self, card):
         self._hand.append(card)
@@ -226,6 +226,7 @@ def main():
         player.card_to_hand(PlayingCard(card))
     player.notify_play(None, Meld(PlayingCard(53)))
     print(player.possible_plays())
+
 
 if __name__ == '__main__':
     main()
