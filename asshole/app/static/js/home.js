@@ -20,19 +20,30 @@ socket.on('update_game_list', function (data) {
         li.innerHTML = `Game ${game.id} - ${game.players.length}/4 Players `;
 
         if (game.players.length <= 4) {
-            var joinLink = document.createElement("a");
+            var joinButton = document.createElement("button");
+
             if (game.players.length == 4) {
-                joinLink.href = "/view_game/" + game.id;
-                joinLink.innerText = "View Game";
+                joinButton.innerText = "View Game";
+                joinButton.onclick = function () {
+                    window.location.href = "/view_game/" + game.id;
+                };
             } else {
-                joinLink.href = "/join_game/" + game.id;
-                joinLink.innerText = "Join Game";
+                joinButton.innerText = "Join Game";
+                joinButton.onclick = function () {
+                    socket.emit("join_game", { game_id: game.id });
+                };
             }
-            li.appendChild(joinLink);
+
+            li.appendChild(joinButton);
         }
 
         gameList.appendChild(li);
     });
+});
+
+// Listen for successful join and redirect to the game page
+socket.on("joined_game", function (data) {
+    window.location.href = "/game/" + data.game_id;
 });
 
 function log_out() {
@@ -118,7 +129,7 @@ function fetchGames() {
     socket.emit('refresh_games'); // Request the latest game list
 }
 
-socket.on('game_created', function(data) {
-    console.log("New game created: " + data.game_id);
+socket.on('notify_player_joined', function(data) {
+    console.log("Joined game: " + data.game_id);
     window.location.href = "/game/" + data.game_id; // Redirect to game page
 });

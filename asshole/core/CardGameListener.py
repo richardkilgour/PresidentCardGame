@@ -16,6 +16,9 @@ class CardGameListener:
         if new_player is not self:
             self.opponents.append(new_player)
 
+    def notify_game_stated(self):
+        pass
+
     def notify_hand_start(self, starter):
         self.memory.clear()
 
