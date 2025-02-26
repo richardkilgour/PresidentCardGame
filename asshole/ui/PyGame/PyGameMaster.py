@@ -8,9 +8,10 @@ import math
 
 # Only for making the list of Sprites
 import pygame
-from asshole.gym_env.Episode import Episode, State
-from asshole.GameMaster import GameMaster
-from AssholeUI import PyGameCard, PyGamePlayer, PlayerNameLabel
+from asshole.core.Episode import Episode, State
+from asshole.core.GameMaster import GameMaster
+from asshole.ui.PyGame import PyGameCard, PlayerNameLabel
+from asshole.ui.PyGame.PyGamePlayer import PyGamePlayer
 
 
 def player_is_human(player):
@@ -69,7 +70,7 @@ class PyGameMaster(GameMaster):
             # Create a new episode
             self.episode = Episode(self.players, self.positions, self.deck, self.listener_list)
 
-        self.positions = self.episode.play()
+        self.positions = self.episode.step()
         if self.episode.state == State.INITIALISED:
             # Do an episode - We need 4 players and a deck of cards.
             pass

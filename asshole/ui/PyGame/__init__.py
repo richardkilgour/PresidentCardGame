@@ -9,17 +9,13 @@ THIS guy should hold all the game objects
 import sys
 import yaml
 import pygame
-from asshole.player.AbstractPlayer import AbstractPlayer
-from pygame.locals import *
-# TODO: load dynamically using importlib
-from AssholeUI.GuiElements import PlayerNameLabel, PassButton, StatBox
-from AssholeUI.PyGameCard import PyGameCard
-from AssholeUI.PyGameMaster import PyGameMaster
-from AssholeUI.PyGamePlayer import PyGamePlayer
 
-from asshole.player.PlayerSimple import PlayerSimple
-from asshole.player.PlayerHolder import PlayerHolder
-from asshole.player.PlayerSplitter import PlayerSplitter
+from asshole.core.AbstractPlayer import AbstractPlayer
+from asshole.ui.PyGame.GuiElements import PlayerNameLabel, PassButton, StatBox
+from asshole.ui.PyGame.PyGameCard import PyGameCard
+from asshole.ui.PyGame.PyGameMaster import PyGameMaster
+
+# TODO: load dynamically using importlib
 
 # TODO: read a configuration file
 config = yaml.safe_load(open("./config.yaml"))
@@ -123,7 +119,7 @@ while running:
         gm.notify_mouseover(None)
 
     # increment the current game state, and render sprites
-    card_sprites_list, other_sprite_list = gm.play()
+    card_sprites_list, other_sprite_list = gm.start()
 
     # Add pass and quit buttons
     for position, player in enumerate(gm.positions):
