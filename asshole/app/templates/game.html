@@ -10,10 +10,7 @@
 </head>
 <body>
 
-<div class="container">
-    <div class="header_row">
-        <h1>Asshole Card Game</h1>
-    </div>
+    <div class="grid-container">
 
     <!-- Left Player -->
     <div class="playfield_left">
@@ -71,15 +68,12 @@
         </div>
     </div>
 
-    <!-- Center Play Area -->
-    <div class="arena">
-        <h2>Cards in Play</h2>
-        {% for i in range(4) %}
-            <div class="arena_play_area_{{ i }}">
-                <H1> ARENA </H1>
-            </div>
-        {% endfor %}
-    </div>
+        <div class="arena_left">Arena Left</div>
+        <div class="arena_center">Arena Center</div>
+        <div class="arena_right">Arena Right</div>
+        <div class="arena_bottom">Arena Bottom</div>
+        <div class="left_over">Left Over</div>
+
 
     <!-- Bottom: Current Player -->
     <div class="playfield_bottom">
@@ -98,6 +92,8 @@
             <a id="logout-btn" href="#" onclick="log_out(); return false;">Logout</a>
         </div>
     </div>
+
+        <div class="right_over">Right Over</div>
 
 </body>
 </html>

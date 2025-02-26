@@ -13,46 +13,25 @@
   background-color: #F1C1A1;
 }
 
-.playfield_left {
-  grid-column: 1;
-  grid-row: 2 / 5;
-  background-color: #C1C1F1;
-  text-align: center;
-  padding: 5px;
+.grid-container {
+    display: grid;
+    grid-template-columns: 25% 12.5% 25%r 12.5% 25%;
+    grid-template-rows: 33% 17% 17% 33%;
+    width: 100vw;
+    height: 100vh;
+    gap: 5px;
 }
 
-.playfield_center {
-  grid-column: 2;
-  grid-row: 2;
-  background-color: #F1F1F1;
-  text-align: center;
-  padding: 20px;
-}
-
-.arena {
-  grid-column: 2;
-  grid-row: 3;
-  background-color: #F1C1F1;
-  height: 10em;
-  padding: 15px;
-}
-
-.playfield_right {
-  grid-column: 3;
-  grid-row: 2 / 5;
-  background-color: #C1F1C1;
-  text-align: center;
-  width: 15em;
-  padding: 5px;
-}
-
-.playfield_bottom {
-  grid-column: 2;
-  grid-row: 4;
-  background-color: #F1C1C1;
-  text-align: center;
-  padding: 15px;
-}
+.playfield_left { grid-area: 1 / 1 / span 3 / 2; background: lightblue; }
+.playfield_center { grid-area: 1 / 2 / span 1 / span 3; background: lightgreen; }
+.playfield_right { grid-area: 1 / 5 / span 3 / 6; background: lightcoral; }
+.arena_left { grid-area: 2 / 2 / span 2 / 3; background: lightsalmon; }
+.arena_center { grid-area: 2 / 3 / span 1 / 4; background: lightgray; }
+.arena_right { grid-area: 2 / 4 / span 2 / 5; background: lightpink; }
+.arena_bottom { grid-area: 3 / 3 / 4 / 4; background: lightyellow; }
+.left_over { grid-area: 4 / 1 / 5 / 2; background: lightcyan; }
+.playfield_bottom { grid-area: 4 / 2 / 5 / 5; background: lightgoldenrodyellow; }
+.right_over { grid-area: 4 / 5 / 5 / 6; background: lightseagreen; }
 
 .arena_play_area_0 {
   position: relative;
