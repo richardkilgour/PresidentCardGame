@@ -19,9 +19,16 @@
     <div class="playfield_left">
         <div class="player_left">
             <div class="hand_play_area">
-             <div id="opponent-1-hand">
-            </div>
-            <h1>{{ players[1] if players|length > 1 else 'Waiting...' }}</h1>
+                <div id="opponent-1-hand"></div>
+                <h1 id="opponent-1-name">Waiting...</h1>
+                <p id="opponent-1-status">Waiting for Player to join</p>
+
+                <!-- AI Player Selection (Visible only to game owner) -->
+                <div id="opponent-1-ai-select" style="display: none;">
+                    <label for="ai-opponent-1">Add AI Player:</label>
+                    <select id="ai-opponent-1"></select>
+                    <button onclick="addAIPlayer(1)">Add AI</button>
+                </div>
         </div>
         </div>
     </div>
@@ -30,22 +37,37 @@
     <div class="playfield_center">
         <div class="player_opposite">
             <div class="hand_play_area">
-              <div id="opponent-2-hand">
-            </div>
-            <h1>{{ players[2] if players|length > 2 else 'Waiting...' }}</h1>
+                <div id="opponent-2-hand"></div>
+                <h1 id="opponent-2-name">Waiting...</h1>
+                <p id="opponent-2-status">Waiting for Player to join</p>
+
+                <!-- AI Player Selection (Visible only to game owner) -->
+                <div id="opponent-2-ai-select" style="display: none;">
+                    <label for="ai-opponent-2">Add AI Player:</label>
+                    <select id="ai-opponent-2"></select>
+                    <button onclick="addAIPlayer(2)">Add AI</button>
+                </div>
             </div>
         </div>
     </div>
+
 
     <!-- Right Player -->
     <div class="playfield_right">
         <div class="player_right">
             <div class="hand_play_area">
-            <div id="opponent-3-hand">
+                <div id="opponent-3-hand"></div>
+                <h1 id="opponent-3-name">Waiting...</h1>
+                <p id="opponent-3-status">Waiting for Player to join</p>
+
         </div>
-            <h1>{{ players[3] if players|length > 3 else 'Waiting...' }}</h1>
         </div>
         </div>
+        <!-- AI Player Selection (Visible only to game owner) -->
+        <div id="opponent-3-ai-select" style="display: none;">
+            <label for="ai-opponent-3">Add AI Player:</label>
+            <select id="ai-opponent-3"></select>
+            <button onclick="addAIPlayer(3)">Add AI</button>
         </div>
     </div>
 
