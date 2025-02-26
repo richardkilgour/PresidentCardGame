@@ -25,7 +25,7 @@
 }
 
 .card {
-  background-image: url("img/red_back.jpg");
+  background-image: url("../img/red_back.jpg");
   border-color: #808080 #000000 #000000 #808080;
   border-width: 1px;
   border-style: solid;
@@ -38,7 +38,7 @@
 }
 
 .card_small {
-  background-image: url("img/blue_back.jpg");
+  background-image: url("../img/blue_back.jpg");
   border-color: #808080 #000000 #000000 #808080;
   border-width: 1px;
   border-style: solid;
