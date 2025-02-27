@@ -57,8 +57,7 @@ function updatePlayerHand(cards) {
     handContainer.innerHTML = ""; // Clear previous cards
 
     cards.forEach((card, index) => {
-        // TODO: Last parameter should be passed from the server if the card may be played
-        handContainer.appendChild(renderCard(card[0], card[1], index, true, true)); // Adjust card data format if needed
+        handContainer.appendChild(renderCard(card[0], card[1], index, true, card[2])); // Adjust card data format if needed
     });
 }
 
@@ -108,9 +107,15 @@ socket.on('notify_hand_won', function(data) {
 });
 
 socket.on('notify_played_out', function(data) {
-    alert(data.opponent + " played out at position " + data.pos);
+    alert(data.player + " played out at position " + data.pos);
     socket.emit("request_game_state");
 });
+
+socket.on('hand_won', function(data) {
+    alert(data.winner + " won the round");
+    socket.emit("request_game_state");
+});
+
 
 socket.on('card_played', function(data) {
     // Get the names from the HTML elements
@@ -166,7 +171,7 @@ function readyToStart() {
 }
 
 function play_cards(cards) {
-    console.log(arguments.callee.name);
+    console.log(arguments.callee.name + ": " + cards);
     socket.emit('play_cards', {'cards': cards});
 }
 
