@@ -12,7 +12,10 @@ from flask_socketio import SocketIO, join_room
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from asshole.app.game_wrapper import GameWrapper
+from asshole.core.AbstractPlayer import possible_plays
 from asshole.core.CardGameListener import CardGameListener
+from asshole.core.Meld import Meld
+from asshole.core.PlayingCard import PlayingCard
 from asshole.players.AsyncPlayer import AsyncPlayer
 from asshole.players.PlayerHolder import PlayerHolder
 from asshole.players.PlayerSimple import PlayerSimple
@@ -106,12 +109,12 @@ class EventBroadcaster(CardGameListener):
 
     def notify_hand_won(self, winner):
         print(f"notify_hand_won called from listener")
-        socketio.emit('hand_won', {"winner": winner})#, to=self.game_id)
+        socketio.emit('hand_won', {"winner": winner.name})#, to=self.game_id)
 
-    def notify_played_out(self, opponent, pos):
+    def notify_played_out(self, player, pos):
         # Someone just lost all their cards
         print(f"notify_played_out called from listener")
-        socketio.emit('notify_played_out', {"player": opponent, "pos": pos})#, to=self.game_id)
+        socketio.emit('notify_played_out', {"player": player.name, "pos": pos})#, to=self.game_id)
 
     def notify_play(self, player, meld):
         print(f"notify_play called from listener")
@@ -302,7 +305,7 @@ def get_player_names(game_id):
         return [player.name if player else None for player in Games().get_game(game_id).players]
     return []
 
-def find_valid_game(user_id, game_id):
+def find_valid_game(user_id, game_id = None):
     games = Games().get_games()
 
     # Check if the provided game_id is valid
@@ -350,12 +353,20 @@ def get_game_state(user_id, game_id=None):
         else:
             opponent_details.append({"name": None, "card_count": 0, "status": "Absent"})
 
+    playable_cards = [c.cards[-1] for c in possible_plays(player._hand, player.target_meld)[:-1]]
+    player_cards = []
+    for card in player._hand:
+        # Check each card to see if it's playable
+        playable = card in playable_cards
+        player_cards.append([card.get_value(), card.suit_str(), playable])
+
+
     return {
         "game_id": game_id,
         "player_id": user_id,
         "opponent_details": opponent_details,
-        "is_owner": (gm.players[0].name == user_id),  # The first player is the host
-        "player_hand": cards_to_list(player._hand)
+        "is_owner": (gm.players[0].name == user_id),
+        "player_hand": player_cards
     }
 
 
@@ -395,21 +406,26 @@ def send_game_state():
 @socketio.on('play_cards')
 def handle_play_card(data):
     user_id = session.get('user')
-    game_id = data.get("game_id")
+    game_id = find_valid_game(user_id)
 
     if not game_id or game_id not in Games().get_games():
         return {'error': 'Game not found'}
 
     game = Games().get_game(game_id)
-    if not game.is_player_turn(user_id):
+    if game.episode.active_players[0].name != user_id:
         return {'error': 'Not your turn'}
 
     # data['cards'] are a string like '5_0'
+    meld = Meld()
+    if data['cards'] != 'pass':
+        for card in data['cards']:
+            value, suit = card.split('_')
+            meld = Meld(PlayingCard(int(value)*4+int(suit)), meld)
 
     # Process the play
     for p in game.players:
         if p.name == user_id:
-            p.add_play(data['cards'])
+            p.add_play(meld)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, allow_unsafe_werkzeug=True, use_reloader=False)
