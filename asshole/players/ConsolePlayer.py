@@ -11,7 +11,6 @@ from asshole.core.AbstractPlayer import AbstractPlayer, possible_plays
 class ConsolePlayer(AbstractPlayer):
     def __init__(self, name):
         AbstractPlayer.__init__(self, name)
-        self.opp_status = ['Waiting', 'Waiting', 'Waiting']
 
     def surrender_cards(self, cards, receiver):
         # Call super function, but also report on the interaction
@@ -41,21 +40,21 @@ class ConsolePlayer(AbstractPlayer):
             print(f'You ({player.name}) played out, and is ranked {self.ranking_names[pos]}')
         else:
             print(f'{player.name} played out, and is ranked {self.ranking_names[pos]}')
-            self.opp_status[self.opponents.index(player)] = self.ranking_names[pos]
+            self.player_status[self.players.index(player)] = self.ranking_names[pos]
 
     def notify_play(self, player, meld):
         super(ConsolePlayer, self).notify_play(player, meld)
         # TODO: for some reason the we get notified before the cards are taken from the hand
         if player != self:
             print(f'{player.name} plays {meld}, leaving {len(player._hand)- len(meld.cards)} cards')
-            self.opp_status[self.opponents.index(player)] = meld
+            self.player_status[self.players.index(player)] = meld
 
     def show_player(self, index):
         """Report on the last card played, and the total cards of the opposition @ given index"""
-        opp = self.opponents[index]
+        opp = self.players[index]
         tabs = "\t" * ((index - 1) * (3 * index - 4))
         print(f'{tabs}{opp.name} has {opp.report_remaining_cards()} cards')
-        print(f'{tabs}\t{self.opp_status[index]}')
+        print(f'{tabs}\t{self.player_status[index]}')
 
     def play(self):
         """Must return a meld (set of cards). Pass is an empty set"""

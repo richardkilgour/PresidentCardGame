@@ -148,7 +148,7 @@ class TensorflowPlayer(AbstractPlayer):
         if player == self:
             self.state.register_meld(0, meld)
         else:
-            self.state.register_meld(self.opponents.get_index(player) + 1, meld)
+            self.state.register_meld(self.players.get_index(player) + 1, meld)
 
     def notify_hand_start(self, starter):
         super(TensorflowPlayer, self).notify_hand_start(starter)

@@ -4,7 +4,6 @@ from random import shuffle
 from asshole.core.AbstractPlayer import AbstractPlayer
 from asshole.core.CardGameListener import CardGameListener
 from asshole.core.PlayingCard import PlayingCard
-# Needed for deserialization eval function
 from asshole.core.Episode import Episode, State
 
 
@@ -22,7 +21,7 @@ class GameMaster:
         Args:
             deck_size: Number of cards in the deck. Defaults to 54.
         """
-        self.players = []
+        self.players = [None, None, None, None]
         self.positions = []
         # This is a list of all the card objects - they will be moved around
         self.deck_size: int = deck_size
@@ -34,7 +33,7 @@ class GameMaster:
 
     def clear(self) -> None:
         """Reset the GameMaster by clearing all players, positions, and listeners."""
-        self.players = []
+        self.players = [None, None, None, None]
         self.positions = []
         self.listener_list = []
 
@@ -67,35 +66,45 @@ class GameMaster:
 
         Returns:
             A string indicating the player's status:
+            - "Absent"
             - "Waiting" (not yet played)
             - "Passed"
             - "Finished" (no cards left)
             - "Played" (with the cards played)
         """
-        return self.players[index].get_status()
+        if self.players[index]:
+            return self.players[index].get_status()
+        return "Absent"
 
-    def add_player(self, player: AbstractPlayer, name: str = None) -> None:
+    def add_player(self, player: AbstractPlayer, position:int  = None) -> int:
         """
         Add a player to the game.
 
         Args:
             player: The player to add
             name: Optional name for the player
-
+            position: Optional position to add the new player there. Otherwise, take the first available one
+        Returns:
+            The index of the new player
         Raises:
-            Exception: If there are already 4 players
+            Exception: ValueError If there are already 4 players
+            Exception: If a requested position is taken
         """
-        if len(self.players) < 4:
-            # Notify everyone of the new player
-            # This includes the player itself, since it's now registered as a listener
-            self.notify_listeners("notify_player_joined", player)
-            # Notify the new player of the other players
-            for existing_player in self.players:
-                player.notify_player_joined(existing_player)
-            self.players.append(player)
-            self.add_listener(player)
-        else:
-            raise Exception("Too many Players")
+        #
+        if not position:
+            position = self.players.index(None)
+        if position and self.players[position]:
+            raise Exception(f"Can't replace exiting player in position {position}")
+
+        # Notify everyone of the new player
+        self.notify_listeners("notify_player_joined", player, position)
+        # Notify the new player of the other players (include own position)
+        self.players[position] = player
+        for i, existing_player in enumerate(self.players):
+            if existing_player:
+                player.notify_player_joined(existing_player, i)
+        self.add_listener(player)
+        return position
 
     def make_player(self, player_type: type[AbstractPlayer], name: str = None) -> AbstractPlayer:
         """
@@ -111,9 +120,9 @@ class GameMaster:
         if not name:
             name = f'Player {len(self.players)}'
         new_player = player_type(name)
-        self.add_player(new_player, name)
+        new_player_index = self.add_player(new_player)
         # Return the new player
-        return self.players[-1]
+        return self.players[new_player_index]
 
     def reset(self, preset_hands: list[PlayingCard] = None) -> None:
         """
@@ -140,7 +149,7 @@ class GameMaster:
         Raises:
             Exception: If there are not exactly 4 players
         """
-        if len(self.players) != 4:
+        if None in self.players:
             raise Exception("Not enough Players")
         self.round_number = 0
         self.number_of_rounds = number_of_rounds

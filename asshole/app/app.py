@@ -7,7 +7,7 @@ import uuid
 from datetime import timedelta
 
 from flask import Flask, request, redirect, session, render_template, url_for, flash, jsonify
-from flask_socketio import SocketIO, join_room, leave_room
+from flask_socketio import SocketIO, join_room
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -93,9 +93,9 @@ class EventBroadcaster(CardGameListener):
         super().__init__()
         self.game_id = game_id
 
-    def notify_player_joined(self, new_player):
+    def notify_player_joined(self, new_player, position):
         print(f"notify_player_joined called from listener")
-        socketio.emit("notify_player_joined", {"game_id": self.game_id, "new_player": new_player.name})#, to=self.game_id)
+        socketio.emit("notify_player_joined", {"game_id": self.game_id, "new_player": new_player.name, "position": position})#, to=self.game_id)
 
     def notify_game_stated(self):
         socketio.emit('notify_game_stated', {'game_id': self.game_id})
@@ -199,7 +199,7 @@ def http_logout():
 def send_game_list():
     """Send game list to all clients"""
     games = Games().get_games()
-    game_list = [{"id": game_id, "players": [player.name for player in gm.players]} for game_id, gm in games.items()]
+    game_list = [{"id": game_id, "players": [player.name for player in gm.players if player]} for game_id, gm in games.items()]
     socketio.emit('update_game_list', {"games": game_list})
 
 
@@ -215,8 +215,7 @@ def get_user_info():
 def add_human_player(user_id, game_id):
     # Add 'human' player to the game
     player = AsyncPlayer(user_id)
-    game = Games().get_game(game_id)
-    game.add_player(player, user_id) # Should trigger a callback to EventBroadcaster
+    Games().get_game(game_id).add_player(player) # Should trigger a callback to EventBroadcaster
     print(f"User {user_id} joined game {game_id}")
 
 
@@ -253,33 +252,30 @@ def handle_join_game(data):
 
 def find_owners_game(user_id):
     # Find the game where the user is the owner
-    games = Games().get_games()
-    return next((gid for gid, game in games.items() if game.players[0].name == user_id), None)
+    return next((gid for gid, game in Games().get_games().items() if game.players[0].name == user_id), None)
 
 
 @socketio.on('add_ai_player')
 def add_ai_player(data):
     user_id = session.get('user')
     game_id = find_owners_game(user_id)
-    game = Games().get_game(game_id)
 
-    if not game_id or user_id != game.players[0].name:
+    if not game_id or user_id != Games().get_game(game_id).players[0].name:
         socketio.emit('error', {'message': 'Only the game owner can add AI players'})
         return
 
-    # TODO: Allow adding in any position (needs refactoring of GameMaster probably)
     opponent_index = data["opponentIndex"]
     ai_name = data["aiName"]
     ai_difficulty = data["aiDifficulty"]
     if ai_difficulty == "Easy":
-        newAI = PlayerSimple(ai_name)
+        new_ai = PlayerSimple(ai_name)
     elif ai_difficulty == "Medium":
-        newAI = PlayerHolder(ai_name)
+        new_ai = PlayerHolder(ai_name)
     else:
-        newAI = PlayerSplitter(ai_name)
+        new_ai = PlayerSplitter(ai_name)
 
     # Add AI to the correct position
-    game.add_player(newAI, ai_name)
+    Games().get_game(game_id).add_player(new_ai, opponent_index)
     send_game_state()
 
 
@@ -303,7 +299,7 @@ def start_game():
 
 def get_player_names(game_id):
     if game_id in Games().get_games():
-        return [player.name for player in Games().get_game(game_id).players]
+        return [player.name if player else None for player in Games().get_game(game_id).players]
     return []
 
 def find_valid_game(user_id, game_id):
@@ -339,17 +335,17 @@ def get_game_state(user_id, game_id=None):
         raise KeyError # The check above should ensure this does not happen
 
     player_index = player_names.index(user_id)
+    player = gm.players[player_index]
 
-    # Get player details
+    # Get opponent details - start at (player_index+1) to ensure the correct order
     opponent_details = []
-    for i in range(0, 4):
-        if i == player_index:
-            player = gm.players[i]
-        elif i < len(gm.players):
+    for i in range(1, 4):
+        opponent_index = (i + player_index) % 4
+        if gm.players[opponent_index]:
             opponent_details.append({
-                "name": gm.players[i].name,
-                "card_count": gm.players[i].report_remaining_cards(),
-                "status": "Waiting",  # TODO: Replace with actual status
+                "name": gm.players[opponent_index].name,
+                "card_count": gm.players[opponent_index].report_remaining_cards(),
+                "status": "Waiting",  # TODO: Replace with actual status, but currently unused
             })
         else:
             opponent_details.append({"name": None, "card_count": 0, "status": "Absent"})
@@ -359,13 +355,12 @@ def get_game_state(user_id, game_id=None):
         "player_id": user_id,
         "opponent_details": opponent_details,
         "is_owner": (gm.players[0].name == user_id),  # The first player is the host
-        # TODO: Replace with actual hand data: player._cards
         "player_hand": cards_to_list(player._hand)
     }
 
 
 @app.route('/game/<game_id>')
-def game(game_id):
+def show_game(game_id):
     if not session.get('logged_in', False):
         # TODO: allow anonymous players
         return redirect(url_for('index'))

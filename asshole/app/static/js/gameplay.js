@@ -396,7 +396,6 @@ function updateOpponentSlot(index, playerName, cardCount, status, isOwner, exist
 }
 
 // Called when the owner selects an AI player
-// Called when the owner selects an AI player
 function addAIPlayer(opponentIndex) {
     const aiDropdown = document.getElementById(`ai-opponent-${opponentIndex}`);
     const aiName = aiDropdown.value;

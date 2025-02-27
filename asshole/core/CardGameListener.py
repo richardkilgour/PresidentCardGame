@@ -9,12 +9,13 @@ from asshole.core.PlayHistory import PlayHistory
 class CardGameListener:
     def __init__(self):
         self.memory = PlayHistory()
-        self.opponents = []
+        self.players = [None, None, None, None]
+        self.player_status = ['Absent', 'Absent', 'Absent', 'Absent']
 
-    def notify_player_joined(self, new_player):
-        # In case anyone wants to track their opponent
-        if new_player is not self:
-            self.opponents.append(new_player)
+    def notify_player_joined(self, new_player, position):
+        # In case anyone wants to track their opponents
+        self.players[position] = new_player
+        self.player_status[position] = 'Waiting'
 
     def notify_game_stated(self):
         pass
