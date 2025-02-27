@@ -4,7 +4,7 @@ from termcolor import colored
 
 
 class PlayingCard:
-    suit_list = ["♠", "♥", "♦", "♣"]
+    suit_list = ["♠", "♣", "♦", "♥"]
     rank_list = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2", "Joker"]
 
     def __init__(self, index):
