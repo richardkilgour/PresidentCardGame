@@ -203,7 +203,7 @@ def main():
         player.card_to_hand(PlayingCard(i))
     # Check the possible melds for each single card
     for i in range(0, 54, 4):
-        # Any single meld should result in possible playes inversly proportional to card value
+        # Any single meld should result in possible plays inversely proportional to card value
         meld = Meld(PlayingCard(i))
         player.notify_play(None, meld)
         assert (len(player.possible_plays()) == 14 - i // 4)
