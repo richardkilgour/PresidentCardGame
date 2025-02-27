@@ -114,8 +114,46 @@ socket.on('notify_played_out', function(data) {
 });
 
 socket.on('card_played', function(data) {
-    // TODO: Display the card
-    alert(data.player_id + " played " + data.card_id);
+    // Get the names from the HTML elements
+    const opponent1Name = document.getElementById('opponent-1-name').textContent.trim();
+    const opponent2Name = document.getElementById('opponent-2-name').textContent.trim();
+    const opponent3Name = document.getElementById('opponent-3-name').textContent.trim();
+    const playerName = document.getElementById('player_id').textContent.trim();
+
+    // Determine the corresponding arena div based on the player name
+    let arenaDivId;
+    if (data.player_id === opponent1Name) {
+        arenaDivId = 'arena_left';
+    } else if (data.player_id === opponent2Name) {
+        arenaDivId = 'arena_center';
+    } else if (data.player_id === opponent3Name) {
+        arenaDivId = 'arena_right';
+    } else if (data.player_id === playerName) {
+        arenaDivId = 'arena_bottom';
+    }
+
+    console.log("Card(s) " + data.card_id + " played by " + data.player_id)
+
+    // Get the arena div
+    const arenaDiv = document.getElementById(arenaDivId);
+    // Clear any existing content in the arena div
+    arenaDiv.innerHTML = '';
+
+    // Check if the card_id array is empty
+    if (data.card_id.length === 0) {
+        // Display "PASSED" message
+        const passedElement = document.createElement('h1');
+        passedElement.textContent = 'PASSED';
+        arenaDiv.appendChild(passedElement);
+    } else {
+        // Render the card(s)
+        data.card_id.forEach((card, index) => {
+            const cardElement = renderCard(card[0], card[1], index, false);
+            arenaDiv.appendChild(cardElement);
+        });
+    }
+
+    // Emit request for game state
     socket.emit("request_game_state");
 });
 
@@ -190,24 +228,81 @@ function renderCard(value, suit, index, playable) {
     const indexBottom = document.createElement("div");
     indexBottom.className = "index_bottom";
 
-    if (value === 11) {
+    // Draw the Values to the side of the cards
+
+    // Special case for Ace
+    if ((value === 11) && (suit != "♠")) {
         indexTop.innerHTML = `A<br>${suit}`;
         indexBottom.innerHTML = `A<br>${suit}`;
-        front.innerHTML += `<div class="ace">${suit}</div>`;
     } else if (value < 8) {
         indexTop.innerHTML = `${value + 3}<br>${suit}`;
         indexBottom.innerHTML = `${value + 3}<br>${suit}`;
-    } else if (value === 12) {
+    } else if (value == 12) {
         indexTop.innerHTML = `2<br>${suit}`;
         indexBottom.innerHTML = `2<br>${suit}`;
-        front.innerHTML += `<div class="spotB1">${suit}</div><div class="spotB5">${suit}</div>`;
+    }
+
+    // Draw the pips
+    if ((value === 11) && (suit != "♠")) {
+        front.innerHTML += `<div class="ace">${suit}</div>`;
+    } else if (value == 12) {
+        front.innerHTML += `<div class="spotB1">${suit}</div>`;
+        front.innerHTML += `<div class="spotB5">${suit}</div>`;
+    } else if (value == 0) {
+        front.innerHTML += `<div class="spotB1">${suit}</div>`;
+        front.innerHTML += `<div class="spotB3">${suit}</div>`;
+        front.innerHTML += `<div class="spotB5">${suit}</div>`;
+    } else if (value < 8) {
+        // Must cards have these pips
+        front.innerHTML += `<div class="spotA1">${suit}</div>`;
+        front.innerHTML += `<div class="spotA5">${suit}</div>`;
+        front.innerHTML += `<div class="spotC1">${suit}</div>`;
+        front.innerHTML += `<div class="spotC5">${suit}</div>`;
+    }
+    // Add any extra pips for cards from 5 to 10 (values 2 to 7)
+    if (value == 2) {
+        front.innerHTML += `<div class="spotB3">${suit}</div>`;
+    } else if (value == 3) {
+        front.innerHTML += `<div class="spotA3">${suit}</div>`;
+        front.innerHTML += `<div class="spotC3">${suit}</div>`;
+    } else if (value == 4) {
+        front.innerHTML += `<div class="spotA3">${suit}</div>`;
+        front.innerHTML += `<div class="spotC3">${suit}</div>`;
+        front.innerHTML += `<div class="spotB2">${suit}</div>`;
+    } else if (value == 5) {
+        front.innerHTML += `<div class="spotA3">${suit}</div>`;
+        front.innerHTML += `<div class="spotC3">${suit}</div>`;
+        front.innerHTML += `<div class="spotB2">${suit}</div>`;
+        front.innerHTML += `<div class="spotB4">${suit}</div>`;
+    } else if (value == 6) {
+        front.innerHTML += `<div class="spotA2">${suit}</div>`;
+        front.innerHTML += `<div class="spotC2">${suit}</div>`;
+        front.innerHTML += `<div class="spotA4">${suit}</div>`;
+        front.innerHTML += `<div class="spotC4">${suit}</div>`;
+        front.innerHTML += `<div class="spotB3">${suit}</div>`;
+    } else if (value == 7) {
+        front.innerHTML += `<div class="spotA2">${suit}</div>`;
+        front.innerHTML += `<div class="spotC2">${suit}</div>`;
+        front.innerHTML += `<div class="spotA4">${suit}</div>`;
+        front.innerHTML += `<div class="spotC4">${suit}</div>`;
+        front.innerHTML += `<div class="spotB2">${suit}</div>`;
+        front.innerHTML += `<div class="spotB4">${suit}</div>`;
     }
 
     front.appendChild(indexTop);
     front.appendChild(indexBottom);
 
+    // Back-facing cards (value is ignored, but can be black or red)
+    if (value < 0) {
+        const img = document.createElement("img");
+        img.className = "face";
+        img.width = 80;
+        img.height = 130;
+        img.src = `../static/img/${suit === "♠" ? "black" : "red"}_back.jpg`;
+        front.appendChild(img);
+    }
     // Face cards & Jokers
-    if (value >= 8 && value <= 13) {
+    if ((value >= 8 && value <= 11) || (value === 13) || ((value === 11) && (suit == "♠"))) {
         const img = document.createElement("img");
         img.className = "face";
         img.width = 80;
@@ -217,15 +312,7 @@ function renderCard(value, suit, index, playable) {
         else if (value === 9) img.src = `../static/img/queen_${suits[suit]}.jpg`;
         else if (value === 10) img.src = `../static/img/king_${suits[suit]}.jpg`;
         else if (value === 13) img.src = `../static/img/${suit === "♠" ? "black_joker" : "red_joker"}.jpg`;
-        front.appendChild(img);
-    }
-    // Back-facing cards
-    if (value < 0) {
-        const img = document.createElement("img");
-        img.className = "face";
-        img.width = 80;
-        img.height = 130;
-        img.src = `../static/img/red_back.jpg`;
+        else img.src = `../static/img/ace_spades.jpg`;
         front.appendChild(img);
     }
 

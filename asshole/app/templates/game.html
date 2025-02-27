@@ -9,91 +9,113 @@
     <script type="text/javascript" src="{{ url_for('static', filename='js/gameplay.js') }}"></script>
 </head>
 <body>
-
     <div class="grid-container">
 
-    <!-- Left Player -->
-    <div class="playfield_left">
-        <div class="player_left">
-            <div class="hand_play_area">
-                <div id="opponent-1-hand"></div>
-                <h1 id="opponent-1-name">Waiting...</h1>
-                <p id="opponent-1-status">Waiting for Player to join</p>
-
-                <!-- AI Player Selection (Visible only to game owner) -->
-                <div id="opponent-1-ai-select" style="display: none;">
-                    <label for="ai-opponent-1">Add AI Player:</label>
-                    <select id="ai-opponent-1"></select>
-                    <button onclick="addAIPlayer(1)">Add AI</button>
-                </div>
-        </div>
-        </div>
-    </div>
-
-    <!-- Opposite Player -->
-    <div class="playfield_center">
-        <div class="player_opposite">
-            <div class="hand_play_area">
-                <div id="opponent-2-hand"></div>
-                <h1 id="opponent-2-name">Waiting...</h1>
-                <p id="opponent-2-status">Waiting for Player to join</p>
-
-                <!-- AI Player Selection (Visible only to game owner) -->
-                <div id="opponent-2-ai-select" style="display: none;">
-                    <label for="ai-opponent-2">Add AI Player:</label>
-                    <select id="ai-opponent-2"></select>
-                    <button onclick="addAIPlayer(2)">Add AI</button>
+        <!-- Left Player -->
+        <div class="playfield_left">
+            <div class="player_left">
+                <div class="hand_play_area">
+                    <div id="opponent-1-hand"></div>
+                    <h1 id="opponent-1-name">Waiting...</h1>
+                    <p id="opponent-1-status">Waiting for Player to join</p>
                 </div>
             </div>
+            <!-- AI Player Selection (Visible only to game owner) -->
+            <div id="opponent-1-ai-select" style="
+                    display: none;
+                    position: absolute;
+                    bottom: 0;
+                    width: 100%;
+                    height: 50px;
+                    border: 1px solid red;
+                    text-align: center;">
+                <label for="ai-opponent-1">Add AI Player:</label>
+                <select id="ai-opponent-1"></select>
+                <button onclick="addAIPlayer(1)">Add AI</button>
+            </div>
         </div>
-    </div>
+
+        <!-- Opposite Player -->
+        <div class="playfield_center">
+            <div class="player_opposite">
+                <div class="hand_play_area">
+                    <div id="opponent-2-hand"></div>
+                    <h1 id="opponent-2-name">Waiting...</h1>
+                    <p id="opponent-2-status">Waiting for Player to join</p>
+                </div>
+            </div>
+
+                    <!-- AI Player Selection (Visible only to game owner) -->
+                    <div id="opponent-2-ai-select" style="
+                            display: none;
+                            position: absolute;
+                            bottom: 0;
+                            width: 100%;
+                            height: 50px;
+                            border: 1px solid red;">
+                        <label for="ai-opponent-2">Add AI Player:</label>
+                        <select id="ai-opponent-2"></select>
+                        <button onclick="addAIPlayer(2)">Add AI</button>
+                    </div>
+        </div>
 
 
-    <!-- Right Player -->
-    <div class="playfield_right">
-        <div class="player_right">
-            <div class="hand_play_area">
-                <div id="opponent-3-hand"></div>
-                <h1 id="opponent-3-name">Waiting...</h1>
-                <p id="opponent-3-status">Waiting for Player to join</p>
+        <!-- Right Player -->
+        <div class="playfield_right">
+            <div class="player_right">
+                <div class="hand_play_area">
+                    <div id="opponent-3-hand"></div>
+                    <h1 id="opponent-3-name">Waiting...</h1>
+                    <p id="opponent-3-status">Waiting for Player to join</p>
+            </div>
 
+            </div>
+            <!-- AI Player Selection (Visible only to game owner) -->
+            <div id="opponent-3-ai-select" style="
+                    display: none;
+                    position: absolute;
+                    bottom: 0;
+                    width: 100%;
+                    height: 50px;
+                    border: 1px solid red;">
+                <label for="ai-opponent-3">Add AI Player:</label>
+                <select id="ai-opponent-3"></select>
+                <button onclick="addAIPlayer(3)">Add AI</button>
+            </div>
         </div>
-        </div>
-        </div>
-        <!-- AI Player Selection (Visible only to game owner) -->
-        <div id="opponent-3-ai-select" style="display: none;">
-            <label for="ai-opponent-3">Add AI Player:</label>
-            <select id="ai-opponent-3"></select>
-            <button onclick="addAIPlayer(3)">Add AI</button>
-        </div>
-    </div>
 
-        <div class="arena_left">Arena Left</div>
-        <div class="arena_center">Arena Center</div>
-        <div class="arena_right">Arena Right</div>
-        <div class="arena_bottom">Arena Bottom</div>
+        <div class="arena_left">
+            <div class = arena_play_area_0 id="arena_left">Arena Left</div>
+        </div>
+        <div class="arena_center">
+            <div class = arena_play_area_1 id="arena_center">Arena Center</div>
+        </div>
+        <div class="arena_right">
+            <div class = arena_play_area_2 id="arena_right">Arena Right</div>
+        </div>
+        <div class="arena_bottom">
+            <div class = arena_play_area_3 id="arena_bottom">Arena Bottom</div>
+        </div>
+
+
         <div class="left_over">Left Over</div>
 
-
-    <!-- Bottom: Current Player -->
-    <div class="playfield_bottom">
-        <div class="player_you">
-            <div class="hand_play_area">
-                <div id="player-hand">
+        <!-- Bottom: Current Player -->
+        <div class="playfield_bottom">
+            <div class="player_you">
+                <div class="hand_play_area">
+                    <div id="player-hand"></div>
+                </div>
+                <h1 id="player_id">{{ player_id }}</h1>
+                <button onclick="play_cards('pass')">Pass</button>
+            </div>
         </div>
 
-            </div>
-            <h1>{{ current_player }}</h1>
-            <h2>Player ID: {{ player_id }}</h2>
-
-            <button onclick="play_cards('pass')">Pass</button>
+        <div class="right_over">
             <button onclick="leave_game()">Leave Game</button>
             <button id="start_game_button" onclick="readyToStart()">Start Game</button>
             <a id="logout-btn" href="#" onclick="log_out(); return false;">Logout</a>
         </div>
     </div>
-
-        <div class="right_over">Right Over</div>
-
 </body>
 </html>

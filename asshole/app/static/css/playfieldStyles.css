@@ -15,22 +15,22 @@
 
 .grid-container {
     display: grid;
-    grid-template-columns: 25% 12.5% 25%r 12.5% 25%;
-    grid-template-rows: 33% 17% 17% 33%;
+    grid-template-columns: 20% 15% 30%r 15% 20%;
+    grid-template-rows: 30% 15% 15% 40%;
     width: 100vw;
     height: 100vh;
     gap: 5px;
 }
 
-.playfield_left { grid-area: 1 / 1 / span 3 / 2; background: lightblue; }
-.playfield_center { grid-area: 1 / 2 / span 1 / span 3; background: lightgreen; }
-.playfield_right { grid-area: 1 / 5 / span 3 / 6; background: lightcoral; }
+.playfield_left { grid-area: 1 / 1 / span 3 / 2; background: lightblue; position: relative; }
+.playfield_center { grid-area: 1 / 2 / span 1 / span 3; background: lightgreen; position: relative; }
+.playfield_right { grid-area: 1 / 5 / span 3 / 6; background: lightcoral; position: relative; }
 .arena_left { grid-area: 2 / 2 / span 2 / 3; background: lightsalmon; }
 .arena_center { grid-area: 2 / 3 / span 1 / 4; background: lightgray; }
 .arena_right { grid-area: 2 / 4 / span 2 / 5; background: lightpink; }
 .arena_bottom { grid-area: 3 / 3 / 4 / 4; background: lightyellow; }
 .left_over { grid-area: 4 / 1 / 5 / 2; background: lightcyan; }
-.playfield_bottom { grid-area: 4 / 2 / 5 / 5; background: lightgoldenrodyellow; }
+.playfield_bottom { grid-area: 4 / 2 / 5 / 5; background: lightgoldenrodyellow; position: relative; }
 .right_over { grid-area: 4 / 5 / 5 / 6; background: lightseagreen; }
 
 .arena_play_area_0 {
