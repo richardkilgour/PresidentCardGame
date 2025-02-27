@@ -35,8 +35,6 @@ socket.on("current_game_state", function (data) {
         .map(opponent => opponent.name)
         .filter(name => name !== null); // Remove empty slots
 
-    console.log("Updated existingPlayers list:", existingPlayers);
-
     // Count how many opponents have joined (ignoring null slots)
     let opponentCount = data.opponent_details.filter(opponent => opponent.name !== null).length;
 
@@ -59,7 +57,8 @@ function updatePlayerHand(cards) {
     handContainer.innerHTML = ""; // Clear previous cards
 
     cards.forEach((card, index) => {
-        handContainer.appendChild(renderCard(card[0], card[1], index, true)); // Adjust card data format if needed
+        // TODO: Last parameter should be passed from the server if the card may be played
+        handContainer.appendChild(renderCard(card[0], card[1], index, true, true)); // Adjust card data format if needed
     });
 }
 
@@ -82,7 +81,7 @@ socket.on('notify_opponent_hands', function(data) {
     opponent_cards.forEach((cardCount, index) => {
         if (index < opponentContainers.length && opponentContainers[index]) {
             for (let i = 0; i < cardCount; i++) {
-                opponentContainers[index].appendChild(renderCard(-1, "&clubs;", i, false));
+                opponentContainers[index].appendChild(renderCard(-1, "", i, false, false));
             }
         }
     });
@@ -148,7 +147,7 @@ socket.on('card_played', function(data) {
     } else {
         // Render the card(s)
         data.card_id.forEach((card, index) => {
-            const cardElement = renderCard(card[0], card[1], index, false);
+            const cardElement = renderCard(card[0], card[1], index, false, false);
             arenaDiv.appendChild(cardElement);
         });
     }
@@ -172,38 +171,48 @@ function play_cards(cards) {
 }
 
 
-function moveCardUp() {
-  for (var i = 0; i < arguments.length; i++) {
-      x = arguments[i];
-      card = document.getElementById(x);
-      card.style.top = "0%";
-      card.style.transform = "translateY(0%)";
-      card.onclick = function() {
-        play_cards(x);
-      }
-  }
+function moveCardUp(...cardIds) {
+    for (const cardId of cardIds) {
+        const card = document.getElementById(cardId);
+        if (card) {
+            card.style.top = "0%";
+            card.style.transform = "translateY(0%)";
+            card.onclick = function() {
+                play_cards(cardIds);
+            }
+        }
+    }
 }
 
-function moveCardDown() {
-  for (var i = 0; i < arguments.length; i++) {
-      x = arguments[i];
-      card = document.getElementById(x);
-      card.style.top = "100%";
-      card.style.transform = "translateY(-100%)";
-      card.onClick = undefined;
-  }
+function moveCardDown(...cardIds) {
+    for (const cardId of cardIds) {
+        const card = document.getElementById(cardId);
+        if (card) {
+            card.style.top = "100%";
+            card.style.transform = "translateY(-100%)";
+            card.onClick = undefined;
+        }
+    }
 }
 
-function renderCard(value, suit, index, playable) {
+function renderCard(value, suit, index, player_card, playable) {
     const suits = {
-        "♣": "clubs",
         "♠": "spades",
+        "♣": "clubs",
         "♦": "diamonds",
         "♥": "hearts"
     };
 
     const suitIndex = Object.keys(suits).indexOf(suit);
-    const cardId = `${value}_${suitIndex}`;
+
+    let cardId;
+    if (player_card) {
+        cardId = `${value}_${suitIndex}`;
+    }
+    else {
+        // Non-player cards can't be accessed by mouse events, so call the something else
+        cardId = `${value}__${suitIndex}`;
+    }
 
     const cardHitArea = document.createElement("div");
     cardHitArea.className = "card_hit_area";
@@ -212,13 +221,23 @@ function renderCard(value, suit, index, playable) {
     cardHitArea.style.transform = `rotate(${7 * (index - 6)}deg)`;
 
     if (playable) {
-        cardHitArea.onmouseover = () => moveCardUp(cardId);
-        cardHitArea.onmouseout = () => moveCardDown(cardId);
+        const playableCards = [cardId];
+        for (let i = 0; i <= suitIndex; i++) {
+            const similarCardId = `${value}_${i}`;
+            const similarCard = document.getElementById(similarCardId);
+            if (similarCard) {
+                playableCards.push(similarCardId);
+            }
+        }
+        console.log(`Setting mouse events for ${playableCards}:`);
+        cardHitArea.onmouseover = () => moveCardUp(...playableCards);
+        cardHitArea.onmouseout = () => moveCardDown(...playableCards);
     }
 
     const card = document.createElement("div");
-    card.className = playable ? "card" : "card_small";
+    card.className = player_card ? "card" : "card_small";
     card.id = cardId;
+
 
     const front = document.createElement("div");
     front.className = suit === "♣" || suit === "♠" ? "front" : "front red";
@@ -363,9 +382,6 @@ function updateOpponentSlot(index, playerName, cardCount, status, isOwner, exist
     const handElement = document.getElementById(`opponent-${index}-hand`);
     const aiSelectElement = document.getElementById(`opponent-${index}-ai-select`);
 
-    console.log("updateOpponentSlot " + index);
-
-
     if (playerName) {
         nameElement.textContent = playerName;
         statusElement.textContent = status;
@@ -373,7 +389,7 @@ function updateOpponentSlot(index, playerName, cardCount, status, isOwner, exist
 
         // Add cards if player has joined
         for (let i = 0; i < cardCount; i++) {
-            handElement.appendChild(renderCard(-1, "&clubs;", i, false));
+            handElement.appendChild(renderCard(-1, "", i, false, false));
         }
 
         // Hide AI selection (owner cannot add AI to an occupied slot)
