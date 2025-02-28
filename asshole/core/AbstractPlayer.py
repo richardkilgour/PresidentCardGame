@@ -10,50 +10,6 @@ from asshole.core.CardGameListener import CardGameListener
 # Only for card encoding (TODO: Abstract that)
 from asshole.core.PlayingCard import PlayingCard
 
-
-def possible_plays(hand, target_meld, name="Unknown Player"):
-    """
-    Make a list of possible melds that may be played given the target minimum meld
-    Will always return the pass option (in last place)
-    Example return value: [[3], [3, 3], [4], ..., []]
-    """
-    # A list of the melds possible to play
-    possible_melds = []
-
-    if not target_meld:
-        # If no minimum, all melds are playable
-        for card in hand:
-            # Check to see if this can make a pair
-            if len(possible_melds) > 0 and card == possible_melds[-1].cards[0]:
-                possible_melds.append(Meld(card, possible_melds[-1]))
-            else:
-                possible_melds.append(Meld(card))
-    else:
-        current_meld = None
-        for card in hand:
-            if current_meld and (card.get_value() == current_meld.cards[0].get_value()):
-                current_meld = Meld(card, current_meld)
-            else:
-                current_meld = Meld(card)
-            if current_meld > target_meld:
-                possible_melds.append(current_meld)
-
-    # The option for Pass
-    possible_melds.append(Meld())
-
-    card_string = f"{name} has:"
-    for s in hand:
-        card_string += " {},".format(s)
-    logging.debug(card_string)
-
-    meld_string = f"Options for {name} to play are:"
-    for s in possible_melds:
-        meld_string += " {},".format(s)
-    logging.debug(meld_string)
-
-    return possible_melds
-
-
 class AbstractPlayer(CardGameListener):
     # the listener keeps track of all cards played
     ranking_names = ["King", "Prince", "Citizen", "Asshole"]
@@ -66,7 +22,6 @@ class AbstractPlayer(CardGameListener):
         self.target_meld = None
         self.position_count = [0, 0, 0, 0]
         self.last_played = None
-        self.possible_plays = None
 
     def set_position(self, pos):
         # Remember the new position for statistical porpoises
@@ -96,13 +51,55 @@ class AbstractPlayer(CardGameListener):
 
     def notify_play(self, player, meld):
         # Ignore passes
-        if not self.target_meld or meld >= self.target_meld:
+        if not self.target_meld or meld > self.target_meld:
             self.target_meld = meld
+
+    def possible_plays(self, target_meld):
+        """
+        Make a list of possible melds that may be played given the target minimum meld
+        Will always return the pass option (in last place)
+        Example return value: [[3], [3, 3], [4], ..., []]
+        """
+        # A list of the melds possible to play
+        possible_melds = []
+
+        if not target_meld:
+            # If no minimum, all melds are playable
+            for card in self._hand:
+                # Check to see if this can make a pair
+                if len(possible_melds) > 0 and card == possible_melds[-1].cards[0]:
+                    possible_melds.append(Meld(card, possible_melds[-1]))
+                else:
+                    possible_melds.append(Meld(card))
+        else:
+            current_meld = None
+            for card in self._hand:
+                if current_meld and (card.get_value() == current_meld.cards[0].get_value()):
+                    current_meld = Meld(card, current_meld)
+                else:
+                    current_meld = Meld(card)
+                if current_meld > target_meld:
+                    possible_melds.append(current_meld)
+
+        # The option for Pass
+        possible_melds.append(Meld())
+
+        card_string = f"{self.name} has:"
+        for s in self._hand:
+            card_string += " {},".format(s)
+        logging.debug(card_string)
+
+        meld_string = f"Options for {self.name} to play are:"
+        for s in possible_melds:
+            meld_string += " {},".format(s)
+        logging.debug(meld_string)
+
+        return possible_melds
 
     @abstractmethod
     def play(self):
         # Must be implemented by children - BLOCKING (Don't expect any redraws)
-        self.possible_plays = possible_plays(self._hand, self.target_meld, self.name)
+        pass
 
     def report_remaining_cards(self):
         return len(self._hand)
@@ -198,7 +195,7 @@ def main():
         assert AbstractPlayer.decode_hand(AbstractPlayer.encode_hand([test_card]))[0] == test_card
     # Make a new players without a GM
     player = AbstractPlayer('')
-    # Give it some cards - a sinle of each type
+    # Give it some cards - a single card of each type
     for i in range(0, 54, 4):
         player.card_to_hand(PlayingCard(i))
     # Check the possible melds for each single card
@@ -206,18 +203,18 @@ def main():
         # Any single meld should result in possible plays inversely proportional to card value
         meld = Meld(PlayingCard(i))
         player.notify_play(None, meld)
-        assert (len(player.possible_plays()) == 14 - i // 4)
+        assert (len(player.possible_plays(meld)) == 14 - i // 4)
         # Any double plays can't be responded to except by 2, Joker, or pass
         meld = Meld(PlayingCard(i + 1), meld)
         player.notify_play(None, meld)
         if meld.cards[0].get_value() < 12:
-            assert (len(player.possible_plays()) == 3)
+            assert (len(player.possible_plays(meld)) == 3)
         elif meld.cards[0].get_value() == 12:
             # Double 2: Joker of pass
-            assert (len(player.possible_plays()) == 2)
+            assert (len(player.possible_plays(meld)) == 2)
         else:
             # Double Joker: only Pass
-            assert (len(player.possible_plays()) == 1)
+            assert (len(player.possible_plays(meld)) == 1)
 
     # Test case based on some bug
     player = AbstractPlayer('')
@@ -225,7 +222,7 @@ def main():
     for card in ([2, 9, 8, 12, 18, 28, 25, 24, 35, 34, 50, 52]):
         player.card_to_hand(PlayingCard(card))
     player.notify_play(None, Meld(PlayingCard(53)))
-    print(player.possible_plays())
+    print(player.possible_plays(meld))
 
 
 if __name__ == '__main__':

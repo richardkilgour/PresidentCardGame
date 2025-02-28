@@ -21,9 +21,9 @@ class PlayerSplitter(PlayerSimple):
         if not self.target_meld:
             logging.info("No minimum value, so {} is going to play {}".format(self.name, self.possible_plays))
             return candidate
-
+        possible_plays = self.possible_plays(self.target_meld)
         # Find the possible melds, and play the lowest one, unless we have a double
-        for candidate in self.possible_plays:
+        for candidate in possible_plays:
             if not candidate.cards:
                 # If pass is the remaining option, take it
                 break
@@ -36,9 +36,9 @@ class PlayerSplitter(PlayerSimple):
 
         # Fallback option - we can play but are considering to pass
         # Split the highest card to stay in the hand
-        if not candidate.cards and (len(self.possible_plays) > 1):
-            logging.info("{} decides to split a {}".format(self.name, self.possible_plays[-2]))
-            candidate = self.possible_plays[-2]
+        if not candidate.cards and (len(possible_plays) > 1):
+            logging.info("{} decides to split a {}".format(self.name, possible_plays[-2]))
+            candidate = possible_plays[-2]
 
         logging.info("{}'s reaction to the {} is a {}".format(self.name, self.target_meld, candidate))
         return candidate

@@ -5,7 +5,7 @@ Human players is a Player with console output (overloading the callbacks)
 The Play function presents a list of the possible plays, and lets the user decide the move
 """
 import logging
-from asshole.core.AbstractPlayer import AbstractPlayer, possible_plays
+from asshole.core.AbstractPlayer import AbstractPlayer
 
 
 class ConsolePlayer(AbstractPlayer):
@@ -64,7 +64,7 @@ class ConsolePlayer(AbstractPlayer):
             self.show_player(i)
         print(self)
 
-        selection = possible_plays(self._hand, self.target_meld, self.name)
+        selection = self.possible_plays(self.target_meld)
 
         card_selection_string = "Select card: \n"
         for key, value in enumerate(selection):

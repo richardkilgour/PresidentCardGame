@@ -108,7 +108,7 @@ class TensorflowPlayer(AbstractPlayer):
             self.old_state = self.state.get_input_vector()
         # Use epsilon to decide on the best action or a random one
         if np.random.rand() <= self._epsilon:
-            possible_plays = possible_plays(self._hand, self.target_meld, self.name)
+            possible_plays = self.possible_plays(self.target_meld)
             self.action = random.choice(possible_plays)
         else:
             x = np.reshape(np.array(self.state.get_input_vector(), dtype=np.bool), (1,-1))

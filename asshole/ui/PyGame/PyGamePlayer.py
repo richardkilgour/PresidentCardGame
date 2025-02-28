@@ -1,5 +1,5 @@
 from asshole.cards.Meld import Meld
-from asshole.player.AbstractPlayer import AbstractPlayer, possible_plays
+from asshole.player.AbstractPlayer import AbstractPlayer
 from asshole.player.PlayerSimple import PlayerSimple
 
 
@@ -51,7 +51,7 @@ class PyGamePlayer(PlayerSimple):
     def get_meld(self, card):
         """Return a meld if the card can be turned into a valid meld, otherwise None"""
         # Last option is Pass, so ignore it
-        selection = possible_plays(self._hand, self.target_meld, self.name)[:-1]
+        selection = self.possible_plays(self.target_meld)[:-1]
         for s in selection:
             # Logic for multiple selections relies on highest card not being on lower combos
             if card.get_index() == s.cards[-1].get_index():

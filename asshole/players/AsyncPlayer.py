@@ -3,7 +3,7 @@
 """
 Dummy player that just waits for a call to play, and plays whatever was buffered
 """
-from asshole.core.AbstractPlayer import AbstractPlayer, possible_plays
+from asshole.core.AbstractPlayer import AbstractPlayer
 from asshole.core.Meld import Meld
 
 

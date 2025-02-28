@@ -12,7 +12,6 @@ from flask_socketio import SocketIO, join_room
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from asshole.app.game_wrapper import GameWrapper
-from asshole.core.AbstractPlayer import possible_plays
 from asshole.core.CardGameListener import CardGameListener
 from asshole.core.Meld import Meld
 from asshole.core.PlayingCard import PlayingCard
@@ -353,7 +352,7 @@ def get_game_state(user_id, game_id=None):
         else:
             opponent_details.append({"name": None, "card_count": 0, "status": "Absent"})
 
-    playable_cards = [c.cards[-1] for c in possible_plays(player._hand, player.target_meld)[:-1]]
+    playable_cards = [c.cards[-1] for c in player.possible_plays(player.target_meld)[:-1]]
     player_cards = []
     for card in player._hand:
         # Check each card to see if it's playable
