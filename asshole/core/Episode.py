@@ -112,7 +112,8 @@ class Episode:
         else:
             player_with_3_spades = self.find_card_holder(0, 0)
             self.move_to_front(player_with_3_spades)
-        self.notify_listeners("notify_hand_start", self.players[0])
+        self.notify_listeners("notify_hand_start")
+        self.notify_listeners("notify_player_turn", self.players[0])
 
     def notify_listeners(self, notify_func_name: str, *args) -> None:
         """
@@ -248,8 +249,10 @@ class Episode:
             self.active_players.remove(player)
             return
 
+        self.notify_listeners("notify_player_turn", player)
+
         action = player.play()
-        if action == '␆':  # Assuming '␆' indicates a no-op action.
+        if action == '␆':  # '␆' indicates a no-op action.
             return
 
         if current_target and action.cards and action < current_target:

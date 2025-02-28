@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-A Card Game Listener is aware of all the goings-on in the game, and keeps a history of them
+A Card Game Listener is aware of all the goings-on in the game, and by default keeps a history of them
 """
 from asshole.core.PlayHistory import PlayHistory
 
@@ -20,7 +20,7 @@ class CardGameListener:
     def notify_game_stated(self):
         pass
 
-    def notify_hand_start(self, starter):
+    def notify_hand_start(self):
         self.memory.clear()
 
     def notify_hand_won(self, winner):
@@ -33,3 +33,7 @@ class CardGameListener:
     def notify_play(self, player, meld):
         # Someone just played (or passed)
         self.memory.add_play(player, meld)
+
+    def notify_player_turn(self, player):
+        # It is this player's turn to play
+        pass
