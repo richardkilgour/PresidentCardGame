@@ -57,12 +57,12 @@ class GameMaster:
         for listener in self.listener_list:
             getattr(listener, notify_func_name)(*args)
 
-    def get_player_status(self, index: int) -> str:
+    def get_player_status(self, player: AbstractPlayer) -> str:
         """
         Get the status of a player.
 
         Args:
-            index: The index of the player
+            player: The player to get the status of
 
         Returns:
             A string indicating the player's status:
@@ -72,9 +72,24 @@ class GameMaster:
             - "Finished" (no cards left)
             - "Played" (with the cards played)
         """
-        if self.players[index]:
-            return self.players[index].get_status()
-        return "Absent"
+        # Query the Episode and get the current status of the requested player
+        if self.episode:
+            # The player has finished, and has a position
+            if player in self.episode.positions:
+                assert player._hand == []
+                return self.episode.positions.index(player)
+            elif player in self.episode.active_players:
+                if player.last_played:
+                    return player.last_played
+                else:
+                    return "Waiting"
+            else:
+                # No position and not active -> Passed
+                return "Passed"
+        elif player in self.players:
+            return "Waiting"
+        else:
+            return "Absent"
 
     def add_player(self, player: AbstractPlayer, position:int  = None) -> int:
         """
@@ -200,6 +215,7 @@ class GameMaster:
                 f'Score = {player.get_score()}'
             )
         return '\n'.join(result)
+
 
     def remove_worst_player(self) -> None:
         """
