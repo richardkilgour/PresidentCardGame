@@ -69,6 +69,14 @@ class Meld:
         # self <= other
         return not (self > other)
 
+    def __ge__(self, other):
+        # equal does not really make sense for melds
+        raise TypeError('Equivalence of melds is invalid')
+
+    def __eq__(self, other):
+        # equal does not really make sense for melds
+        raise TypeError('Equivalence of melds is invalid')
+
     def __str__(self):
         if not self.cards:
             return "<pass>"
@@ -81,38 +89,46 @@ def test_cases():
     assert (single_3 <= single_3)
 
     double_3 = Meld(PlayingCard(3), single_3)
+    # Singles can't beat doubles; doubles can't beat singles
     assert (double_3 <= single_3)
     assert (single_3 <= double_3)
 
     single_4 = Meld(PlayingCard(4))
-    assert (single_3 <= single_4)
-    assert (double_3 <= single_4)
     assert (single_4 > single_3)
-    assert (single_4 <= double_3)
+    assert (single_3 <= single_4)
     assert (single_4 <= single_4)
+    assert (double_3 <= single_4)
+    # Singles can't beat doubles; doubles can't beat singles
+    assert (single_4 <= double_3)
 
     double_4 = Meld(PlayingCard(5), single_4)
-    assert (double_4 <= single_3)
     assert (double_4 > double_3)
+    # Singles can't beat doubles; doubles can't beat singles
+    assert (double_4 <= single_3)
     assert (double_4 <= single_4)
 
     single_2 = Meld(PlayingCard(49))
+    # 2s are the second best card
     assert (single_3 <= single_2)
-    assert (double_3 <= single_2)
     assert (single_4 <= single_2)
+    # Singles can't beat doubles; doubles can't beat singles
+    assert (double_3 <= single_2)
     assert (double_4 <= single_2)
 
     triple_4 = Meld(PlayingCard(6), double_4)
+    # Singles can't beat doubles; doubles can't beat singles
     assert (single_2 <= triple_4)
 
-    # Triple 8 should beat triple 3
     triple_3 = Meld(PlayingCard(0), Meld(PlayingCard(1), Meld((PlayingCard(2)))))
     triple_8 = Meld(PlayingCard(24), Meld(PlayingCard(25), Meld((PlayingCard(26)))))
+    # Triple 8 should beat triple 3
     assert (triple_8 > triple_3)
 
-    # double 2 should beat triple 3
+    # Special case for 2s and jokers - double 2 should beat triple 3
     double_2 = Meld(PlayingCard(50), single_2)
     assert (double_2 > triple_3)
+    assert (single_2 <= triple_3)
+
 
 if __name__ == '__main__':
     test_cases()
