@@ -6,8 +6,6 @@ import numpy as np
 
 from asshole.core.Meld import Meld
 from asshole.core.CardGameListener import CardGameListener
-
-# Only for card encoding (TODO: Abstract that)
 from asshole.core.PlayingCard import PlayingCard
 
 class AbstractPlayer(CardGameListener):
@@ -15,7 +13,7 @@ class AbstractPlayer(CardGameListener):
     ranking_names = ["King", "Prince", "Citizen", "Asshole"]
 
     def __init__(self, name):
-        super(AbstractPlayer, self).__init__()
+        super().__init__()
         self.name = name
         self._hand = []
         # TODO: ask the GM?
@@ -41,12 +39,9 @@ class AbstractPlayer(CardGameListener):
         # Useful for exact matching
         return [c.get_index() for c in self._hand]
 
-    def notify_hand_start(self, starter):
-        super(AbstractPlayer, self).notify_hand_start(starter)
-
     def notify_hand_won(self, winner):
         # Someone just won the hand
-        super(AbstractPlayer, self).notify_hand_won(winner)
+        super().notify_hand_won(winner)
         self.target_meld = None
 
     def notify_play(self, player, meld):
@@ -221,7 +216,8 @@ def main():
     # 3♦ 5♥ 5♠ 6♠ 7♦ 8♦ 9♥ 9♠ J♣ J♦ 2♦ Joker
     for card in ([2, 9, 8, 12, 18, 28, 25, 24, 35, 34, 50, 52]):
         player.card_to_hand(PlayingCard(card))
-    player.notify_play(None, Meld(PlayingCard(53)))
+    meld =  Meld(PlayingCard(53))
+    player.notify_play(None, meld)
     print(player.possible_plays(meld))
 
 
