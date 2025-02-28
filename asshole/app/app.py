@@ -102,9 +102,9 @@ class EventBroadcaster(CardGameListener):
     def notify_game_stated(self):
         socketio.emit('notify_game_stated', {'game_id': self.game_id})
 
-    def notify_hand_start(self, starter):
+    def notify_hand_start(self):
         print(f"notify_hand_start called from listener")
-        socketio.emit('notify_hand_start',{"starter": starter.name})#, to=self.game_id)
+        socketio.emit('notify_hand_start')#, to=self.game_id)
 
     def notify_hand_won(self, winner):
         print(f"notify_hand_won called from listener")
@@ -121,6 +121,9 @@ class EventBroadcaster(CardGameListener):
             'player_id': player.name,
             'card_id': cards_to_list(meld.cards),
         })#, to=self.game_id)
+
+    def notify_player_turn(self, player):
+        socketio.emit('notify_player_turn', {"player": player.name})
 
 
 @socketio.on('connect')
@@ -347,7 +350,7 @@ def get_game_state(user_id, game_id=None):
             opponent_details.append({
                 "name": gm.players[opponent_index].name,
                 "card_count": gm.players[opponent_index].report_remaining_cards(),
-                "status": "Waiting",  # TODO: Replace with actual status, but currently unused
+                "status": gm.get_player_status(gm.players[opponent_index]),  # TODO: Replace with actual status, but currently unused
             })
         else:
             opponent_details.append({"name": None, "card_count": 0, "status": "Absent"})
@@ -411,6 +414,8 @@ def handle_play_card(data):
         return {'error': 'Game not found'}
 
     game = Games().get_game(game_id)
+    if not game.episode.active_players:
+        return {'error': 'Round not started'}
     if game.episode.active_players[0].name != user_id:
         return {'error': 'Not your turn'}
 
