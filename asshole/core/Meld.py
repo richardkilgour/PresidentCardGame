@@ -69,14 +69,6 @@ class Meld:
         # self <= other
         return not (self > other)
 
-    def __ge__(self, other):
-        # equal does not really make sense for melds
-        raise TypeError('Equivalence of melds is invalid')
-
-    def __eq__(self, other):
-        # equal does not really make sense for melds
-        raise TypeError('Equivalence of melds is invalid')
-
     def __str__(self):
         if not self.cards:
             return "<pass>"
