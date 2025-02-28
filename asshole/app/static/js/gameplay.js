@@ -97,7 +97,6 @@ socket.on('notify_game_started', function(data) {
 });
 
 socket.on('notify_hand_start', function(data) {
-    alert("It's turn for " + data.starter + " to start!");
     socket.emit("request_game_state");
 });
 
@@ -116,6 +115,40 @@ socket.on('hand_won', function(data) {
     socket.emit("request_game_state");
 });
 
+socket.on('notify_player_turn', function(data) {
+    console.log('notify_player_turn: ' + data.player);
+
+    // Remove existing borders
+    document.getElementById('playfield_left').style.border = 'none';
+    document.getElementById('playfield_center').style.border = 'none';
+    document.getElementById('playfield_right').style.border = 'none';
+    document.getElementById('playfield_bottom').style.border = 'none';
+
+    // Get the names from the HTML elements
+    const opponent1Name = document.getElementById('opponent-1-name').textContent.trim();
+    const opponent2Name = document.getElementById('opponent-2-name').textContent.trim();
+    const opponent3Name = document.getElementById('opponent-3-name').textContent.trim();
+    const playerName = document.getElementById('player_id').textContent.trim();
+
+    // Determine which player's turn it is and highlight the corresponding div
+    let playfieldDivId;
+    if (data.player === opponent1Name) {
+        playfieldDivId = 'playfield_left';
+    } else if (data.player === opponent2Name) {
+        playfieldDivId = 'playfield_center';
+    } else if (data.player === opponent3Name) {
+        playfieldDivId = 'playfield_right';
+    } else if (data.player === playerName) {
+        playfieldDivId = 'playfield_bottom';
+    }
+
+    if (playfieldDivId) {
+        const playfieldDiv = document.getElementById(playfieldDivId);
+        if (playfieldDiv) playfieldDiv.style.border = '5px solid red'; // Big, fat border
+    }
+
+    socket.emit("request_game_state");
+});
 
 socket.on('card_played', function(data) {
     // Get the names from the HTML elements
