@@ -90,3 +90,8 @@
   top: 50%;
   transform: translate(-50%, -50%);
 }
+
+[data-rank]::before {
+    content: attr(data-rank);
+    margin-right: 5px;
+}
