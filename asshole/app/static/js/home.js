@@ -1,135 +1,236 @@
-var socket = io.connect('http://' + document.domain + ':' + location.port);
+// Configuration
+const config = {
+  socketUrl: 'http://' + document.domain + ':' + location.port
+};
 
-socket.on('connect', function() {
-    console.log('WebSocket connection established');
-});
+// WebSocket Service
+class SocketService {
+  constructor(url) {
+    this.socket = io.connect(url);
+    this.setupListeners();
+  }
 
-document.addEventListener("DOMContentLoaded", function () {
-    fetchUserInfo(); // Get user info on load and setup displayed fields
-    fetchGames(); // Request game list from server
-    setup_auth(); // Ensure authentication buttons are registered
-});
-
-socket.on('update_game_list', function (data) {
-    var gameList = document.getElementById("game-list");
-    console.log("Updating game list");
-    gameList.innerHTML = ""; // Clear list
-
-    data.games.forEach(function (game) {
-        var li = document.createElement("li");
-        li.innerHTML = `Game ${game.id} - ${game.players.length}/4 Players `;
-
-        if (game.players.length <= 4) {
-            var joinButton = document.createElement("button");
-
-            if (game.players.length == 4) {
-                joinButton.innerText = "View Game";
-                joinButton.onclick = function () {
-                    window.location.href = "/view_game/" + game.id;
-                };
-            } else {
-                joinButton.innerText = "Join Game";
-                joinButton.onclick = function () {
-                    socket.emit("join_game", { game_id: game.id });
-                };
-            }
-
-            li.appendChild(joinButton);
-        }
-
-        gameList.appendChild(li);
+  setupListeners() {
+    this.socket.on('connect', () => {
+      console.log('WebSocket connection established');
     });
-});
+  }
 
-// Listen for successful join and redirect to the game page
-socket.on("joined_game", function (data) {
-    window.location.href = "/game/" + data.game_id;
-});
+  emit(event, data) {
+    this.socket.emit(event, data);
+  }
 
-function log_out() {
-    console.log("Requesting logout");
-    socket.emit('logout');
-    // Also make HTTP request to ensure session is cleared
-    fetch('/logout', {method: 'POST'})
-        .then(() => window.location.href = '/');
+  on(event, callback) {
+    this.socket.on(event, callback);
+  }
 }
 
-function fetchUserInfo() {
-    console.log("Fetching user info");
-    fetch('/get_user_info')
-        .then(response => response.json())
-        .then(data => {
-            if (data.logged_in) {
-                console.log("User is logged in");
-                document.getElementById("user-status").innerText = "Logged in as " + data.username;
-                document.getElementById("new_game_button").style.display = "block";
-                document.getElementById('new_game_button').addEventListener("click", function () {
-                    socket.emit("new_game");
-                    fetchGames(); // Refresh the game list after requesting a new game
-                });
-                document.getElementById("login-message").style.display = "none";
-                document.getElementById("login-form").style.display = "none";
-                document.getElementById("logout-btn").style.display = "inline";
-            } else {
-                console.log("User is NOT logged in");
-                document.getElementById("user-status").innerText = "Not Logged In";
-                document.getElementById("login-form").style.display = "block";
-                document.getElementById("new_game_button").style.display = "none";
-                document.getElementById("login-message").style.display = "block";
-            }
-        })
-        .catch(error => {
-            console.error("Error fetching user info:", error);
-        });
+// API Service
+class APIService {
+  static async fetchJSON(url, options = {}) {
+    try {
+      const response = await fetch(url, options);
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`API Error (${url}):`, error);
+      throw error;
+    }
+  }
+
+  static async getUserInfo() {
+    return this.fetchJSON('/get_user_info');
+  }
+
+  static async authenticate(action, username, password) {
+    return this.fetchJSON('/' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+  }
+
+  static async logout() {
+    return this.fetchJSON('/logout', { method: 'POST' });
+  }
 }
 
-function setup_auth() {
-    var auth_form = document.getElementById('auth-form');
-    if (auth_form === null) {
-        console.log('auth_form not found!');
-        return;
+// User Auth Controller
+class AuthController {
+  constructor(socketService) {
+    this.socketService = socketService;
+  }
+
+  async initialize() {
+    this.setupAuthForm();
+    await this.updateUserStatus();
+  }
+
+  async updateUserStatus() {
+    const data = await APIService.getUserInfo();
+    const userStatusEl = document.getElementById("user-status");
+    const newGameButton = document.getElementById("new_game_button");
+    const loginForm = document.getElementById("login-form");
+    const loginMessage = document.getElementById("login-message");
+    const logoutBtn = document.getElementById("logout-btn");
+
+    if (data.logged_in) {
+      console.log("User is logged in");
+      userStatusEl.innerText = "Logged in as " + data.username;
+      newGameButton.style.display = "block";
+      loginForm.style.display = "none";
+      loginMessage.style.display = "none";
+      logoutBtn.style.display = "inline";
+    } else {
+      console.log("User is NOT logged in");
+      userStatusEl.innerText = "Not Logged In";
+      loginForm.style.display = "block";
+      newGameButton.style.display = "none";
+      loginMessage.style.display = "block";
+      logoutBtn.style.display = "none";
+    }
+    return data.logged_in;
+  }
+
+  setupAuthForm() {
+    const authForm = document.getElementById('auth-form');
+    if (!authForm) {
+      console.log('auth_form not found!');
+      return;
     }
 
-    document.getElementById("auth-form").addEventListener("click", function(event) {
-        if (event.target.tagName !== "BUTTON") return; // Ignore non-button clicks
+    authForm.addEventListener("click", async (event) => {
+      if (event.target.tagName !== "BUTTON") return;
 
-        event.preventDefault();
-        let action = event.target.getAttribute("data-action");
-        let username = document.getElementById("username").value;
-        let password = document.getElementById("password").value;
+      event.preventDefault();
+      const action = event.target.getAttribute("data-action");
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
 
-        if (!username || !password) {
-            alert("Please enter a username and password.");
-            return;
+      if (!username || !password) {
+        alert("Please enter a username and password.");
+        return;
+      }
+
+      try {
+        const data = await APIService.authenticate(action, username, password);
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(`${this.capitalizeFirst(action)} failed: ${data.error}`);
+        }
+      } catch (error) {
+        alert("An error occurred during authentication. Please try again.");
+      }
+    });
+
+    // Setup logout button
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", async () => {
+        console.log("Requesting logout");
+        this.socketService.emit('logout');
+        await APIService.logout();
+        window.location.href = '/';
+      });
+    }
+  }
+
+  capitalizeFirst(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+  }
+}
+
+// Game List Controller
+class GameListController {
+  constructor(socketService) {
+    this.socketService = socketService;
+  }
+
+  initialize() {
+    this.setupSocketListeners();
+    this.setupNewGameButton();
+  }
+
+  setupSocketListeners() {
+    this.socketService.on('update_game_list', (data) => {
+      this.renderGameList(data.games);
+    });
+
+    this.socketService.on("joined_game", (data) => {
+      window.location.href = "/game/" + data.game_id;
+    });
+
+    this.socketService.on('notify_player_joined', (data) => {
+      console.log("Joined game: " + data.game_id);
+      window.location.href = "/game/" + data.game_id;
+    });
+  }
+
+  setupNewGameButton() {
+    const newGameButton = document.getElementById('new_game_button');
+    if (newGameButton) {
+      newGameButton.addEventListener("click", () => {
+        this.socketService.emit("new_game");
+        this.refreshGameList();
+      });
+    }
+  }
+
+  refreshGameList() {
+    console.log("Requesting game list refresh");
+    this.socketService.emit('refresh_games');
+  }
+
+  renderGameList(games) {
+    const gameList = document.getElementById("game-list");
+    console.log("Updating game list");
+    gameList.innerHTML = "";
+
+    games.forEach((game) => {
+      const li = document.createElement("li");
+      li.innerHTML = `Game ${game.id} - ${game.players.length}/4 Players `;
+
+      if (game.players.length <= 4) {
+        const joinButton = document.createElement("button");
+
+        if (game.players.length == 4) {
+          joinButton.innerText = "View Game";
+          joinButton.onclick = () => {
+            window.location.href = "/view_game/" + game.id;
+          };
+        } else {
+          joinButton.innerText = "Join Game";
+          joinButton.onclick = () => {
+            this.socketService.emit("join_game", { game_id: game.id });
+          };
         }
 
-        console.log("Fetching action: " + action);
+        li.appendChild(joinButton);
+      }
 
-        fetch('/' + action, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        }).then(response => response.json())
-          .then(data => {
-              if (data.success) {
-                  location.reload(); // Reload to update UI
-              } else {
-                  alert(`${action.charAt(0).toUpperCase() + action.slice(1)} failed: ${data.error}`);
-              }
-          })
-          .catch(error => {
-              console.error("Authentication error:", error);
-              alert("An error occurred during authentication. Please try again.");
-          });
+      gameList.appendChild(li);
     });
+  }
 }
 
-function fetchGames() {
-    console.log("Requesting game list refresh");
-    socket.emit('refresh_games'); // Request the latest game list
+// Application Controller
+class HomeApp {
+  constructor() {
+    this.socketService = new SocketService(config.socketUrl);
+    this.authController = new AuthController(this.socketService);
+    this.gameListController = new GameListController(this.socketService);
+  }
+
+  async initialize() {
+    await this.authController.initialize();
+    this.gameListController.initialize();
+    this.gameListController.refreshGameList();
+  }
 }
 
-socket.on('notify_player_joined', function(data) {
-    console.log("Joined game: " + data.game_id);
-    window.location.href = "/game/" + data.game_id; // Redirect to game page
+// Initialize the application when DOM is ready
+document.addEventListener("DOMContentLoaded", () => {
+  const app = new HomeApp();
+  app.initialize();
 });

@@ -93,14 +93,14 @@
                     <div id="player-hand"></div>
                 </div>
                 <h1 id="player_id">{{ player_id }}</h1>
-                <button onclick="play_cards('pass')">Pass</button>
+                <button onclick="playCards('pass')">Pass</button>
             </div>
         </div>
 
         <div class="right_over">
-            <button onclick="leave_game()">Leave Game</button>
+            <button onclick="leaveGame()">Leave Game</button>
             <button id="start_game_button" onclick="readyToStart()">Start Game</button>
-            <a id="logout-btn" href="#" onclick="log_out(); return false;">Logout</a>
+            <button id="logout-btn" onclick="logOut(); return false;">Logout</button>
         </div>
 
         <div class="arena_left">
