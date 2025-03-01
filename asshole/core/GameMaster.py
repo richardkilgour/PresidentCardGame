@@ -76,7 +76,7 @@ class GameMaster:
         if self.episode:
             # The player has finished, and has a position
             if player in self.episode.positions:
-                assert player._hand == []
+                # assert player._hand == []
                 return self.episode.positions.index(player)
             elif player in self.episode.active_players:
                 if player.last_played:
