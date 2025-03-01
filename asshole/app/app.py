@@ -127,14 +127,14 @@ class EventBroadcaster(CardGameListener):
 
 
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(data=None):
     # Associate Flask session data with this socket if needed
     session['socket_id'] = request.sid
     session.modified = True  # Important: Mark the session as modified
 
 
 @socketio.on('disconnect')
-def handle_disconnect():
+def handle_disconnect(data=None):
     session['socket_id'] = None
     session.modified = True  # Important: Mark the session as modified
 
@@ -181,7 +181,7 @@ def login():
 
 
 @socketio.on('logout')
-def logout():
+def logout(data=None):
     user = session.get('user')
     # TODO: leave_room(game_id)
     session['logged_in'] = False
@@ -201,7 +201,7 @@ def http_logout():
 
 
 @socketio.on('refresh_games')
-def send_game_list():
+def send_game_list(data=None):
     """Send game list to all clients"""
     games = Games().get_games()
     game_list = [{"id": game_id, "players": [player.name for player in gm.players if player]} for game_id, gm in games.items()]
@@ -225,7 +225,7 @@ def add_human_player(user_id, game_id):
 
 
 @socketio.on('new_game')
-def create_game():
+def create_game(data=None):
     user = session.get('user')  # Retrieve user from session
 
     if not user:
@@ -285,14 +285,14 @@ def add_ai_player(data):
 
 
 @socketio.on('view_game')
-def view_game():
+def view_game(data=None):
     # TODO: view game but can't interact with it (unless someone leaves)
     pass
 
 
 # Add new socket event handler
 @socketio.on('start_game')
-def start_game():
+def start_game(data=None):
     player_id = session.get('user')
     game_id = find_owners_game(player_id)
 
@@ -355,20 +355,21 @@ def get_game_state(user_id, game_id=None):
         else:
             opponent_details.append({"name": None, "card_count": 0, "status": "Absent"})
 
-    playable_cards = [c.cards[-1] for c in player.possible_plays(player.target_meld)[:-1]]
-    player_cards = []
+    # Use index because we need an exact match - suit is significant
+    playable_indices = [c.cards[-1].get_index() for c in player.possible_plays(player.target_meld)[:-1]]
+
+    playable_cards = []
     for card in player._hand:
         # Check each card to see if it's playable
-        playable = card in playable_cards
-        player_cards.append([card.get_value(), card.suit_str(), playable])
-
+        playable = card.get_index() in playable_indices
+        playable_cards.append([card.get_value(), card.suit_str(), playable])
 
     return {
         "game_id": game_id,
         "player_id": user_id,
         "opponent_details": opponent_details,
         "is_owner": (gm.players[0].name == user_id),
-        "player_hand": player_cards
+        "player_hand": playable_cards
     }
 
 
@@ -392,7 +393,7 @@ def show_game(game_id):
 
 
 @socketio.on('request_game_state')
-def send_game_state():
+def send_game_state(data=None):
     """Send the full game state to the requesting player."""
     user_id = session.get('user')
     game_state = get_game_state(user_id)
@@ -414,6 +415,8 @@ def handle_play_card(data):
         return {'error': 'Game not found'}
 
     game = Games().get_game(game_id)
+    if not game.episode:
+        return {'error': 'Game not started'}
     if not game.episode.active_players:
         return {'error': 'Round not started'}
     if game.episode.active_players[0].name != user_id:
@@ -430,6 +433,7 @@ def handle_play_card(data):
     for p in game.players:
         if p.name == user_id:
             p.add_play(meld)
+    game.episode.step()
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, allow_unsafe_werkzeug=True, use_reloader=False)
