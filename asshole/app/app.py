@@ -424,7 +424,7 @@ def handle_play_card(data):
 
     # data['cards'] are a string like '5_0'
     meld = Meld()
-    if data['cards'] != 'pass':
+    if data['cards'] != 'PASSED':
         for card in data['cards']:
             value, suit = card.split('_')
             meld = Meld(PlayingCard(int(value)*4+int(suit)), meld)
