@@ -66,6 +66,7 @@ const CardGame = {
             if (playerElement) {
                 playerElement.setAttribute("data-rank", rankSymbols[data.pos]);
             }
+            this.setStatus(playerId, 'Finished');
             this.socket.emit("request_game_state");
         });
         this.socket.on('hand_won', (data) => {
@@ -74,7 +75,7 @@ const CardGame = {
         });
         this.socket.on('notify_player_turn', (data) => this.highlightCurrentPlayerTurn(data));
         this.socket.on('card_played', (data) => {
-            this.playCard(data.player_id, data.card_id);
+            this.setPlayedCard(data.player_id, data.card_id);
             this.socket.emit("request_game_state");
         });
     },
@@ -193,8 +194,21 @@ const CardGame = {
             return 'arena_bottom';
         }
     },
-    
-    playCard: function(playerId, cardIds) {
+
+
+    setStatus: function(playerId, status) {
+        console.log("Status " + status + " of " + playerId);
+        // Get the arena div
+        const arenaDivId = this.findArena(playerId);
+        const arenaDiv = document.getElementById(arenaDivId);
+        // Display the message
+        const passedElement = document.createElement('h1');
+        passedElement.textContent = status;
+        arenaDiv.innerHTML = '';
+        arenaDiv.appendChild(passedElement);
+    },
+
+    setPlayedCard: function(playerId, cardIds) {
         const arenaDivId = this.findArena(playerId);
         
         console.log("Card(s) " + cardIds + " played by " + playerId);
@@ -205,10 +219,10 @@ const CardGame = {
         arenaDiv.innerHTML = '';
         
         // Check if the card_id array is empty
-        if (cardIds.length === 0) {
-            // Display "PASSED" message
+        if (!cardIds || cardIds.length === 0) {
+            // Display the message
             const passedElement = document.createElement('h1');
-            passedElement.textContent = 'PASSED';
+            passedElement.textContent = "Passed";  // Display a meaningful message
             arenaDiv.appendChild(passedElement);
         } else {
             // Render the card(s)
