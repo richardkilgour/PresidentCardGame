@@ -37,3 +37,8 @@ class CardGameListener:
     def notify_player_turn(self, player):
         # It is this player's turn to play
         pass
+
+    def notify_cards_swapped(self, player_good, player_bad, num_cards):
+        # Notify that one player swapped cards with another.
+        # player_good got good card(s) from player_bad and vice versa
+        pass

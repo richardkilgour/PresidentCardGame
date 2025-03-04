@@ -38,26 +38,28 @@ class Episode:
             deck (list[Any]): list representing the deck of cards.
             listener_list (list[Any]): list of listener objects for notifications.
         """
-        self.discards = []
-        self.positions = positions
-        self.deck = deck
+        self.state: State = State.INITIALISED
         self.players = players
+        self.positions = positions
+        # These can be inferred from player status
         # '␆' represents "not played yet" for melds; otherwise, melds can be of any type that supports comparison.
         self.current_melds = ['␆', '␆', '␆', '␆']
-        self.listener_list = listener_list
-        self.state: State = State.INITIALISED
         self.active_players = []
 
-    def clear(self):
+        self.deck = deck
+        self.listener_list = listener_list
+        # For testing - only used as a 'checksum' for the cards
         self.discards = []
-        self.positions = []
-        self.deck = []
-        self.players = []
-        # '␆' represents "not played yet" for melds; otherwise, melds can be of any type that supports comparison.
-        self.current_melds = ['␆', '␆', '␆', '␆']
-        self.listener_list = []
+
+    def clear(self):
         self.state: State = State.INITIALISED
+        self.players = []
+        self.positions = []
+        self.current_melds = ['␆', '␆', '␆', '␆']
         self.active_players = []
+        self.deck = []
+        self.listener_list = []
+        self.discards = []
 
 
     def target_meld(self) -> Meld | None:
@@ -88,6 +90,7 @@ class Episode:
             king.surrender_cards(discard, asshole)
             logging.debug(
                 f'{asshole.name} swapped {tribute[0]} and {tribute[1]} for {king.name}\'s cards {discard[0]} and {discard[1]}')
+            self.notify_listeners("notify_cards_swapped", king, asshole, 2)
 
             print(f'{prince.name} must give {citizen.name} 1 card')
             tribute = [prince._hand[-1]]
@@ -95,6 +98,7 @@ class Episode:
             discard = [citizen._hand[0]]
             citizen.surrender_cards(discard, prince)
             logging.debug(f'{prince.name} swapped {tribute[0]} for {citizen.name}\'s card {discard[0]}')
+            self.notify_listeners("notify_cards_swapped", prince, citizen, 1)
 
             for player in self.players:
                 logging.debug(f'{player.name} has {player}')

@@ -29,6 +29,7 @@ class GameMaster:
         self.listener_list = []
         self.number_of_rounds = None
         self.round_number = 0
+        # Episode contains current player hands and status (playing, meld, out or passed)
         self.episode = None
 
     def clear(self) -> None:
@@ -170,6 +171,7 @@ class GameMaster:
         self.number_of_rounds = number_of_rounds
         # The initial hand has no positions
         self.reset(preset_hands=preset_hands)
+        self.notify_listeners("notify_game_stated")
 
     def step(self) -> bool:
         """
