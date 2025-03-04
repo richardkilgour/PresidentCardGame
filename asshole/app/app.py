@@ -13,6 +13,7 @@ from flask_socketio import SocketIO, join_room
 from werkzeug.security import check_password_hash
 
 from asshole.app.game_event_handler import GameEventHandler
+from asshole.app.game_keeper import GamesKeeper
 from asshole.app.game_wrapper import GameWrapper
 from asshole.core.Meld import Meld
 from asshole.core.PlayingCard import PlayingCard
@@ -52,55 +53,27 @@ def save_data(filepath, data):
 # Dictionary of user IDs and passwords
 players = load_data(PLAYER_DB)
 
-# Singleton
-class Games:
-    _instance = None
-    _games = {}
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(Games, cls).__new__(cls)
-        return cls._instance
-
-    def get_games(self):
-        return self._games
-
-    def get_game(self, game_id):
-        return self._games[game_id]
-
-    def add_game(self, game_id, game_wrapper):
-        self._games[game_id] = game_wrapper
-
-    def remove_game(self, game_id):
-        if game_id in self._games:
-            del self._games[game_id]
-
-    def find_player(self, player_id) -> list[str]:
-        """Return a list of all the games the given player is in"""
-        game_list = []
-        for gid, game in self._games.items():
-            if player_id in [p.name for p in game.players if p]:
-                game_list.append(gid)
-        return game_list
-
-
 def step_games(sc):
-    games = Games().get_games()
+    games = GamesKeeper().get_games()
     for game_id, game_wrapper in games.items():
         if game_wrapper.episode:
             game_wrapper.step()
     # Schedule the function to run again after 1 second
     sc.enter(1, 1, step_games, (sc,))
 
+
 scheduler = sched.scheduler(time.time, time.sleep)
+
 
 def run_scheduler():
     scheduler.enter(1, 1, step_games, (scheduler,))
     scheduler.run()
 
+
 # Start the scheduler in a separate thread
 scheduler_thread = threading.Thread(target=run_scheduler)
 scheduler_thread.start()
+
 
 @socketio.on('connect')
 def handle_connect(data=None):
@@ -119,7 +92,7 @@ def handle_connect(data=None):
         print(f"User {username} connected with socket ID: {sid}")
 
         # If the user is in a game, add them to the room
-        for game_id in Games().find_player(username):
+        for game_id in GamesKeeper().find_player(username):
             for sid in user_socket_map[username]:
                 join_room(game_id, sid)
     else:
@@ -289,13 +262,10 @@ def emit_to_user(username, event, data):
             socketio.emit(event, data, to=sid)
 
 
-
 @socketio.on('refresh_games')
 def send_game_list(data=None):
     """Send game list to all clients"""
-    games = Games().get_games()
-    game_list = [{"id": game_id, "players": [player.name for player in gm.players if player]} for game_id, gm in games.items()]
-    socketio.emit('update_game_list', {"games": game_list})
+    socketio.emit('update_game_list', {"games": GamesKeeper().game_list()})
 
 
 @app.route('/get_user_info')
@@ -312,7 +282,7 @@ def add_human_player(user_id, game_id):
     player = AsyncPlayer(user_id)
     for sid in user_socket_map[user_id]:
         join_room(game_id, sid)
-    Games().get_game(game_id).add_player(player) # Should trigger a callback to EventBroadcaster
+    GamesKeeper().add_player(game_id, player)  # Should trigger a callback to EventBroadcaster
     print(f"User {user_id} joined game {game_id}")
 
 
@@ -326,7 +296,7 @@ def create_game(data=None):
         return
 
     game_id = str(uuid.uuid4())
-    Games().add_game(game_id, GameWrapper(game_id, GameEventHandler(socketio, game_id)))
+    GamesKeeper().add_game(game_id, GameWrapper(game_id, GameEventHandler(socketio, game_id)))
     # Notify the user and update the game list for all players
     socketio.emit('game_created', {'game_id': game_id})
     print(f"New game created by {user}: {game_id}")
@@ -345,17 +315,12 @@ def handle_join_game(data):
     add_human_player(user_id, game_id)
 
 
-def find_owners_game(user_id):
-    # Find the game where the user is the owner
-    return next((gid for gid, game in Games().get_games().items() if game.players[0].name == user_id), None)
-
-
 @socketio.on('add_ai_player')
 def add_ai_player(data):
     user_id = session.get('user')
-    game_id = find_owners_game(user_id)
+    game_id = GamesKeeper().find_owners_game(user_id)
 
-    if not game_id or user_id != Games().get_game(game_id).players[0].name:
+    if not game_id:
         socketio.emit('error', {'message': 'Only the game owner can add AI players'})
         return
 
@@ -370,7 +335,7 @@ def add_ai_player(data):
         new_ai = PlayerSplitter(ai_name)
 
     # Add AI to the correct position
-    Games().get_game(game_id).add_player(new_ai, opponent_index)
+    GamesKeeper().add_player(game_id, new_ai, opponent_index)
     send_game_state()
 
 
@@ -384,33 +349,27 @@ def view_game(data=None):
 @socketio.on('start_game')
 def start_game(data=None):
     player_id = session.get('user')
-    game_id = find_owners_game(player_id)
+    game_id = GamesKeeper().find_owners_game(player_id)
 
-    if not game_id or game_id not in Games().get_games():
+    if not game_id or game_id not in GamesKeeper().get_games():
         return {'error': 'Game not found'}
 
-    Games().get_game(game_id).start()
+    GamesKeeper().get_game(game_id).start()
 
 
-def get_player_names(game_id):
-    if game_id in Games().get_games():
-        return [player.name if player else None for player in Games().get_game(game_id).players]
-    return []
-
-def find_valid_game(user_id, game_id = None):
-    games = Games().get_games()
+def find_valid_game(user_id, game_id=None):
+    games = GamesKeeper().get_games()
 
     # Check if the provided game_id is valid
     if not game_id or game_id not in games:
         # Search for a valid game based on user_id
-        game_id = next((gid for gid, gm in games.items() if user_id in get_player_names(gid)), None)
+        game_id = next((gid for gid, gm in games.items() if user_id in GamesKeeper().get_player_names(gid)), None)
 
     # Return None if no valid game_id is found
     if not game_id or game_id not in games:
         return None
 
     return game_id
-
 
 
 def get_game_state(user_id, game_id=None):
@@ -421,13 +380,13 @@ def get_game_state(user_id, game_id=None):
     game_id = find_valid_game(user_id, game_id)
 
     if not game_id:
-        return None # Invalid game ID or player not in game
+        return None  # Invalid game ID or player not in game
 
-    gm = Games().get_game(game_id)
-    player_names = get_player_names(game_id)
+    gm = GamesKeeper().get_game(game_id)
+    player_names = GamesKeeper().get_player_names(game_id)
 
     if user_id not in player_names:
-        raise KeyError # The check above should ensure this does not happen
+        raise KeyError  # The check above should ensure this does not happen
 
     player_index = player_names.index(user_id)
     player = gm.players[player_index]
@@ -501,10 +460,10 @@ def handle_play_card(data):
     user_id = session.get('user')
     game_id = find_valid_game(user_id)
 
-    if not game_id or game_id not in Games().get_games():
+    if not game_id or game_id not in GamesKeeper().get_games():
         return {'error': 'Game not found'}
 
-    game = Games().get_game(game_id)
+    game = GamesKeeper().get_game(game_id)
     if not game.episode:
         return {'error': 'Game not started'}
     if not game.episode.active_players:
@@ -517,13 +476,14 @@ def handle_play_card(data):
     if data['cards'] != 'PASSED':
         for card in data['cards']:
             value, suit = card.split('_')
-            meld = Meld(PlayingCard(int(value)*4+int(suit)), meld)
+            meld = Meld(PlayingCard(int(value) * 4 + int(suit)), meld)
 
     # Process the play
     for p in game.players:
         if p.name == user_id:
             p.add_play(meld)
     game.episode.step()
+
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, allow_unsafe_werkzeug=True, use_reloader=False)
