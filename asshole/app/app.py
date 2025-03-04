@@ -6,13 +6,14 @@ import time
 import uuid
 from datetime import timedelta
 
+import bcrypt
 from flask import Flask, request, redirect, session, render_template, url_for, flash, jsonify
 from flask_socketio import SocketIO, join_room
 
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash
 
+from asshole.app.game_event_handler import GameEventHandler
 from asshole.app.game_wrapper import GameWrapper
-from asshole.core.CardGameListener import CardGameListener
 from asshole.core.Meld import Meld
 from asshole.core.PlayingCard import PlayingCard
 from asshole.players.AsyncPlayer import AsyncPlayer
@@ -27,6 +28,12 @@ socketio = SocketIO(app, cors_allowed_origins="*", manage_session=True)
 
 PLAYER_DB = "db/players.json"
 GAME_DB = "db/games.json"
+
+# In-memory mapping of user sessions to socket IDs
+# In production, consider using Redis or another shared cache
+user_socket_map = {}  # {username: {sid1, sid2, ...}}
+socket_user_map = {}  # {sid: username}
+
 
 def load_data(filepath):
     try:
@@ -68,6 +75,14 @@ class Games:
         if game_id in self._games:
             del self._games[game_id]
 
+    def find_player(self, player_id) -> list[str]:
+        """Return a list of all the games the given player is in"""
+        game_list = []
+        for gid, game in self._games.items():
+            if player_id in [p.name for p in game.players if p]:
+                game_list.append(gid)
+        return game_list
+
 
 def step_games(sc):
     games = Games().get_games()
@@ -87,83 +102,138 @@ def run_scheduler():
 scheduler_thread = threading.Thread(target=run_scheduler)
 scheduler_thread.start()
 
-def cards_to_list(cards):
-    return [[card.get_value(), card.suit_str()] for card in cards]
-
-class EventBroadcaster(CardGameListener):
-    def __init__(self, game_id):
-        super().__init__()
-        self.game_id = game_id
-
-    def notify_player_joined(self, new_player, position):
-        print(f"notify_player_joined called from listener")
-        socketio.emit("notify_player_joined", {"game_id": self.game_id, "new_player": new_player.name, "position": position})#, to=self.game_id)
-
-    def notify_game_stated(self):
-        socketio.emit('notify_game_stated', {'game_id': self.game_id})
-
-    def notify_hand_start(self):
-        print(f"notify_hand_start called from listener")
-        socketio.emit('notify_hand_start')#, to=self.game_id)
-
-    def notify_hand_won(self, winner):
-        print(f"notify_hand_won called from listener")
-        socketio.emit('hand_won', {"winner": winner.name})#, to=self.game_id)
-
-    def notify_played_out(self, player, pos):
-        # Someone just lost all their cards
-        print(f"notify_played_out called from listener")
-        socketio.emit('notify_played_out', {"player": player.name, "pos": pos})#, to=self.game_id)
-
-    def notify_play(self, player, meld):
-        print(f"notify_play called from listener")
-        socketio.emit('card_played', {
-            'player_id': player.name,
-            'card_id': cards_to_list(meld.cards),
-        })#, to=self.game_id)
-
-    def notify_player_turn(self, player):
-        socketio.emit('notify_player_turn', {"player": player.name})
-
-
 @socketio.on('connect')
 def handle_connect(data=None):
-    # Associate Flask session data with this socket if needed
-    session['socket_id'] = request.sid
-    session.modified = True  # Important: Mark the session as modified
+    username = session.get("user")
+    sid = request.sid
+
+    if username:
+        # Associate this socket with the logged-in user
+        if username not in user_socket_map:
+            user_socket_map[username] = set()
+        user_socket_map[username].add(sid)
+        socket_user_map[sid] = username
+
+        # Notify user of successful connection
+        socketio.emit('connection_status', {'status': 'connected', 'username': username})
+        print(f"User {username} connected with socket ID: {sid}")
+
+        # If the user is in a game, add them to the room
+        for game_id in Games().find_player(username):
+            for sid in user_socket_map[username]:
+                join_room(game_id, sid)
+    else:
+        # Allow connection but mark as unauthenticated
+        # This gives you a chance to handle login via socket events if needed
+        socketio.emit('connection_status', {'status': 'anonymous'})
+        print(f"Anonymous socket connection: {sid}")
 
 
 @socketio.on('disconnect')
 def handle_disconnect(data=None):
-    session['socket_id'] = None
-    session.modified = True  # Important: Mark the session as modified
+    sid = request.sid
+    username = socket_user_map.get(sid)
+
+    if username:
+        # Remove this socket ID from the user's set of active connections
+        if username in user_socket_map:
+            user_socket_map[username].discard(sid)
+            # If user has no active connections left, clean up
+            if not user_socket_map[username]:
+                del user_socket_map[username]
+
+        # Remove from socket to user mapping
+        del socket_user_map[sid]
+        print(f"User {username} disconnected socket {sid}")
+    else:
+        print(f"Anonymous socket disconnected: {sid}")
 
 
-@app.route('/')
-def index():
-    # TODO: If this user is currently in a game, send them there
-    return render_template(
-        'home.html',
-        games=Games().get_games(),
-        username=session.get('user')
-    )
+@socketio.on('authenticate')
+def handle_socket_authentication(data):
+    """Handle authentication via SocketIO instead of HTTP"""
+    sid = request.sid
+    username = data.get('username')
+    password = data.get('password')
+
+    players = load_data(PLAYER_DB)
+
+    if username in players and bcrypt.checkpw(password.encode(), players[username]["password"].encode()):
+        # Set Flask session
+        session["user"] = username
+        session.modified = True
+
+        # Update socket mappings
+        if username not in user_socket_map:
+            user_socket_map[username] = set()
+        user_socket_map[username].add(sid)
+        socket_user_map[sid] = username
+
+        socketio.emit('auth_response', {'success': True, 'username': username})
+        print(f"Socket authentication successful for {username}")
+
+        # Check if user is in a game and send relevant game data
+        games = load_data(GAME_DB)
+        for game_id, game in games.items():
+            if username in game["players"]:
+                socketio.emit('active_game', {'game_id': game_id})
+                break
+    else:
+        socketio.emit('auth_response', {'success': False, 'error': 'Invalid credentials'})
+        print(f"Socket authentication failed for {username}")
 
 
-@app.route('/register_user', methods=['POST'])
+@app.route("/", methods=["GET", "POST"])
+def home():
+    players = load_data(PLAYER_DB)
+    games = load_data(GAME_DB)
+    username = session.get("user")
+
+    # Check if user is already in a game
+    if username:
+        for game_id, game in games.items():
+            if username in game["players"]:
+                return redirect(url_for("playfield", game_id=game_id, player_id=username))
+
+    # Handle login form submission
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        if username in players and bcrypt.checkpw(password.encode(), players[username]["password"].encode()):
+            # Set session with a unique identifier
+            session["user"] = username
+            session["login_time"] = uuid.uuid4().hex  # Add a unique token for this login session
+
+            # Check if user is already in a game again (after login)
+            for game_id, game in games.items():
+                if username in game["players"]:
+                    return redirect(url_for("playfield", game_id=game_id, player_id=username))
+
+            return redirect(url_for("home"))
+        return render_template("home.html", games=games, login_error="Invalid credentials")
+
+    return render_template("home.html", games=games, username=username)
+
+
+@app.route("/register", methods=["POST"])
 def register():
-    data = request.get_json()
-    username, password = data.get('username'), data.get('password')
+    players = load_data(PLAYER_DB)
+    username = request.form["username"]
+    password = request.form["password"]
 
     if username in players:
-        flash('Username already exists')
-        return redirect(url_for('register'))
+        return render_template("home.html", register_error="Username already taken")
 
-    # Assign a unique ID to the new user
-    players[username] = generate_password_hash(password)
-    session['user'] = username
-    session['logged_in'] = True
+    hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    players[username] = {"password": hashed_password, "wins": 0, "losses": 0}
     save_data(PLAYER_DB, players)
-    return redirect(url_for('register'))
+
+    # Set session variables
+    session["user"] = username
+    session["login_time"] = uuid.uuid4().hex
+
+    return redirect(url_for("home"))
 
 
 @app.route('/login', methods=['POST'])
@@ -180,24 +250,44 @@ def login():
     return jsonify({"success": False, "error": "Invalid credentials"})
 
 
-@socketio.on('logout')
+@app.route("/logout", methods=['POST'])
 def logout(data=None):
-    user = session.get('user')
-    # TODO: leave_room(game_id)
-    session['logged_in'] = False
-    if user:
-        session.pop('user')
-    session.modified = True  # Important: Mark the session as modified
+    username = session.get("user")
+
+    # Clear all socket connections for this user
+    if username and username in user_socket_map:
+        # Store sids in a list since we'll be modifying the set during iteration
+        user_sids = list(user_socket_map[username])
+        for sid in user_sids:
+            if sid in socket_user_map:
+                del socket_user_map[sid]
+            # Disconnect the socket
+            socketio.emit('force_disconnect', {'reason': 'User logged out'}, to=sid)
+            try:
+                socketio.server.disconnect(sid)
+            except Exception as e:
+                print(f"Error disconnecting socket {sid}: {str(e)}")
+
+        # Remove user from mappings
+        del user_socket_map[username]
+
+    # Clear Flask session
+    session.clear()
+
+    return redirect(url_for("home"))
 
 
-# Also allow log out via HTTP
-@app.route('/logout', methods=['POST'])
-def http_logout():
-    session['logged_in'] = False
-    # TODO: leave_room(game_id)
-    if 'user' in session:
-        session.pop('user')
-    return redirect(url_for('index'))
+# Helper function to get active sockets for a username
+def get_user_sockets(username):
+    return user_socket_map.get(username, set())
+
+
+# Helper to broadcast to all sockets belonging to a specific user
+def emit_to_user(username, event, data):
+    if username in user_socket_map:
+        for sid in user_socket_map[username]:
+            socketio.emit(event, data, to=sid)
+
 
 
 @socketio.on('refresh_games')
@@ -220,6 +310,8 @@ def get_user_info():
 def add_human_player(user_id, game_id):
     # Add 'human' player to the game
     player = AsyncPlayer(user_id)
+    for sid in user_socket_map[user_id]:
+        join_room(game_id, sid)
     Games().get_game(game_id).add_player(player) # Should trigger a callback to EventBroadcaster
     print(f"User {user_id} joined game {game_id}")
 
@@ -234,11 +326,10 @@ def create_game(data=None):
         return
 
     game_id = str(uuid.uuid4())
-    Games().add_game(game_id, GameWrapper(game_id, EventBroadcaster(game_id)))
+    Games().add_game(game_id, GameWrapper(game_id, GameEventHandler(socketio, game_id)))
     # Notify the user and update the game list for all players
     socketio.emit('game_created', {'game_id': game_id})
     print(f"New game created by {user}: {game_id}")
-    join_room(game_id)
     add_human_player(user, game_id)
 
 
@@ -251,7 +342,6 @@ def handle_join_game(data):
         return
 
     game_id = data.get("game_id")
-    join_room(game_id)
     add_human_player(user_id, game_id)
 
 
@@ -350,7 +440,7 @@ def get_game_state(user_id, game_id=None):
             opponent_details.append({
                 "name": gm.players[opponent_index].name,
                 "card_count": gm.players[opponent_index].report_remaining_cards(),
-                "status": gm.get_player_status(gm.players[opponent_index]),  # TODO: Replace with actual status, but currently unused
+                "status": gm.get_player_status(gm.players[opponent_index]),
             })
         else:
             opponent_details.append({"name": None, "card_count": 0, "status": "Absent"})
@@ -403,7 +493,7 @@ def send_game_state(data=None):
         return
 
     # Emit the entire game state in one message
-    socketio.emit('current_game_state', game_state)
+    emit_to_user(user_id, 'current_game_state', game_state)
 
 
 @socketio.on('play_cards')
