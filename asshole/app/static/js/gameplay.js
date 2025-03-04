@@ -227,7 +227,7 @@ const CardGame = {
         } else {
             // Render the card(s)
             cardIds.forEach((card, index) => {
-                const cardElement = this.renderCard(card[0], card[1], index, false, false);
+                const cardElement = this.renderCard(card[0], card[1], index+6, false, false);
                 arenaDiv.appendChild(cardElement);
             });
         }
