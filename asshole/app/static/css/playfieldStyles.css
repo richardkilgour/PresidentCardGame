@@ -15,7 +15,7 @@
 
 .grid-container {
     display: grid;
-    grid-template-columns: 20% 15% 30%r 15% 20%;
+    grid-template-columns: 20% 15% 30% 15% 20%;
     grid-template-rows: 30% 15% 15% 40%;
     width: 100vw;
     height: 100vh;
