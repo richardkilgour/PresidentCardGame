@@ -197,7 +197,6 @@ class GameMaster:
                 self.remove_worst_player()
                 return True
         else:
-            # May be blocking if a player does not play
             self.episode.step()
         return False
 
