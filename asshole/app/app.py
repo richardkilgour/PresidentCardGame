@@ -486,4 +486,4 @@ def handle_play_card(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, allow_unsafe_werkzeug=True, use_reloader=False)
+    socketio.run(app, debug=True, allow_unsafe_werkzeug=True, use_reloader=False, host="0.0.0.0")
