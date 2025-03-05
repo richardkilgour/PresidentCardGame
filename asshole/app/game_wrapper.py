@@ -1,5 +1,4 @@
 # Wrap a Game Master object is a way that can be used by the server app
-from asshole.core.CardGameListener import CardGameListener
 from asshole.core.GameMaster import GameMaster
 
 

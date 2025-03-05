@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Will save a high card for each low card
+For example, if a 3 is in the hand, then
 Otherwise acts as a splitter
 """
 import logging
@@ -9,6 +10,7 @@ import logging
 from asshole.core.PlayingCard import PlayingCard
 from asshole.players.PlayerSplitter import PlayerSplitter
 
+DEBUG = False
 
 class PlayerHolder(PlayerSplitter):
     def play(self):
@@ -36,7 +38,7 @@ class PlayerHolder(PlayerSplitter):
             return candidate
 
         # Debug only block
-        if False:
+        if DEBUG:
             lowest_card = self._hand[0]
             logging.debug("{}'s lowest card is {}".format(self.name, lowest_card))
             for x in range(0, lowest_card.get_value()):
@@ -49,7 +51,7 @@ class PlayerHolder(PlayerSplitter):
         # Do we want to wait for a higher card to be played?
         # 1) Do we have the lowest possible card? No - then play, otherwise
         # 2) We should only play our highest card if it's a winner
-        if (self._hand[-1].get_value() == candidate.cards[0].get_value()):
+        if self._hand[-1].get_value() == candidate.cards[0].get_value():
             save_it = True
             lowest_card = self._hand[0]
             for x in range(0, lowest_card.get_value()):
@@ -62,7 +64,7 @@ class PlayerHolder(PlayerSplitter):
                     if self.memory.get_number_remaining(x) > 0:
                         # Don't risk it!
                         logging.info("{} decides not to play {} to protect the {}".format(self.name, candidate, lowest_card))
-                        candidate = self.possible_plays[-1]
+                        candidate = self.possible_plays(self.target_meld)[-1]
                         break
 
         logging.info("{}'s reaction to the {} is a {}".format(self.name, self.target_meld, candidate))

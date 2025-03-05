@@ -148,7 +148,7 @@ class Episode:
         Deals cards in a round-robin fashion starting from player index 1.
         """
         for player in self.players:
-            assert player.report_remaining_cards() == 0, f"{player.name} has remaining cards before dealing."
+            assert player.report_remaining_cards() == 0, f"{player.name} has {player.report_remaining_cards()} remaining cards before dealing."
         assert len(self.discards) == 0, "Discards pile is not empty before dealing."
 
         i = 1

@@ -26,7 +26,6 @@ const CardGame = {
     setupSocketEvents: function() {
         this.socket.on('connect', () => console.log('WebSocket connection established'));
         this.socket.on("current_game_state", (data) => this.handleGameState(data));
-        this.socket.on('notify_opponent_hands', (data) => this.updateOpponentHands(data));
         this.socket.on('notify_player_joined', () => this.socket.emit("request_game_state"));
         this.socket.on('notify_game_started', () => {
             alert("game_started");
@@ -108,38 +107,12 @@ const CardGame = {
     updatePlayerHand: function(cards) {
         const handContainer = document.getElementById("player-hand");
         handContainer.innerHTML = ""; // Clear previous cards
-
-        //console.log("updatePlayerHand: " + cards);
-
-        cards.forEach((card, index) => {
+        cards.forEach((card, i) => {
+            let index = i - Math.floor(cards.length / 2);
             handContainer.appendChild(this.renderCard(card[0], card[1], index, true, card[2]));
         });
     },
 
-
-    updateOpponentHands: function(data) {
-        console.log("updateOpponentHands");
-        this.opponentCards = data.opponent_cards;
-
-        const opponentContainers = [
-            document.getElementById("opponent-1-hand"),
-            document.getElementById("opponent-2-hand"),
-            document.getElementById("opponent-3-hand")
-        ];
-
-        // Clear existing cards before updating
-        opponentContainers.forEach(container => {
-            if (container) container.innerHTML = "";
-        });
-
-        this.opponentCards.forEach((cardCount, index) => {
-            if (index < opponentContainers.length && opponentContainers[index]) {
-                for (let i = 0; i < cardCount; i++) {
-                    opponentContainers[index].appendChild(this.renderCard(-1, "", i+5, false, false));
-                }
-            }
-        });
-    },
 
     highlightCurrentPlayerTurn: function(data) {
         console.log('notify_player_turn: ' + data.player);
@@ -226,8 +199,9 @@ const CardGame = {
             arenaDiv.appendChild(passedElement);
         } else {
             // Render the card(s)
-            cardIds.forEach((card, index) => {
-                const cardElement = this.renderCard(card[0], card[1], index+6, false, false);
+            cardIds.forEach((card, i) => {
+                let index = i - Math.floor(cardIds.length / 2);
+                const cardElement = this.renderCard(card[0], card[1], index, false, false);
                 arenaDiv.appendChild(cardElement);
             });
         }
@@ -274,9 +248,9 @@ const CardGame = {
 
         const cardHitArea = document.createElement("div");
         cardHitArea.className = "card_hit_area";
-        cardHitArea.style.left = `${index}em`;
-        cardHitArea.style.top = `${((index - 6) / 4) ** 2}em`;
-        cardHitArea.style.transform = `rotate(${7 * (index - 6)}deg)`;
+        cardHitArea.style.left = `${index+6}em`;
+        cardHitArea.style.top = `${(index / 4) ** 2}em`;
+        cardHitArea.style.transform = `rotate(${7 * index}deg)`;
 
         if (playable) {
             const playableCards = [cardId];
@@ -438,7 +412,8 @@ const CardGame = {
 
             // Add cards if player has joined
             for (let i = 0; i < cardCount; i++) {
-                handElement.appendChild(this.renderCard(-1, "", i, false, false));
+                let index = i - Math.floor(cardCount / 2);
+                handElement.appendChild(this.renderCard(-1, "", index, false, false));
             }
 
             // Hide AI selection (owner cannot add AI to an occupied slot)
