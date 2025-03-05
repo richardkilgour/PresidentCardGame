@@ -376,8 +376,24 @@ def find_valid_game(user_id, game_id=None):
 
     return game_id
 
+def get_game_state(game_id):
+    gm = GamesKeeper().get_game(game_id)
+    player_names = GamesKeeper().get_player_names(game_id)
+    player_status = [gm.get_player_status(player) if player else "Absent" for player in gm.players]
+    player_positions = [gm.positions.index(player) if player else -1 for player in gm.positions]
+    player_cards = [player._hand if player else [] for player in gm.players]
 
-def get_game_state(user_id, game_id=None):
+    return {
+        "game_id": game_id,
+        "player_names": player_names,
+        "player_status": player_status,
+        "player_positions": player_positions,
+        "player_hands": player_cards,
+        "owner": gm.players[0].name,
+    }
+
+
+def get_state_for_user(user_id, game_id=None):
     """Find the game from the POV of a user and return structured game state data."""
     if not user_id:
         return None  # No valid session
@@ -387,41 +403,33 @@ def get_game_state(user_id, game_id=None):
     if not game_id:
         return None  # Invalid game ID or player not in game
 
-    gm = GamesKeeper().get_game(game_id)
-    list_of_players = GamesKeeper().get_player_names(game_id)
+    game_state = get_game_state(game_id)
 
-    if user_id not in list_of_players:
+
+    if user_id not in game_state["player_names"]:
         raise KeyError  # The check above should ensure this does not happen
 
     # This is the index that all the lists are based on - the player's perspective
-    player_index = list_of_players.index(user_id)
-    player = gm.players[player_index]
+    player_index = game_state["player_names"].index(user_id)
 
-    player_names = [player.name]
-    player_status = [gm.get_player_status(player)]
-    player_positions = [gm.positions.index(player) if player in gm.positions else -1]
+    player_names = game_state["player_names"][player_index:] + game_state["player_names"][:player_index]
+    player_status = game_state["player_status"][player_index:] + game_state["player_status"][:player_index]
+    player_positions = game_state["player_positions"][player_index:] + game_state["player_positions"][:player_index]
 
     # Get opponent details - start at (player_index+1) to ensure the correct order
     opponent_cards = []
     for i in range(1, 4):
         opponent_index = (i + player_index) % 4
-        opponent = gm.players[opponent_index]
-        if gm.players[opponent_index]:
-            player_names.append(opponent.name)
-            player_status.append(gm.get_player_status(opponent))
-            player_positions.append(gm.positions.index(opponent) if opponent in gm.positions else -1)
-            opponent_cards.append(opponent.report_remaining_cards())
-        else:
-            player_names.append(None)
-            player_status.append("Absent")
-            player_positions.append(-1)
-            opponent_cards.append(0)
+        opponent_cards.append(len(game_state["player_hands"][opponent_index]))
 
     # Use index because we need an exact match - suit is significant
+    # We need the player object to call the possible_plays function
+    player = GamesKeeper().get_game(game_id).players[player_index]
+    # Grab the last card in a meld using c.cards[-1]
     playable_indices = [c.cards[-1].get_index() for c in player.possible_plays(player.target_meld)[:-1]]
 
     playable_cards = []
-    for card in player._hand:
+    for card in game_state["player_hands"][player_index]:
         # Check each card to see if it's playable
         playable = card.get_index() in playable_indices
         playable_cards.append([card.get_value(), card.suit_str(), playable])
@@ -433,7 +441,7 @@ def get_game_state(user_id, game_id=None):
         "positions": player_positions,
         "player_hand": playable_cards,
         "opponent_cards": opponent_cards,
-        "is_owner": (gm.players[0].name == user_id),
+        "is_owner": (game_state["owner"] == user_id),
     }
 
 
@@ -444,7 +452,7 @@ def show_game(game_id):
         return redirect(url_for('index'))
 
     user = session.get('user')
-    game_state = get_game_state(user, game_id)
+    game_state = get_state_for_user(user, game_id)
 
     if not game_state:
         return "Game not found or unauthorized access", 404
@@ -460,7 +468,7 @@ def show_game(game_id):
 def send_game_state(data=None):
     """Send the full game state to the requesting player."""
     user_id = session.get('user')
-    game_state = get_game_state(user_id)
+    game_state = get_state_for_user(user_id)
 
     if not game_state:
         socketio.emit('error', {'message': 'Game not found or unauthorized access'})
