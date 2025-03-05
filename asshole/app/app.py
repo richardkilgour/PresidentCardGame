@@ -15,6 +15,7 @@ from werkzeug.security import check_password_hash
 from asshole.app.game_event_handler import GameEventHandler
 from asshole.app.game_keeper import GamesKeeper
 from asshole.app.game_wrapper import GameWrapper
+from asshole.core.Episode import State
 from asshole.core.Meld import Meld
 from asshole.core.PlayingCard import PlayingCard
 from asshole.players.AsyncPlayer import AsyncPlayer
@@ -346,6 +347,7 @@ def view_game(data=None):
 
 
 # Add new socket event handler
+# TODO: The timed start button hammers this.
 @socketio.on('start_game')
 def start_game(data=None):
     player_id = session.get('user')
@@ -354,7 +356,10 @@ def start_game(data=None):
     if not game_id or game_id not in GamesKeeper().get_games():
         return {'error': 'Game not found'}
 
-    GamesKeeper().get_game(game_id).start()
+    # Only call start if the game is not already underway
+    game = GamesKeeper().get_game(game_id)
+    if not game.episode or game.episode.state == State.INITIALISED:
+        game.start()
 
 
 def find_valid_game(user_id, game_id=None):
