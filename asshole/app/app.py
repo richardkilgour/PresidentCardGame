@@ -373,7 +373,7 @@ def find_valid_game(user_id, game_id=None):
 
 
 def get_game_state(user_id, game_id=None):
-    """Find the game for a user and return structured game state data."""
+    """Find the game from the POV of a user and return structured game state data."""
     if not user_id:
         return None  # No valid session
 
@@ -383,26 +383,34 @@ def get_game_state(user_id, game_id=None):
         return None  # Invalid game ID or player not in game
 
     gm = GamesKeeper().get_game(game_id)
-    player_names = GamesKeeper().get_player_names(game_id)
+    list_of_players = GamesKeeper().get_player_names(game_id)
 
-    if user_id not in player_names:
+    if user_id not in list_of_players:
         raise KeyError  # The check above should ensure this does not happen
 
-    player_index = player_names.index(user_id)
+    # This is the index that all the lists are based on - the player's perspective
+    player_index = list_of_players.index(user_id)
     player = gm.players[player_index]
 
+    player_names = [player.name]
+    player_status = [gm.get_player_status(player)]
+    player_positions = [gm.positions.index(player) if player in gm.positions else -1]
+
     # Get opponent details - start at (player_index+1) to ensure the correct order
-    opponent_details = []
+    opponent_cards = []
     for i in range(1, 4):
         opponent_index = (i + player_index) % 4
+        opponent = gm.players[opponent_index]
         if gm.players[opponent_index]:
-            opponent_details.append({
-                "name": gm.players[opponent_index].name,
-                "card_count": gm.players[opponent_index].report_remaining_cards(),
-                "status": gm.get_player_status(gm.players[opponent_index]),
-            })
+            player_names.append(opponent.name)
+            player_status.append(gm.get_player_status(opponent))
+            player_positions.append(gm.positions.index(opponent) if opponent in gm.positions else -1)
+            opponent_cards.append(opponent.report_remaining_cards())
         else:
-            opponent_details.append({"name": None, "card_count": 0, "status": "Absent"})
+            player_names.append(None)
+            player_status.append("Absent")
+            player_positions.append(-1)
+            opponent_cards.append(0)
 
     # Use index because we need an exact match - suit is significant
     playable_indices = [c.cards[-1].get_index() for c in player.possible_plays(player.target_meld)[:-1]]
@@ -415,10 +423,12 @@ def get_game_state(user_id, game_id=None):
 
     return {
         "game_id": game_id,
-        "player_id": user_id,
-        "opponent_details": opponent_details,
+        "player_names": player_names,
+        "player_status": player_status,
+        "positions": player_positions,
+        "player_hand": playable_cards,
+        "opponent_cards": opponent_cards,
         "is_owner": (gm.players[0].name == user_id),
-        "player_hand": playable_cards
     }
 
 
@@ -435,9 +445,9 @@ def show_game(game_id):
         return "Game not found or unauthorized access", 404
 
     return render_template('game.html',
-                           player_id=game_state["player_id"],
+                           player_names=game_state["player_names"],
                            game_id=game_state["game_id"],
-                           opponent_details=game_state["opponent_details"],
+                           opponent_cards=game_state["opponent_cards"],
                            is_owner=game_state["is_owner"])
 
 

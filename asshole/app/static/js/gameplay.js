@@ -96,30 +96,28 @@ const CardGame = {
 
 
     handleGameState: function(data) {
-        //console.log("Received full game state:", data);
-
-        // Create an array of all existing players (opponents + self)
-        let existingPlayers = data.opponent_details
-            .map(opponent => opponent.name)
-            .filter(name => name !== null); // Remove empty slots
+        console.log("Received full game state:", data);
 
         // Count how many opponents have joined (ignoring null slots)
-        let opponentCount = data.opponent_details.filter(opponent => opponent.name !== null).length;
+        let playerCount = data.player_names.filter(opponent => opponent !== null).length;
+
 
         // Enable "Start Game" button if 3 opponents have joined
         let startGameButton = document.getElementById("start_game_button");
-        if (opponentCount >= 3 && startGameButton.disabled) {
+        if (playerCount >= 4 && startGameButton.disabled) {
             this.enableStartButton();
         }
 
         // Update opponent slots dynamically
-        data.opponent_details.forEach((opponent, index) => {
-            this.updateOpponentSlot(index + 1, opponent.name, opponent.card_count,
-                                  opponent.status, data.is_owner, existingPlayers);
-        });
+        for (var i = 0; i < 3; i += 1) {
+            this.updateOpponentSlot(i + 1, data.player_names[i+1], data.opponent_cards[i],
+                                  data.player_status[i+1], data.is_owner, data.player_names);
+        }
 
         // Update player's hand
         this.updatePlayerHand(data.player_hand);
+        // Update player's name
+        document.getElementById("player_id").innerHTML = data.player_names[0]
     },
 
     updatePlayerHand: function(cards) {
