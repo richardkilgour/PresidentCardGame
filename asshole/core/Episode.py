@@ -287,25 +287,25 @@ class Episode:
             shuffle(self.deck)
             self.state = State.DEALING
             self.deal()
-        elif self.state == State.DEALING:
+        if self.state == State.DEALING:
             # Transition state; potential for delays/notifications.
             self.state = State.SWAPPING
             for player in self.players:
                 logging.debug(f'{player.name} has {player}')
             self.swap_cards()
-        elif self.state == State.SWAPPING:
+        if self.state == State.SWAPPING:
             self.state = State.ROUND_STARTING
             self.pick_round_starter()
             self.positions = []
-        elif self.state == State.ROUND_STARTING:
+        if self.state == State.ROUND_STARTING:
             self.active_players = self.players_with_cards()
             self.current_melds = ['␆', '␆', '␆', '␆']
             self.state = State.PLAYING
-        elif self.state == State.PLAYING:
+        if self.state == State.PLAYING:
             self.player_turn()
             if len(self.active_players) == 1:
                 self.state = State.HAND_WON
-        elif self.state == State.HAND_WON:
+        if self.state == State.HAND_WON:
             if len(self.positions) == 4:
                 self.post_episode_checks()
                 self.state = State.FINISHED
