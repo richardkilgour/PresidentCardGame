@@ -110,7 +110,8 @@ class GameMaster:
         if not position:
             position = self.players.index(None)
         if position and self.players[position]:
-            raise Exception(f"Can't replace exiting player in position {position}")
+            print(f"WARNING: Can't replace exiting player {position=}")
+            return -1
 
         # Notify everyone of the new player
         self.notify_listeners("notify_player_joined", player, position)
