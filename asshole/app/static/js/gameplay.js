@@ -123,7 +123,7 @@ const CardGame = {
         // Update opponent slots dynamically
         for (var i = 0; i < 3; i += 1) {
             this.updateOpponentSlot(i + 1, data.player_names[i+1], data.opponent_cards[i],
-                                  data.player_status[i+1], data.is_owner, data.player_names);
+                                  data.is_owner, data.player_names);
         }
 
         // Update player's hand
@@ -254,15 +254,13 @@ const CardGame = {
         });
     },
 
-    updateOpponentSlot: function(index, playerName, cardCount, status, isOwner, existingPlayers) {
+    updateOpponentSlot: function(index, playerName, cardCount, isOwner, existingPlayers) {
         const nameElement = document.getElementById(`opponent-${index}-name`);
-        const statusElement = document.getElementById(`opponent-${index}-status`);
         const handElement = document.getElementById(`opponent-${index}-hand`);
         const aiSelectElement = document.getElementById(`opponent-${index}-ai-select`);
 
         if (playerName) {
             nameElement.textContent = playerName;
-            statusElement.textContent = status;
             handElement.innerHTML = ""; // Clear existing cards
 
             // Add cards if player has joined
@@ -277,8 +275,7 @@ const CardGame = {
             }
         } else {
             // Player has not joined
-            nameElement.textContent = "Waiting...";
-            statusElement.textContent = "Waiting for Player to join";
+            nameElement.textContent = "Waiting for player to join...";
             handElement.innerHTML = ""; // No cards shown
             console.log("isOwner = " + isOwner);
             console.log("aiSelectElement = " + aiSelectElement);

@@ -15,10 +15,9 @@
         <!-- Left Player -->
         <div class="playfield_left" id="playfield_left">
             <div class="player_left">
+                <h1 id="opponent-1-name">Waiting...</h1>
                 <div class="hand_play_area">
                     <div id="opponent-1-hand"></div>
-                    <h1 id="opponent-1-name">Waiting...</h1>
-                    <p id="opponent-1-status">Waiting for Player to join</p>
                 </div>
             </div>
             <!-- AI Player Selection (Visible only to game owner) -->
@@ -39,10 +38,9 @@
         <!-- Opposite Player -->
         <div class="playfield_center" id="playfield_center">
             <div class="player_opposite">
+                <h1 id="opponent-2-name">Waiting...</h1>
                 <div class="hand_play_area">
                     <div id="opponent-2-hand"></div>
-                    <h1 id="opponent-2-name">Waiting...</h1>
-                    <p id="opponent-2-status">Waiting for Player to join</p>
                 </div>
             </div>
 
@@ -64,10 +62,9 @@
         <!-- Right Player -->
         <div class="playfield_right" id="playfield_right">
             <div class="player_right">
+                <h1 id="opponent-3-name">Waiting...</h1>
                 <div class="hand_play_area">
-                    <div id="opponent-3-hand"></div>
-                    <h1 id="opponent-3-name">Waiting...</h1>
-                    <p id="opponent-3-status">Waiting for Player to join</p>
+                <div id="opponent-3-hand"></div>
             </div>
 
             </div>
@@ -89,11 +86,11 @@
 
         <!-- Bottom: Current Player -->
         <div class="playfield_bottom" id="playfield_bottom">
+            <h1 id="player_id"></h1>
             <div class="player_you">
                 <div class="hand_play_area">
                     <div id="player-hand"></div>
                 </div>
-                <h1 id="player_id"></h1>
                 <button onclick="playCards('PASSED')">Pass</button>
             </div>
         </div>
