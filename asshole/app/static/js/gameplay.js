@@ -79,6 +79,22 @@ const CardGame = {
         });
     },
 
+
+    enableStartButton: function() {
+        console.log("Enable start button");
+        let startGameButton = document.getElementById("start_game_button");
+        startGameButton.disabled = false;
+
+        // Add class to trigger animation
+        startGameButton.classList.add("fill");
+
+        // Auto-click after 5 seconds
+        setTimeout(() => {
+            startGameButton.click();
+        }, 5000);
+    },
+
+
     handleGameState: function(data) {
         //console.log("Received full game state:", data);
 
@@ -92,7 +108,9 @@ const CardGame = {
 
         // Enable "Start Game" button if 3 opponents have joined
         let startGameButton = document.getElementById("start_game_button");
-        startGameButton.disabled = opponentCount < 3;  // Disable unless 3+ players
+        if (opponentCount >= 3 && startGameButton.disabled) {
+            this.enableStartButton();
+        }
 
         // Update opponent slots dynamically
         data.opponent_details.forEach((opponent, index) => {
