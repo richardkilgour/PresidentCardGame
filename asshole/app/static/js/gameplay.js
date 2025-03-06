@@ -24,18 +24,14 @@ const CardGame = {
         this.socket.on("current_game_state", (data) => this.handleGameState(data));
         this.socket.on('notify_player_joined', () => this.socket.emit("request_game_state"));
         this.socket.on('notify_game_started', () => {
-            alert("game_started");
             this.disableStartButton();
             this.socket.emit("request_game_state");
         });
         this.socket.on('notify_hand_start', () => this.socket.emit("request_game_state"));
         this.socket.on('notify_hand_won', (data) => {
-            alert(data.winner + " won the hand.");
             this.socket.emit("request_game_state");
         });
         this.socket.on('notify_played_out', (data) => {
-            alert(data.player + " played out at position " + data.pos);
-
             const rankSymbols = ["👑", "🥈", "🥉", "💩"];
 
             if (data.pos == 0) {
@@ -62,16 +58,14 @@ const CardGame = {
             if (playerElement) {
                 playerElement.setAttribute("data-rank", rankSymbols[data.pos]);
             }
-            this.setStatus(data.player, 'Finished');
             this.socket.emit("request_game_state");
         });
         this.socket.on('hand_won', (data) => {
-            alert(data.winner + " won the round");
             this.socket.emit("request_game_state");
         });
         this.socket.on('notify_player_turn', (data) => this.highlightCurrentPlayerTurn(data));
         this.socket.on('card_played', (data) => {
-            this.setPlayedCard(data.player_id, data.card_id);
+            // Just request the new state - setPlayedCard will be called by the game state receiver
             this.socket.emit("request_game_state");
         });
     },
@@ -130,6 +124,31 @@ const CardGame = {
         this.updatePlayerHand(data.player_hand);
         // Update player's name
         document.getElementById("player_id").innerHTML = data.player_names[0]
+
+        const position_names = [
+            "King",
+            "Prince",
+            "Citizen",
+            "Asshole",
+        ];
+
+        for (var i = 0; i < 4; i += 1) {
+            if (typeof data.player_status[i] === "string") {
+                // The element for Absent players can't be found, so skip them
+                if (data.player_status[i] !== "Absent") {
+                    let position_index = data.player_positions.indexOf(data.player_names[i])
+                    if (position_index >= 0) {
+                        this.setStatus(data.player_names[i], "Finished as " + position_names[position_index] )
+                    } else {
+                        this.setStatus(data.player_names[i], data.player_status[i])
+                    }
+                }
+            }
+            else {
+                // Some cards have been played
+                this.setPlayedCard(data.player_names[i], data.player_status[i]);
+            }
+        }
     },
 
     updatePlayerHand: function(cards) {
@@ -183,7 +202,6 @@ const CardGame = {
 
 
     setStatus: function(playerId, status) {
-        console.log("Status " + status + " of " + playerId);
         // Get the arena div
         const arenaDivId = this.findArena(playerId);
         const arenaDiv = document.getElementById(arenaDivId);
