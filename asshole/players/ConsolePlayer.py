@@ -22,14 +22,6 @@ class ConsolePlayer(AbstractPlayer):
         print(f'Just got {", ".join(c.__str__() for c in cards)} from {giver.name}')
         super().award_cards(cards, giver)
 
-    # Special card_game_listener behaviour
-    def notify_hand_start(self, starter):
-        super(ConsolePlayer, self).notify_hand_start(starter)
-        if starter == self:
-            print("YOU get to start the round")
-        else:
-            print(f'{starter.name} gets to start the round')
-
     def notify_hand_won(self, winner):
         super(ConsolePlayer, self).notify_hand_won(winner)
         print(f'--{winner.name} wins the round--')
