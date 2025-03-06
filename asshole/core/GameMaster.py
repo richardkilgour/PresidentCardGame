@@ -22,7 +22,7 @@ class GameMaster:
             deck_size: Number of cards in the deck. Defaults to 54.
         """
         self.players = [None, None, None, None]
-        self.positions = []
+        self.positions = [None, None, None, None]
         # This is a list of all the card objects - they will be moved around
         self.deck_size: int = deck_size
         self.deck = [PlayingCard(i) for i in range(deck_size)]
@@ -35,7 +35,7 @@ class GameMaster:
     def clear(self) -> None:
         """Reset the GameMaster by clearing all players, positions, and listeners."""
         self.players = [None, None, None, None]
-        self.positions = []
+        self.positions = [None, None, None, None]
         self.listener_list = []
 
     def add_listener(self, listener: CardGameListener) -> None:
@@ -70,18 +70,15 @@ class GameMaster:
             - "Absent"
             - "Waiting" (not yet played)
             - "Passed"
-            - "Finished" (no cards left)
             - "Played" (with the cards played)
         """
         # Query the Episode and get the current status of the requested player
         if self.episode:
-            # The player has finished, and has a position
-            if player in self.episode.positions:
-                # assert player._hand == []
-                return self.episode.positions.index(player)
-            elif player in self.episode.active_players:
-                if player.last_played:
-                    return player.last_played
+            if player in self.episode.active_players:
+                player_index = self.players.index(player)
+                # If they have played card(s), return that
+                if self.episode.current_melds[player_index] and self.episode.current_melds[player_index] != '␆':
+                    return self.episode.current_melds[player_index]
                 else:
                     return "Waiting"
             else:
@@ -148,7 +145,7 @@ class GameMaster:
         Args:
             preset_hands: Optional pre-arranged deck for testing or tournament play
         """
-        logging.info(f"--- Start of a new Game --- positions={self.positions}")
+        logging.info(f"--- Start of a new Game --- {self.positions=}")
         # A client can shuffle the cards themselves (for testing... or cheating?)
         # Shuffle the cards
         if not preset_hands:

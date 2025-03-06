@@ -80,7 +80,7 @@ class Episode:
         Perform the card swapping between players based on their positions.
         Assumes positions are set as [King, Citizen, Prince, Asshole].
         """
-        if self.positions:
+        if all(item is not None for item in self.positions):
             # Use descriptive names for clarity.
             king, citizen, prince, asshole = self.positions[0], self.positions[1], self.positions[2], self.positions[3]
             print(f'{asshole.name} must give {king.name} 2 cards')
@@ -111,7 +111,7 @@ class Episode:
         Otherwise, the player holding the 3♠ (assumed to be value 0, suit 0) starts.
         Notifies listeners about the hand start.
         """
-        if self.positions:
+        if all(item is not None for item in self.positions):
             self.move_to_front(self.positions[3])
         else:
             player_with_3_spades = self.find_card_holder(0, 0)
@@ -209,7 +209,7 @@ class Episode:
         while self.discards:
             self.deck.append(self.discards.pop())
 
-        assert len(self.positions) == 4, "There should be 4 positions."
+        assert not any(pos is None for pos in self.positions), "There should no empty positions."
         for i, p in enumerate(self.positions):
             print(f"{p.name} is ranked as {p.ranking_names[i]}")
         for p in self.players:
@@ -224,12 +224,12 @@ class Episode:
         Args:
             player (Any): The player who has finished playing.
         """
-        ranking = len(self.positions)
+        ranking = self.positions.index(None)
         logging.info(f"{player.name} played out and is ranked {player.ranking_names[ranking]}")
         player.set_position(ranking)
         self.notify_listeners("notify_played_out", player, ranking)
-        self.positions.append(player)
-        player_names = ' '.join(p.name for p in self.positions)
+        self.positions[ranking] = player
+        player_names = ' '.join(p.name if p else '' for p in self.positions)
         logging.info(f"Positions: {player_names}")
 
     def player_turn(self) -> None:
@@ -296,7 +296,7 @@ class Episode:
         if self.state == State.SWAPPING:
             self.state = State.ROUND_STARTING
             self.pick_round_starter()
-            self.positions = []
+            self.positions = [None, None, None, None]
         if self.state == State.ROUND_STARTING:
             self.active_players = self.players_with_cards()
             self.current_melds = ['␆', '␆', '␆', '␆']
@@ -306,7 +306,7 @@ class Episode:
             if len(self.active_players) == 1:
                 self.state = State.HAND_WON
         if self.state == State.HAND_WON:
-            if len(self.positions) == 4:
+            if all(item is not None for item in self.positions):
                 self.post_episode_checks()
                 self.state = State.FINISHED
             else:

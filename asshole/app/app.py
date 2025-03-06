@@ -12,7 +12,7 @@ from flask_socketio import SocketIO, join_room
 
 from werkzeug.security import check_password_hash
 
-from asshole.app.game_event_handler import GameEventHandler
+from asshole.app.game_event_handler import GameEventHandler, cards_to_list
 from asshole.app.game_keeper import GamesKeeper
 from asshole.app.game_wrapper import GameWrapper
 from asshole.core.Episode import State
@@ -380,8 +380,14 @@ def get_game_state(game_id):
     gm = GamesKeeper().get_game(game_id)
     player_names = GamesKeeper().get_player_names(game_id)
     player_status = [gm.get_player_status(player) if player else "Absent" for player in gm.players]
-    player_positions = [gm.positions.index(player) if player else -1 for player in gm.positions]
+    if gm.episode:
+        player_positions = [player.name if player else -1 for player in gm.episode.positions]
+    else:
+        player_positions = [-1]*4
     player_cards = [player._hand if player else [] for player in gm.players]
+
+    # Make the player_state serializable
+    player_status = [status if isinstance(status, str) else cards_to_list(status.cards) for status in player_status]
 
     return {
         "game_id": game_id,
@@ -414,9 +420,11 @@ def get_state_for_user(user_id, game_id=None):
 
     player_names = game_state["player_names"][player_index:] + game_state["player_names"][:player_index]
     player_status = game_state["player_status"][player_index:] + game_state["player_status"][:player_index]
-    player_positions = game_state["player_positions"][player_index:] + game_state["player_positions"][:player_index]
 
-    # Get opponent details - start at (player_index+1) to ensure the correct order
+    # These do not change from the player's perspective
+    player_positions = game_state["player_positions"]
+
+    # Get opponent cards counts - start at (player_index+1) to ensure the correct order
     opponent_cards = []
     for i in range(1, 4):
         opponent_index = (i + player_index) % 4
@@ -438,7 +446,7 @@ def get_state_for_user(user_id, game_id=None):
         "game_id": game_id,
         "player_names": player_names,
         "player_status": player_status,
-        "positions": player_positions,
+        "player_positions": player_positions,
         "player_hand": playable_cards,
         "opponent_cards": opponent_cards,
         "is_owner": (game_state["owner"] == user_id),
