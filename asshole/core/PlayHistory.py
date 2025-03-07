@@ -11,7 +11,7 @@ class PlayHistory:
         # TODO: This is None if someone played out high, and everyone passed
         # meld.cards throws
         if meld:
-            self._memory.append((player, meld.cards))
+            self._memory.append((player, meld))
 
     def get_highest_remaining(self):
         for x in range(13, 0, -1):
