@@ -83,7 +83,6 @@ class Episode:
         if all(item is not None for item in self.positions):
             # Use descriptive names for clarity.
             king, citizen, prince, asshole = self.positions[0], self.positions[1], self.positions[2], self.positions[3]
-            print(f'{asshole.name} must give {king.name} 2 cards')
             tribute = [asshole._hand[-2], asshole._hand[-1]]
             asshole.surrender_cards(tribute, king)
             discard = [king._hand[0], king._hand[1]]
@@ -92,7 +91,6 @@ class Episode:
                 f'{asshole.name} swapped {tribute[0]} and {tribute[1]} for {king.name}\'s cards {discard[0]} and {discard[1]}')
             self.notify_listeners("notify_cards_swapped", king, asshole, 2)
 
-            print(f'{prince.name} must give {citizen.name} 1 card')
             tribute = [prince._hand[-1]]
             prince.surrender_cards(tribute, citizen)
             discard = [citizen._hand[0]]
@@ -211,7 +209,7 @@ class Episode:
 
         assert not any(pos is None for pos in self.positions), "There should no empty positions."
         for i, p in enumerate(self.positions):
-            print(f"{p.name} is ranked as {p.ranking_names[i]}")
+            logging.info(f"{p.name} is ranked as {p.ranking_names[i]}")
         for p in self.players:
             assert p.report_remaining_cards() == 0, f"{p.name} still has cards remaining."
         assert len(self.deck) == 54, "Deck should have 54 cards after restoration."
