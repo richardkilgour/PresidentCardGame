@@ -120,7 +120,7 @@ class AbstractPlayer(CardGameListener):
         self._hand.sort(key=lambda c: c.get_index())
 
     def __str__(self):
-        return " ".join(str(card) for card in self._hand)
+        return self.name + ": " + " ".join(str(card) for card in self._hand)
 
     # Inform the players if a given meld will split the cards
     def will_split(self, candidate):
