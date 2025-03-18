@@ -19,8 +19,8 @@ def meld_to_index(meld: Meld):
     return 54
 
 
-def index_to_meld(index: int) -> Meld:
-    # TODO: accept the hand, and play actual cards
+def index_to_meld(index: int) -> Meld | None:
+    # TODO: accept the hand, and return actual cards
     if index == 54:
         return Meld()
     elif index == 55:
@@ -61,29 +61,43 @@ class DataGrabber(CardGameListener):
         self.target = None
     def notify_play(self, player, meld):
         super().notify_play(player, meld)
-        self.input = torch.zeros(56 * 3 + 54)
-        player_index = self.players.index(player)
-        others_indices = [(player_index + i)%4 for i in range(1,4)]
+        # Add the hand to the input
+        hand = hand_to_indices(player._hand)
+
+        prev_plays = [-1, -1, -1]
+        previous_player_index = (self.players.index(player) + 3) % 4
+        # Move previous player to the front
+        players = self.players[previous_player_index:] + self.players[:previous_player_index]
         # Look over the history, populating the input vectors
-        for move in self.memory._memory.reverse():
-            offset = i * 56
-            if len(self.memory._memory) < (4-i):
-                # Memory is too short, so default to Noop
-                self.input[offset + 55] = 1
-                continue
-            play = self.memory._memory[i-4]
-            if play[0] == self.players[others_indices[i]]:
+        offset = 2
+        # Ignore the most recent play - it's covered by the meld
+        for move in reversed(self.memory._memory[:-1]):
+            # Find the player that made this move (move is [player, meld])
+            while move[0] != players[0]:
+                # Not the expected player - Assume they passed
+                prev_plays[offset] = 54
+                offset -= 1
+                # Bring the last player to the front
+                players = [players[-1]] + players[:-1]
+                if offset < 0:
+                    break
+            if move[0] == players[0]:
                 # This is the expected player
-                other_meld = play[1]
-                self.input[offset + meld_to_index(other_meld)] = 1
-            else:
-                # Noop?
-                self.input[offset + 55] = 1
-        for i in hand_to_indices(player._hand):
-            self.input[56 * 3 + i] = 1
+                other_meld = move[1]
+                prev_plays[offset] = meld_to_index(other_meld)
+                offset -= 1
+                # Bring the last player to the front
+                players = [players[-1]] + players[:-1]
+            if offset < 0:
+                break
+        while offset >= 0:
+            # Assume noop
+            prev_plays[offset] = 55
+            offset -= 1
+
         # Make the training data
-        self.target = torch.zeros(55)
-        self.target[meld_to_index(meld)] = 1
+        self.input = prev_plays + [hand]
+        self.target = meld_to_index(meld)
     def get_data(self):
         input_ = self.input
         target = self.target
@@ -115,50 +129,38 @@ def generate_data(number_of_rounds = 100):
 class ExpertDataset(Dataset):
     def __init__(self, device, filename="expert_data.pt"):
         data = torch.load(filename)
-        self.inputs = torch.tensor(data["inputs"], dtype=torch.float32).to(device)
-        self.targets = torch.tensor(data["targets"], dtype=torch.float32).to(device)
+        self.inputs = data["inputs"]
+        self.targets = data["targets"]
 
     def __len__(self):
         return len(self.inputs)
 
     def __getitem__(self, idx):
+        print(self.inputs[idx], self.targets[idx])
         return self.inputs[idx], self.targets[idx]
 
 
 def generate_random_input():
-    # Create three zero tensors of size 56
-    vec1 = torch.zeros(56, dtype=torch.float32)
-    vec2 = torch.zeros(56, dtype=torch.float32)
-    vec3 = torch.zeros(56, dtype=torch.float32)
+    # Randomly select indices for previous plays
+    idx1 = torch.randint(0, 56, (1,))
+    idx2 = torch.randint(0, 56, (1,))
+    idx3 = torch.randint(0, 56, (1,))
 
-    # Randomly select indices and set them to 1
-    vec1[torch.randint(0, 56, (1,))] = 1
-    vec2[torch.randint(0, 56, (1,))] = 1
-    vec3[torch.randint(0, 56, (1,))] = 1
-
-    # Create a zero tensor of size 54
-    vec4 = torch.zeros(54, dtype=torch.float32)
-
-    # Choose between 0 and 14 random indices to set to 1
+    # Choose between 0 and 14 random indices
     num_indices = torch.randint(0, 15, (1,)).item()
-    random_indices = torch.randint(0, 54, (num_indices,))
-    vec4[random_indices] = 1
+    hand = torch.randint(0, 54, (num_indices,))
 
-    # Concatenate all four vectors into a single input vector
-    input_vector = torch.cat([vec1, vec2, vec3, vec4], dim=0)  # (56 * 3 + 54) = (222,)
-
-    return input_vector
+    return idx1, idx2, idx3, hand
 
 def main():
     # Run some tests
     inp, targ = generate_data(1)
 
     for i, t in zip(inp, targ):
-        vec1, vec2, vec3, vec4 = i[:56], i[56:112], i[112:168], i[168:222]
-        hand_indices = torch.nonzero(vec4, as_tuple=True)[0].tolist()
-        hand = '|'.join([i.__str__() for i in indices_to_hand(hand_indices)])
-        print(index_to_meld(torch.argmax(vec1).item()), index_to_meld(torch.argmax(vec2).item()), index_to_meld(torch.argmax(vec3).item()),
-              hand, index_to_meld(torch.argmax(t).item()))
+        vec1, vec2, vec3, hand = i
+        hand = '|'.join([i.__str__() for i in indices_to_hand(hand)])
+        print(index_to_meld(vec1), index_to_meld(vec2), index_to_meld(vec3),
+              hand, index_to_meld(t))
 
 
 if __name__=="__main__":

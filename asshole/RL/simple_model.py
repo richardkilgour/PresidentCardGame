@@ -8,8 +8,8 @@ class SimpleModel(nn.Module):
         super().__init__()
 
         # Define embeddings
-        self.play_embedding = nn.Embedding(56, 12)  # Maps 56-dim inputs to 12-dim
-        self.hand_embedding = nn.Embedding(54, 20)  # Maps 54-dim inputs to 20-dim
+        self.play_embedding = nn.Embedding(56, 4)
+        self.hand_embedding = nn.Embedding(54, 20, max_norm=1.0)
 
         # MLP hidden layers
         self.fc1 = nn.Linear(56, 128)
@@ -17,26 +17,17 @@ class SimpleModel(nn.Module):
         self.fc2 = nn.Linear(128, 55)
         self.dropout2 = nn.Dropout(dropout_rate)
 
-    def forward(self, x):
-        # Split input into the four sub-vectors
-        vec1, vec2, vec3, vec4 = x[:, :56], x[:, 56:112], x[:, 112:168], x[:, 168:222]  # First three are 56, last is 54
-
+    def forward(self, prev_plays0, prev_plays1, prev_plays2,  hand):
         # Apply the same embedding to the first three vectors
-        emb1 = self.play_embedding(vec1.long())  # (batch, 56, 12)
-        emb2 = self.play_embedding(vec2.long())
-        emb3 = self.play_embedding(vec3.long())
+        e1 = self.embed1(prev_plays0)  # (batch, embed_dim)
+        e2 = self.embed1(prev_plays1)
+        e3 = self.embed1(prev_plays2)
 
-        # Apply a separate embedding to the fourth vector
-        emb4 = self.hand_embedding(vec4.long())  # (batch, 54, 20)
-
-        # Sum over the sequence dimension
-        emb1 = emb1.sum(dim=1)  # (batch, 12)
-        emb2 = emb2.sum(dim=1)
-        emb3 = emb3.sum(dim=1)
-        emb4 = emb4.sum(dim=1)  # (batch, 20)
+        e_set = self.embed2(hand)  # (batch, set_size, embed_dim)
+        e_set = e_set.mean(dim=1)  # Aggregate embeddings (mean or sum)
 
         # Concatenate the embedded vectors (final size: 56)
-        embeddings = torch.cat([emb1, emb2, emb3, emb4], dim=1)  # (batch, 56)
+        embeddings = torch.cat([e1, e2, e3, e_set], dim=-1)
 
         # Pass through MLP with ReLU and Dropout
         hidden = F.relu(self.fc1(embeddings))
@@ -45,7 +36,7 @@ class SimpleModel(nn.Module):
         mlp_output = self.dropout2(mlp_output)  # Dropout before final output
 
         # Apply skip connection to first 54 outputs
-        skip_connection = vec4.float()  # Convert to float (batch, 54)
+        skip_connection = hand.float()  # Convert to float (batch, 54)
         mlp_output[:, :54] += skip_connection  # Add skip-connection values (no dropout applied here)
 
         return mlp_output
