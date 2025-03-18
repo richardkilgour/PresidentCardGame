@@ -5,9 +5,7 @@ from asshole.RL.simple_model import SimpleModel
 
 def save_expert_data(inputs, targets, filename="expert_data.pt"):
     """Converts lists of tensors to single tensor and saves to file."""
-    inputs_tensor = torch.stack(inputs)  # Convert list of tensors to a single tensor
-    targets_tensor = torch.stack(targets)
-    torch.save({"inputs": inputs_tensor, "targets": targets_tensor}, filename)
+    torch.save({"inputs": inputs, "targets": targets}, filename)
 
 
 def load_expert_data(filename="expert_data.pt"):
