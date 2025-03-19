@@ -20,21 +20,15 @@ class PlayHistory:
         return -1
 
     def get_number_remaining(self, value):
-        if value == 13:
-            num_remaining = 2
-        else:
-            num_remaining = 4
-        for m in self._memory:
-            if m[1]:
-                if m[1][0].get_value() == value:
-                    num_remaining -= len(m[1])
-        return num_remaining
+        """Calculate the number of cards remaining for the given value"""
+        # Start with total possible (2 jokers or 4 regular cards)
+        starting_count = 2 if value == 13 else 4
+
+        # Subtract cards that have been played
+        played = sum(len(m[1]) for m in self._memory
+                     if m[1] and m[1][0].get_value() == value)
+
+        return starting_count - played
 
     def __str__(self):
-        # Should probably dump raw, but instead sort it
-        str = ""
-        for m in self._memory:
-            if m[1]:
-                for c in m[1]:
-                    str += "{} ".format(c)
-        return str
+        return ' '.join(c for m in self._memory if m[1] for c in m[1])
