@@ -22,8 +22,10 @@ def meld_to_index(meld: Meld):
 def index_to_meld(index: int) -> Meld | None:
     # TODO: accept the hand, and return actual cards
     if index == 54:
+        # "Pass" is an empty meld
         return Meld()
     elif index == 55:
+        # Waiting is None
         return None
     meld = Meld(PlayingCard(index))
     while index % 4:
@@ -34,7 +36,13 @@ def index_to_meld(index: int) -> Meld | None:
 def indices_to_hand(indices: list[int]):
     hand = []
     for i in indices:
-        hand.append(index_to_meld(i).cards[-1])
+        meld = index_to_meld(i)
+        if meld:
+            if meld.cards:
+                hand.append(meld.cards[-1])
+            else:
+                # "Pass"
+                hand.append(meld)
     return hand
 
 
@@ -59,44 +67,34 @@ class DataGrabber(CardGameListener):
         super().__init__()
         self.input = None
         self.target = None
+
     def notify_play(self, player, meld):
         super().notify_play(player, meld)
         # Add the hand to the input
         hand = hand_to_indices(player._hand)
 
-        prev_plays = [-1, -1, -1]
         previous_player_index = (self.players.index(player) + 3) % 4
         # Move previous player to the front
         players = self.players[previous_player_index:] + self.players[:previous_player_index]
-        # Look over the history, populating the input vectors
-        offset = 2
-        # Ignore the most recent play - it's covered by the meld
-        for move in reversed(self.memory._memory[:-1]):
-            # Find the player that made this move (move is [player, meld])
-            while move[0] != players[0]:
-                # Not the expected player - Assume they passed
-                prev_plays[offset] = 54
-                offset -= 1
-                # Bring the last player to the front
-                players = [players[-1]] + players[:-1]
-                if offset < 0:
-                    break
-            if move[0] == players[0]:
-                # This is the expected player
-                other_meld = move[1]
-                prev_plays[offset] = meld_to_index(other_meld)
-                offset -= 1
-                # Bring the last player to the front
-                players = [players[-1]] + players[:-1]
-            if offset < 0:
+
+        # Get up to 3 previous plays
+        prev_plays = []
+        for play in self.memory.previous_plays_generator(players):
+            cards = meld_to_index(play)
+            prev_plays.append(cards)
+            if len(prev_plays) >= 3:
                 break
-        while offset >= 0:
-            # Assume noop
-            prev_plays[offset] = 55
-            offset -= 1
+
+        # Fill with "noop" if we don't have enough plays
+        while len(prev_plays) < 3:
+            prev_plays.append(55)  # Noop code
+
+        # Reverse to match original order
+        prev_plays = list(reversed(prev_plays))
 
         # Make the training data
-        self.input = prev_plays + [hand]
+        padding = [54] * (14-len(hand))
+        self.input = prev_plays + hand + padding
         self.target = meld_to_index(meld)
     def get_data(self):
         input_ = self.input
@@ -129,38 +127,44 @@ def generate_data(number_of_rounds = 100):
 class ExpertDataset(Dataset):
     def __init__(self, device, filename="expert_data.pt"):
         data = torch.load(filename)
-        self.inputs = data["inputs"]
-        self.targets = data["targets"]
+        self.inputs = torch.tensor(data["inputs"], dtype=torch.int64).to(device)
+        self.targets = torch.tensor(data["targets"], dtype=torch.int64).to(device)
 
     def __len__(self):
         return len(self.inputs)
 
     def __getitem__(self, idx):
-        print(self.inputs[idx], self.targets[idx])
         return self.inputs[idx], self.targets[idx]
 
 
-def generate_random_input():
-    # Randomly select indices for previous plays
-    idx1 = torch.randint(0, 56, (1,))
-    idx2 = torch.randint(0, 56, (1,))
-    idx3 = torch.randint(0, 56, (1,))
+def generate_random_input(batch_size):
+    # Randomly select indices for previous plays (batch_size x 3 values in {0, ..., 55})
+    idxs = torch.randint(0, 56, (batch_size, 3))
 
-    # Choose between 0 and 14 random indices
-    num_indices = torch.randint(0, 15, (1,)).item()
-    hand = torch.randint(0, 54, (num_indices,))
+    # Generate hands with different lengths for each sample
+    hands = []
+    for _ in range(batch_size):
+        num_indices = torch.randint(0, 15, (1,)).item()  # Between 0 and 14 values
+        hand = torch.randint(0, 54, (num_indices,))  # Values in {0, ..., 53}
+        padding = torch.full((14 - num_indices,), 54, dtype=torch.long)  # Pad with 55
+        hands.append(torch.cat([hand, padding]))
 
-    return idx1, idx2, idx3, hand
+    # Stack hands into a batch (batch_size x 14)
+    hands = torch.stack(hands)
+
+    # Concatenate idxs and hands to form the final batch tensor (batch_size x 17)
+    return torch.cat([idxs, hands], dim=1)
 
 def main():
     # Run some tests
     inp, targ = generate_data(1)
 
     for i, t in zip(inp, targ):
-        vec1, vec2, vec3, hand = i
-        hand = '|'.join([i.__str__() for i in indices_to_hand(hand)])
-        print(index_to_meld(vec1), index_to_meld(vec2), index_to_meld(vec3),
-              hand, index_to_meld(t))
+        plays = i[:3]
+        hand = filter(lambda val: val<54, i[3:])
+        hand_str = '|'.join([i.__str__() for i in indices_to_hand(hand)])
+        print(index_to_meld(plays[0]), index_to_meld(plays[1]), index_to_meld(plays[2]),
+              hand_str, index_to_meld(t))
 
 
 if __name__=="__main__":
