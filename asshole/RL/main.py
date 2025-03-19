@@ -39,7 +39,7 @@ if TRAIN:
         for inputs, targets in dataloader:
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = criterion(outputs, targets.argmax(dim=1))  # Convert one-hot to class index
+            loss = criterion(outputs, targets)  # Convert one-hot to class index
             loss.backward()
             optimizer.step()
 
@@ -54,10 +54,8 @@ if TRAIN:
 trained_model = load_model()
 # Generate random input and pass it through the model
 test_batch_size = 10
-test_inputs = []
-for _ in range(test_batch_size):
-    test_inputs.append(generate_random_input())
-test_batch = torch.stack(test_inputs)
+
+test_batch = generate_random_input(test_batch_size)
 
 output = trained_model(test_batch)
 
