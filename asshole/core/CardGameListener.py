@@ -32,7 +32,7 @@ class CardGameListener:
 
     def notify_play(self, player, meld):
         # Someone just played (or passed)
-        self.memory.add_play(player, meld)
+        self.memory.add_play(player, meld, player.report_remaining_cards())
 
     def notify_player_turn(self, player):
         # It is this player's turn to play
