@@ -49,7 +49,7 @@ class AbstractPlayer(CardGameListener):
         if not self.target_meld or meld > self.target_meld:
             self.target_meld = meld
 
-    def possible_plays(self, target_meld):
+    def possible_plays(self):
         """
         Make a list of possible melds that may be played given the target minimum meld
         Will always return the pass option (in last place)
@@ -58,7 +58,7 @@ class AbstractPlayer(CardGameListener):
         # A list of the melds possible to play
         possible_melds = []
 
-        if not target_meld:
+        if not self.target_meld:
             # If no minimum, all melds are playable
             for card in self._hand:
                 # Check to see if this can make a pair
@@ -73,7 +73,7 @@ class AbstractPlayer(CardGameListener):
                     current_meld = Meld(card, current_meld)
                 else:
                     current_meld = Meld(card)
-                if current_meld > target_meld:
+                if current_meld > self.target_meld:
                     possible_melds.append(current_meld)
 
         # The option for Pass

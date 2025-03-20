@@ -21,7 +21,7 @@ class PlayerSplitter(PlayerSimple):
         if not self.target_meld:
             logging.info("No minimum value, so {} is going to play {}".format(self.name, self.possible_plays))
             return candidate
-        possible_plays = self.possible_plays(self.target_meld)
+        possible_plays = self.possible_plays()
         # Find the possible melds, and play the lowest one, unless we have a double
         for candidate in possible_plays:
             if not candidate.cards:

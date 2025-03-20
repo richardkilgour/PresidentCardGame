@@ -28,7 +28,7 @@ class PlayerHolder(PlayerSplitter):
         # Find the possible melded, and play the lowest one, unless we have a double
 
         # If pass is the only option, then do that
-        if len(self.possible_plays(self.target_meld)) == 1 and not candidate.cards:
+        if len(self.possible_plays()) == 1 and not candidate.cards:
             logging.info("{}'s reaction to the {} is a mandatory {}".format(self.name, self.target_meld, candidate))
             return candidate
 
@@ -64,7 +64,7 @@ class PlayerHolder(PlayerSplitter):
                     if self.memory.get_number_remaining(x) > 0:
                         # Don't risk it!
                         logging.info("{} decides not to play {} to protect the {}".format(self.name, candidate, lowest_card))
-                        candidate = self.possible_plays(self.target_meld)[-1]
+                        candidate = self.possible_plays()[-1]
                         break
 
         logging.info("{}'s reaction to the {} is a {}".format(self.name, self.target_meld, candidate))

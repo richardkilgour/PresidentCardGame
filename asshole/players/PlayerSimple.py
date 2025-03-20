@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 The second most simple players type
-Most simple would play possible_plays(self.target_meld)[0]
+Most simple would play possible_plays()[0]
 This one will always play the lowest possible card _unless_ it would split a set.
 """
 import logging
@@ -19,7 +19,7 @@ class PlayerSimple(AbstractPlayer):
         """
         super().play()
         # We know the target meld, and play the lowest option that beats the meld
-        possible_plays = self.possible_plays(self.target_meld)
+        possible_plays = self.possible_plays()
         # If there is the only remaining option (usually 'pass'), take it
         if len(possible_plays) == 1:
             return possible_plays[0]

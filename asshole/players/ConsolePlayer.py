@@ -56,7 +56,7 @@ class ConsolePlayer(AbstractPlayer):
             self.show_player(i)
         print(self)
 
-        selection = self.possible_plays(self.target_meld)
+        selection = self.possible_plays()
 
         card_selection_string = "Select card: \n"
         for key, value in enumerate(selection):
