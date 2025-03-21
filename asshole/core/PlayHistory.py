@@ -28,11 +28,9 @@ class PlayHistory:
 
     def add_play(self, player, meld: [Meld|int], remaining_cards):
         if len(self._passed_players) == 3:
-            # This is the new lead of a fresh hand
-            print(f"ROUND WON BY {player.name=} {remaining_cards=}")
+            # This is the new lead of a fresh hand - TODO: Do we need to remember this?
             self._memory.append((player, ROUND_WON, None, remaining_cards))
             self._passed_players = []
-        print(f"Target meld: {player.target_meld}")
         # Move previous player to end of list
         if not self._players:
             self._players = [player]
@@ -44,30 +42,36 @@ class PlayHistory:
                 self._players = [player] + self._players
 
         # Has the expected player already passed or completed? We are not explicitly notified, so add that to the list
-        while self._players[0] != player:
-            # TODO: Find their remaining cards from the history
-            temp_remaining_cards = 100
-            if player in self._finished_players:
-                self.add_play(self._players[0], COMPLETE, 0)
-            elif player in self._passed_players:
-                self.add_play(self._players[0], Meld(), temp_remaining_cards)
+        expected_player = self._players[0]
+        while expected_player != player:
+            temp_remaining_cards = expected_player.report_remaining_cards()
+            if expected_player in self._finished_players:
+                # player has already finished
+                self._memory.append((expected_player, COMPLETE, self._finished_players.index(expected_player), 0))
+            elif expected_player in self._passed_players:
+                # player has already passed
+                self._memory.append((expected_player, MELD, Meld(), temp_remaining_cards))
             else:
-                self.add_play(self._players[0], WAITING, temp_remaining_cards)
+                # player is waiting
+                self._memory.append((expected_player, WAITING, 0, temp_remaining_cards))
+            self._players.append(self._players.pop(0))
+            expected_player = self._players[0]
 
+        # Remember the cards that were played
+        self._memory.append((player, MELD, meld, remaining_cards))
 
         if remaining_cards == 0:
+            # player gets a position
             if player not in self._finished_players:
                 self._finished_players.append(player)
-            self._memory.append((player, COMPLETE, self._finished_players.index(player), remaining_cards))
-            return
-        if meld == WAITING:
-            self._memory.append((player, WAITING, self._players.index(player), remaining_cards))
+            # If this is the Citizen, only the Asshole is left
+            if len(self._finished_players) == 3:
+                for p in self._players:
+                    if p not in self._finished_players:
+                        self._finished_players.append(p)
             return
         if not meld.cards and player not in self._passed_players:
             self._passed_players.append(player)
-        # Now remember the cards that were played
-        print(f"{player.name} {meld} {remaining_cards=}")
-        self._memory.append((player, MELD, meld, remaining_cards))
 
 
     def get_highest_remaining(self):
@@ -116,7 +120,7 @@ class PlayHistory:
                 current_players = [current_players[-1]] + current_players[:-1]
 
             # We found the player who made the move
-            other_meld = move[1]
+            other_meld = move[2]
             yield other_meld
             # Bring the last player to the front
             current_players = [current_players[-1]] + current_players[:-1]
@@ -143,9 +147,18 @@ def main():
     while not gm.step():
         if gm.episode.state == State.FINISHED:
             break
+    print("=======  REPLAY  ==========")
     for h in listener.memory._memory:
-        print(h)
-
+        if h[1] in [MELD, WAITING]:
+            print(f"{h[0]} {h[2]} {h[3]}")
+        elif h[1] == COMPLETE:
+            print(f"{h[0]} IS DONE RANK {h[2]}")
+    print("=======  BACKWARDS  ==========")
+    for p in listener.memory.previous_plays_generator(listener.players, False):
+        if p in [0, 1,2 ,3]:
+            print(f"Out in position {p}")
+        else:
+            print(p)
 
 if __name__ == "__main__":
     main()
