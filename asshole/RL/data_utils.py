@@ -8,23 +8,33 @@ from asshole.core.Meld import Meld
 from asshole.core.PlayingCard import PlayingCard
 from asshole.players.PlayerSplitter import PlayerSplitter
 
+# TODO: Find a better place for these constants
+PASS_INDEX = 54
+NOOP_INDEX = 55  # AKA waiting
+MAX_HAND_SIZE = 14
 
 def meld_to_index(meld: Meld):
     # Index is based on the card values, plus the number of cards played
     # 0 is a single 3, 1 is a double 3, 2 is a triple 3 and 3 is a quadruple 3
     # 4 is a single 4, 5 is a double 4 , and so forth.
-    # index 54 is a pass
+    # None is waiting
+    if not meld:
+        return NOOP_INDEX
+    # If the meld is a number, it's the position of the player (0=King etc)
+    if meld in [0, 1, 2, 3]:
+        # TODO: The models can't differentiate winning hand with pass
+        return PASS_INDEX
     if meld.cards:
         return 4 * meld.cards[0].get_value() + len(meld.cards) - 1
-    return 54
+    return PASS_INDEX
 
 
 def index_to_meld(index: int) -> Meld | None:
     # TODO: accept the hand, and return actual cards
-    if index == 54:
+    if index == PASS_INDEX:
         # "Pass" is an empty meld
         return Meld()
-    elif index == 55:
+    elif index == NOOP_INDEX:
         # Waiting is None
         return None
     meld = Meld(PlayingCard(index))
@@ -87,13 +97,13 @@ class DataGrabber(CardGameListener):
 
         # Fill with "noop" if we don't have enough plays
         while len(prev_plays) < 3:
-            prev_plays.append(55)  # Noop code
+            prev_plays.append(NOOP_INDEX)  # Noop code
 
         # Reverse to match original order
         prev_plays = list(reversed(prev_plays))
 
         # Make the training data
-        padding = [54] * (14-len(hand))
+        padding = [PASS_INDEX] * (MAX_HAND_SIZE-len(hand))
         self.input = prev_plays + hand + padding
         self.target = meld_to_index(meld)
     def get_data(self):
@@ -139,14 +149,14 @@ class ExpertDataset(Dataset):
 
 def generate_random_input(batch_size):
     # Randomly select indices for previous plays (batch_size x 3 values in {0, ..., 55})
-    idxs = torch.randint(0, 56, (batch_size, 3))
+    idxs = torch.randint(0, NOOP_INDEX+1, (batch_size, 3))
 
     # Generate hands with different lengths for each sample
     hands = []
     for _ in range(batch_size):
         num_indices = torch.randint(0, 15, (1,)).item()  # Between 0 and 14 values
-        hand = torch.randint(0, 54, (num_indices,))  # Values in {0, ..., 53}
-        padding = torch.full((14 - num_indices,), 54, dtype=torch.long)  # Pad with 55
+        hand = torch.randint(0, PASS_INDEX, (num_indices,))  # Values in {0, ..., 53}
+        padding = torch.full((MAX_HAND_SIZE - num_indices,), PASS_INDEX, dtype=torch.long)  # Pad with 55
         hands.append(torch.cat([hand, padding]))
 
     # Stack hands into a batch (batch_size x 14)
@@ -161,7 +171,7 @@ def main():
 
     for i, t in zip(inp, targ):
         plays = i[:3]
-        hand = filter(lambda val: val<54, i[3:])
+        hand = filter(lambda val: val<PASS_INDEX, i[3:])
         hand_str = '|'.join([i.__str__() for i in indices_to_hand(hand)])
         print(index_to_meld(plays[0]), index_to_meld(plays[1]), index_to_meld(plays[2]),
               hand_str, index_to_meld(t))
