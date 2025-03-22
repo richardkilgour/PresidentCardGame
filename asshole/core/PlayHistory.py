@@ -39,21 +39,16 @@ class PlayHistory:
         self._passed_players = []
         self._finished_players = []
 
-    def add_play(self, player, meld: [Meld|int], remaining_cards):
+    def add_play(self, player, meld: [Meld|int]):
+        # Note: It has not been executed yet, so hand includes the meld
+        remaining_cards = player.report_remaining_cards() - len(meld.cards)
+
         self._update_player_order(player)
 
         self._handle_skipped_players(player)
 
         if len(self._passed_players) == 3:
-            # This is the new lead of a fresh hand.
-            self._memory.append(GameEvent(
-                player=player,
-                event_type=EventType.ROUND_WON,
-                primary_data=None,
-                secondary_data=remaining_cards,
-            ))
-            # TODO: Other players go to considered 'waiting'
-            self._passed_players = []
+            self._handle_round_won(player, remaining_cards)
 
         # Remember the cards that were played
         self._memory.append(GameEvent(
@@ -68,6 +63,26 @@ class PlayHistory:
             return
         if not meld.cards and player not in self._passed_players:
             self._passed_players.append(player)
+
+    def _handle_round_won(self, player, remaining_cards):
+        # This is the new lead of a fresh hand.
+        self._memory.append(GameEvent(
+            player=player,
+            event_type=EventType.ROUND_WON,
+            primary_data=None,
+            secondary_data=remaining_cards,
+        ))
+        # Other players go to 'waiting'
+        self._rotate_player_list()
+        for _ in range(0, 3):
+            self._memory.append(GameEvent(
+                player=self._players[0],
+                event_type=EventType.WAITING,
+                primary_data=None,
+                secondary_data=self._players[0].report_remaining_cards()
+            ))
+            self._rotate_player_list()
+        self._passed_players = []
 
     def _handle_player_finished(self, player):
         # player gets a position
@@ -111,13 +126,16 @@ class PlayHistory:
             self._update_player_order(expected_player)
             expected_player = self._players[0]
 
+    def _rotate_player_list(self):
+        self._players.append(self._players.pop(0))
+
     def _update_player_order(self, player):
         # Move previous player to end of list
         if not self._players:
             self._players = [player]
         else:
             # Move previous player to end of list
-            self._players.append(self._players.pop(0))
+            self._rotate_player_list()
             if player not in self._players:
                 # Add the new player to the start of player list
                 self._players = [player] + self._players
