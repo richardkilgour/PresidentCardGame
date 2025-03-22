@@ -89,7 +89,7 @@ class GameMaster:
         else:
             return "Absent"
 
-    def add_player(self, player: AbstractPlayer, position:int  = None) -> int:
+    def add_player(self, player: AbstractPlayer, position:int = None) -> int:
         """
         Add a player to the game.
 
@@ -103,7 +103,6 @@ class GameMaster:
             Exception: ValueError If there are already 4 players
             Exception: If a requested position is taken
         """
-        #
         if not position:
             position = self.players.index(None)
         if position and self.players[position]:
