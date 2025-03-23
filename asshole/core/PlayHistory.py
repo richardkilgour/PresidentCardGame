@@ -9,7 +9,8 @@ from asshole.core.Meld import Meld
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, List
+from typing import Any
+
 
 # Clear enum for event types
 class EventType(Enum):
@@ -18,12 +19,14 @@ class EventType(Enum):
     COMPLETE = auto()    # Player completed their turn
     WAITING = auto()     # Player is waiting for their turn
 
+
 @dataclass
 class GameEvent:
-    player: Any          # Player reference
+    player: Any  # Player reference
     event_type: EventType
-    primary_data: Any    # Meld info, player index, or other primary data
+    primary_data: Any  # Meld info, player index, or other primary data
     secondary_data: Any  # Remaining cards or other secondary data
+
 
 class PlayHistory:
     def __init__(self):
@@ -39,7 +42,7 @@ class PlayHistory:
         self._passed_players = []
         self._finished_players = []
 
-    def add_play(self, player, meld: [Meld|int]):
+    def add_play(self, player, meld: [Meld | int]):
         # Note: It has not been executed yet, so hand includes the meld
         remaining_cards = player.report_remaining_cards() - len(meld.cards)
 
@@ -60,6 +63,7 @@ class PlayHistory:
 
         if remaining_cards == 0:
             self._handle_player_finished(player)
+            print(f"JUST FINISHED: {player}")
             return
         if not meld.cards and player not in self._passed_players:
             self._passed_players.append(player)
@@ -157,43 +161,39 @@ class PlayHistory:
 
         return starting_count - played
 
-    def previous_plays_generator(self, start_players, ignore_latest=True):
+    def previous_plays_generator(self, start_pos:int = -2):
         """
         Generate previous play indices in reverse chronological order.
 
         Args:
-            start_players: List of players, with the previous player at index 0
-            ignore_latest: Whether to ignore the most recent play in memory
+            start_pos: starting position in the memory, and work back from there Default -2 -: Ignore the most recent play
 
         Yields:
-            Integer indices representing previous plays (54 for pass, others for actual plays)
+            Tuple of player name and integer indices representing previous plays (54 for pass, others for actual plays)
         """
-        # Make a copy of players that we can modify
-        current_players = start_players.copy()
-
         # Determine where to start in the memory
-        memory = self._memory
-        if ignore_latest:
-            memory = memory[:-1]  # Skip the last entry
+        memory = self._memory[:start_pos+1]
 
         # Iterate through memory in reverse order
         for move in reversed(memory):
-            # Rotate players until we find the one who made this move
-            while move.player != current_players[0]:
-                # Not the expected player - Assume they passed
-                yield Meld()  # Pass code
-                # Bring the last player to the front
-                current_players = [current_players[-1]] + current_players[:-1]
-
-            # We found the player who made the move
-            other_meld = move.primary_data
-            yield other_meld
-            # Bring the last player to the front
-            current_players = [current_players[-1]] + current_players[:-1]
-
+            # We have the move in question
+            if move.event_type == EventType.MELD:
+                yield move.player, move.primary_data
+            if move.event_type == EventType.ROUND_WON:
+                yield move.player, "ROUND WON"
+            if move.event_type == EventType.COMPLETE:
+                yield move.player, f"PLAYER FINISHED pos {move.primary_data}"
+            if move.event_type == EventType.WAITING:
+                yield move.player, None
+        # Three players are waiting at the start of history
+        for i in range(0, 3):
+            # Edge case: If this is the first payer, the other players may not have been added yet
+            player = self._memory[3-i].player if len(self._memory) >= (4-i) else None
+            yield player, None
 
     def __str__(self):
         return ' '.join(c for m in self._memory if m[2] for c in m[2])
+
 
 def main():
     # Run some tests
@@ -213,8 +213,8 @@ def main():
     while not gm.step():
         if gm.episode.state == State.FINISHED:
             break
-    print("=======  REPLAY  ==========")
-    for event in listener.memory._memory:
+    print("=======  RAW MEMORY  ==========")
+    for i, event in enumerate(listener.memory._memory):
         # Check based on the actual event type value
         if event.event_type.value in [EventType.MELD.value, EventType.WAITING.value]:
             print(f"{event.player} {event.primary_data} {event.secondary_data}")
@@ -222,12 +222,15 @@ def main():
             print(f"{event.player} IS DONE RANK {event.primary_data}")
         elif event.event_type.value == EventType.ROUND_WON.value:
             print(f"{event.player} WON THE HAND {event.primary_data}")
-    print("=======  BACKWARDS  ==========")
-    for p in listener.memory.previous_plays_generator(listener.players, False):
-        if p in [0, 1,2 ,3]:
-            print(f"Out in position {p}")
-        else:
-            print(p)
+    print("=======  MEMORY WITH HISoTRY  ==========")
+    for i in range(0, len(listener.memory._memory)):
+        prev_plays = []
+        for player, play in listener.memory.previous_plays_generator(i):
+            # Perpend the previous ones
+            prev_plays.insert(0, f"{player} {play}\t")
+            if len(prev_plays) >= 4:
+                break
+        print(f"{' '.join(prev_plays)}")
 
 if __name__ == "__main__":
     main()

@@ -1,12 +1,10 @@
 import torch
 from torch.utils.data import Dataset
 
-from asshole.RL.file_utils import load_expert_data
 from asshole.core.CardGameListener import CardGameListener
 from asshole.core.GameMaster import GameMaster
 from asshole.core.Meld import Meld
 from asshole.core.PlayingCard import PlayingCard
-from asshole.players.PlayerSplitter import PlayerSplitter
 
 # TODO: Find a better place for these constants
 PASS_INDEX = 54
@@ -79,19 +77,20 @@ class DataGrabber(CardGameListener):
         self.target = None
 
     def notify_play(self, player, meld):
+        # This will add the current play to the memory
         super().notify_play(player, meld)
-        # Add the hand to the input
-        hand = hand_to_indices(player._hand)
 
-        previous_player_index = (self.players.index(player) + 3) % 4
-        # Move previous player to the front
-        players = self.players[previous_player_index:] + self.players[:previous_player_index]
+        assert self.memory._memory[-1].player == player
+        assert self.memory._memory[-1].primary_data == meld
+
+        # Add the player's hand to the input
+        hand = hand_to_indices(player._hand)
 
         # Get up to 3 previous plays
         prev_plays = []
-        for play in self.memory.previous_plays_generator(players):
+        for _, play in self.memory.previous_plays_generator():
             cards = meld_to_index(play)
-            prev_plays.append(cards)
+            prev_plays.insert(0, cards)
             if len(prev_plays) >= 3:
                 break
 
@@ -115,13 +114,15 @@ class DataGrabber(CardGameListener):
 
 
 def generate_data(number_of_rounds = 100):
+    from asshole.players.PlayerSimple import PlayerSimple
     gm = GameMaster()
     data_grabber = DataGrabber()
     gm.add_listener(data_grabber)
-    gm.add_player(PlayerSplitter(f'name_1'))
-    gm.add_player(PlayerSplitter(f'name_2'))
-    gm.add_player(PlayerSplitter(f'name_3'))
-    gm.add_player(PlayerSplitter(f'name_4'))
+    # Learn to play like a simple player
+    gm.add_player(PlayerSimple(f'name_1'))
+    gm.add_player(PlayerSimple(f'name_2'))
+    gm.add_player(PlayerSimple(f'name_3'))
+    gm.add_player(PlayerSimple(f'name_4'))
     gm.start(number_of_rounds)
     inputs = []
     targets = []
