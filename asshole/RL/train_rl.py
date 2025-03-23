@@ -18,6 +18,7 @@ NUM_GAMES = 1000
 EPOCHS = 100
 
 TRAIN = True
+EXTRA_TESTING = False
 
 if TRAIN:
     inputs, targets = generate_data(NUM_GAMES)
@@ -26,6 +27,23 @@ if TRAIN:
     # Use DataLoader for batch processing
     dataset = ExpertDataset(device)
     dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+    if EXTRA_TESTING:
+        from asshole.RL.data_utils import PASS_INDEX
+
+        for inputs, targets in dataloader:
+            # Some tests
+            for i in range(0,64):
+                inp = inputs[i,:].tolist()
+                targ = targets[i].tolist()
+                hist = inp[:3]
+                hand = [x for x in filter(lambda val: val < PASS_INDEX, inp[3:])]
+                if targ not in hand and targ != PASS_INDEX:
+                    print(f"WARNING: {targ=} not in {hand=}")
+                melds = [x for x in filter(lambda val: val < PASS_INDEX, hist)]
+                if melds and targ <= max(melds):
+                    print(f"WARNING: {targ=} does not beat {melds=}")
+                    print(inp, targ)
 
     # Define model, loss, optimizer
     model = SimpleModel().to(device)
