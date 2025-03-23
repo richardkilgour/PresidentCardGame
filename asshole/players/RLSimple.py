@@ -7,14 +7,38 @@ This one will always play the lowest possible card _unless_ it would split a set
 """
 import logging
 
-from asshole.RL.data_utils import hand_to_indices, meld_to_index
+import torch
+
+from asshole.RL.data_utils import hand_to_indices, meld_to_index, index_to_meld
 from asshole.RL.file_utils import load_model
 from asshole.core.AbstractPlayer import AbstractPlayer
 
 
+def masked_argmax(output_probs, valid_indices):
+    """
+    Selects the index with the highest probability, but only among valid indices.
+
+    Args:
+        output_probs (torch.Tensor): Model output tensor of shape (batch_size, 55).
+        valid_indices (list or torch.Tensor): List of valid indices.
+
+    Returns:
+        torch.Tensor: The selected class indices for each batch element.
+    """
+    # Convert valid_indices to a mask (batch_size, 55) where invalid indices are -inf
+    mask = torch.full_like(output_probs, float('-inf'))
+    mask[:, valid_indices] = output_probs[:, valid_indices]
+
+    # Take argmax only on valid indices
+    return mask.argmax(dim=1)
+
+
 class RLSimple(AbstractPlayer):
-    def __init__(self, model_file, name):
+    def __init__(self, name, model_file = None):
         super().__init__(name)
+        # Default model location. Move to config?
+        if not model_file:
+            model_file = "RL/best_model.pt"
         self.trained_model = load_model(filepath = model_file)
 
     """Concrete players with a simple and stupid strategy - play the lowest possible card"""
@@ -28,7 +52,7 @@ class RLSimple(AbstractPlayer):
         # We know the target meld, and play the lowest option that beats the meld
         possible_plays = self.possible_plays()
 
-        # TODO: Mostly duplicetd from DataGrabber
+        # TODO: Mostly duplicated from DataGrabber
         previous_player_index = (self.players.index(self) + 3) % 4
         # Move previous player to the front
         players = self.players[previous_player_index:] + self.players[:previous_player_index]
@@ -43,4 +67,14 @@ class RLSimple(AbstractPlayer):
                 break
         hand = hand_to_indices(self._hand)
         padding = [54] * (14-len(hand))
-        self.input = prev_plays + hand + padding
+        net_in = torch.tensor([prev_plays + hand + padding],  dtype=torch.int64)
+        net_out = self.trained_model(net_in)
+
+        # Turn possible plays into a mask
+        valid_indices = []
+        for p in possible_plays:
+            valid_indices.append(meld_to_index(p))
+        # Filter the output by the possible plays
+        best_meld = masked_argmax(net_out, valid_indices)
+        meld = index_to_meld(best_meld)
+        return meld
