@@ -81,14 +81,14 @@ class DataGrabber(CardGameListener):
         super().notify_play(player, meld)
 
         assert self.memory._memory[-1].player == player
-        assert self.memory._memory[-1].primary_data == meld
+        assert self.memory._memory[-1].meld == meld
 
         # Add the player's hand to the input
         hand = hand_to_indices(player._hand)
 
         # Get up to 3 previous plays
         prev_plays = []
-        for _, play in self.memory.previous_plays_generator():
+        for _, play, desc in self.memory.previous_plays_generator():
             cards = meld_to_index(play)
             prev_plays.insert(0, cards)
             if len(prev_plays) >= 3:

@@ -14,18 +14,22 @@ from typing import Any
 
 # Clear enum for event types
 class EventType(Enum):
-    MELD = auto()        # Player made a meld
-    ROUND_WON = auto()   # Player won a round
-    COMPLETE = auto()    # Player completed their turn
-    WAITING = auto()     # Player is waiting for their turn
+    MELD = "meld"        # Player made a meld
+    ROUND_WON = "round_won"   # Player won a round
+    COMPLETE = "completed"    # Player completed their turn
+    WAITING = "waiting"     # Player is waiting for their turn
 
 
 @dataclass
 class GameEvent:
     player: Any  # Player reference
     event_type: EventType
-    primary_data: Any  # Meld info, player index, or other primary data
-    secondary_data: Any  # Remaining cards or other secondary data
+    meld: Any  # Meld info, player index, or other primary data
+    remaining_cards: Any  # Remaining cards or other secondary data
+
+    def __str__(self):
+        return (f"{self.event_type}\t{self.player=}\t"
+                f"{self.meld=}\t{self.remaining_cards=})")
 
 
 class PlayHistory:
@@ -57,13 +61,12 @@ class PlayHistory:
         self._memory.append(GameEvent(
             player=player,
             event_type=EventType.MELD,
-            primary_data=meld,
-            secondary_data=remaining_cards,
+            meld=meld,
+            remaining_cards=remaining_cards,
         ))
 
         if remaining_cards == 0:
             self._handle_player_finished(player)
-            print(f"JUST FINISHED: {player}")
             return
         if not meld.cards and player not in self._passed_players:
             self._passed_players.append(player)
@@ -73,8 +76,8 @@ class PlayHistory:
         self._memory.append(GameEvent(
             player=player,
             event_type=EventType.ROUND_WON,
-            primary_data=None,
-            secondary_data=remaining_cards,
+            meld=None,
+            remaining_cards=remaining_cards,
         ))
         # Other players go to 'waiting'
         self._rotate_player_list()
@@ -82,8 +85,8 @@ class PlayHistory:
             self._memory.append(GameEvent(
                 player=self._players[0],
                 event_type=EventType.WAITING,
-                primary_data=None,
-                secondary_data=self._players[0].report_remaining_cards()
+                meld=None,
+                remaining_cards=self._players[0].report_remaining_cards()
             ))
             self._rotate_player_list()
         self._passed_players = []
@@ -108,24 +111,24 @@ class PlayHistory:
                 self._memory.append(GameEvent(
                     player=expected_player,
                     event_type=EventType.COMPLETE,
-                    primary_data=self._finished_players.index(expected_player),
-                    secondary_data=0,
+                    meld=self._finished_players.index(expected_player),
+                    remaining_cards=0,
                 ))
             elif expected_player in self._passed_players:
                 # player has already passed
                 self._memory.append(GameEvent(
                     player=expected_player,
                     event_type=EventType.MELD,
-                    primary_data=Meld(),
-                    secondary_data=temp_remaining_cards,
+                    meld=Meld(),
+                    remaining_cards=temp_remaining_cards,
                 ))
             else:
                 # player is waiting
                 self._memory.append(GameEvent(
                     player=expected_player,
                     event_type=EventType.WAITING,
-                    primary_data=0,
-                    secondary_data=temp_remaining_cards,
+                    meld=0,
+                    remaining_cards=temp_remaining_cards,
                 ))
             self._update_player_order(expected_player)
             expected_player = self._players[0]
@@ -161,35 +164,41 @@ class PlayHistory:
 
         return starting_count - played
 
-    def previous_plays_generator(self, start_pos:int = -2):
+    def previous_plays_generator(self, start_pos:int = 0):
         """
         Generate previous play indices in reverse chronological order.
 
         Args:
-            start_pos: starting position in the memory, and work back from there Default -2 -: Ignore the most recent play
+            start_pos: starting position in the memory, and work back from there Default: 0 - take the whole memory
 
         Yields:
-            Tuple of player name and integer indices representing previous plays (54 for pass, others for actual plays)
+            Tuple of:
+               player name
+               integer indices representing previous plays (54 for pass, others for actual plays)
+               string representation of the event
         """
         # Determine where to start in the memory
-        memory = self._memory[:start_pos+1]
+        if start_pos <= 0:
+            memory = self._memory
+        else:
+            memory = self._memory[:-start_pos] if start_pos < len(self._memory) else []  # Remove last n items or return empty list
 
         # Iterate through memory in reverse order
         for move in reversed(memory):
             # We have the move in question
             if move.event_type == EventType.MELD:
-                yield move.player, move.primary_data
+                yield move.player, move.meld, f"{move.player.name} PLAYED {move.meld}"
             if move.event_type == EventType.ROUND_WON:
-                yield move.player, "ROUND WON"
+                yield move.player, -1, f"{move.player.name} WON THE ROUND"
             if move.event_type == EventType.COMPLETE:
-                yield move.player, f"PLAYER FINISHED pos {move.primary_data}"
+                yield move.player, move.meld, f"PLAYER IS FINISHED IN POS {move.meld}"
             if move.event_type == EventType.WAITING:
-                yield move.player, None
+                yield move.player, None, f"{move.player.name} IS WAITING"
         # Three players are waiting at the start of history
         for i in range(0, 3):
             # Edge case: If this is the first payer, the other players may not have been added yet
             player = self._memory[3-i].player if len(self._memory) >= (4-i) else None
-            yield player, None
+            yield player, None, f"{getattr(player, 'name', '<unknown>')} IS WAITING"
 
     def __str__(self):
         return ' '.join(c for m in self._memory if m[2] for c in m[2])
@@ -217,17 +226,17 @@ def main():
     for i, event in enumerate(listener.memory._memory):
         # Check based on the actual event type value
         if event.event_type.value in [EventType.MELD.value, EventType.WAITING.value]:
-            print(f"{event.player} {event.primary_data} {event.secondary_data}")
+            print(f"{event.player} {event.meld} {event.remaining_cards}")
         elif event.event_type.value == EventType.COMPLETE.value:
-            print(f"{event.player} IS DONE RANK {event.primary_data}")
+            print(f"{event.player} IS DONE RANK {event.meld}")
         elif event.event_type.value == EventType.ROUND_WON.value:
-            print(f"{event.player} WON THE HAND {event.primary_data}")
+            print(f"{event.player} WON THE HAND {event.meld}")
     print("=======  MEMORY WITH HISoTRY  ==========")
     for i in range(0, len(listener.memory._memory)):
         prev_plays = []
-        for player, play in listener.memory.previous_plays_generator(i):
+        for player, play, desc in listener.memory.previous_plays_generator(i):
             # Perpend the previous ones
-            prev_plays.insert(0, f"{player} {play}\t")
+            prev_plays.insert(0, desc + "\t")
             if len(prev_plays) >= 4:
                 break
         print(f"{' '.join(prev_plays)}")

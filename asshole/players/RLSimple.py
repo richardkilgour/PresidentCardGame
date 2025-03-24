@@ -52,17 +52,12 @@ class RLSimple(AbstractPlayer):
         # We know the target meld, and play the lowest option that beats the meld
         possible_plays = self.possible_plays()
 
-        # TODO: Mostly duplicated from DataGrabber
-        previous_player_index = (self.players.index(self) + 3) % 4
-        # Move previous player to the front
-        players = self.players[previous_player_index:] + self.players[:previous_player_index]
-
         # Create an input vector for the model (similar to DataGrabber)
         # Get up to 3 previous plays
         prev_plays = []
-        for play in self.memory.previous_plays_generator(players):
+        for _, play, desc in self.memory.previous_plays_generator():
             cards = meld_to_index(play)
-            prev_plays.append(cards)
+            prev_plays.insert(0, cards)
             if len(prev_plays) >= 3:
                 break
         hand = hand_to_indices(self._hand)
@@ -71,9 +66,7 @@ class RLSimple(AbstractPlayer):
         net_out = self.trained_model(net_in)
 
         # Turn possible plays into a mask
-        valid_indices = []
-        for p in possible_plays:
-            valid_indices.append(meld_to_index(p))
+        valid_indices = [meld_to_index(p) for p in possible_plays]
         # Filter the output by the possible plays
         best_meld = masked_argmax(net_out, valid_indices)
         meld = index_to_meld(best_meld)
