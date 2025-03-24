@@ -45,6 +45,7 @@ class AbstractPlayer(CardGameListener):
         self.target_meld = None
 
     def notify_play(self, player, meld):
+        super().notify_play(player, meld)
         # Ignore passes
         if not self.target_meld or meld > self.target_meld:
             self.target_meld = meld
