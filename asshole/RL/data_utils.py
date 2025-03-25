@@ -88,7 +88,8 @@ class DataGrabber(CardGameListener):
 
         # Get up to 3 previous plays
         prev_plays = []
-        for _, play, desc in self.memory.previous_plays_generator():
+        # Skip the current play
+        for _, play, desc in self.memory.previous_plays_generator(1):
             cards = meld_to_index(play)
             prev_plays.insert(0, cards)
             if len(prev_plays) >= 3:
@@ -97,9 +98,6 @@ class DataGrabber(CardGameListener):
         # Fill with "noop" if we don't have enough plays
         while len(prev_plays) < 3:
             prev_plays.append(NOOP_INDEX)  # Noop code
-
-        # Reverse to match original order
-        prev_plays = list(reversed(prev_plays))
 
         # Make the training data
         padding = [PASS_INDEX] * (MAX_HAND_SIZE-len(hand))
