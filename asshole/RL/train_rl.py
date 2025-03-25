@@ -14,8 +14,8 @@ else:
     device = 'cpu'
 print(f"Using {device}")
 
-NUM_GAMES = 1000
-EPOCHS = 100
+NUM_GAMES = 5000
+EPOCHS = 40
 
 TRAIN = True
 EXTRA_TESTING = False

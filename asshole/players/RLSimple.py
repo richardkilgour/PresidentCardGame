@@ -5,8 +5,6 @@ The second most simple players type
 Most simple would play possible_plays()[0]
 This one will always play the lowest possible card _unless_ it would split a set.
 """
-import logging
-
 import torch
 
 from asshole.RL.data_utils import hand_to_indices, meld_to_index, index_to_meld

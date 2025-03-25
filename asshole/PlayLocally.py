@@ -23,7 +23,7 @@ def main():
         module = importlib.import_module(module_name)
         player_class = getattr(module, p['type'])
         gm.make_player(player_class, p['name'])
-    gm.start(number_of_rounds=100)
+    gm.start(number_of_rounds=1000)
     while not gm.step():
         pass
 

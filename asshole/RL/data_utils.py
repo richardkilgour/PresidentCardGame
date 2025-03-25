@@ -112,15 +112,15 @@ class DataGrabber(CardGameListener):
 
 
 def generate_data(number_of_rounds = 100):
-    from asshole.players.PlayerSimple import PlayerSimple
+    from asshole.players.PlayerSplitter import PlayerSplitter
     gm = GameMaster()
     data_grabber = DataGrabber()
     gm.add_listener(data_grabber)
     # Learn to play like a simple player
-    gm.add_player(PlayerSimple(f'name_1'))
-    gm.add_player(PlayerSimple(f'name_2'))
-    gm.add_player(PlayerSimple(f'name_3'))
-    gm.add_player(PlayerSimple(f'name_4'))
+    gm.add_player(PlayerSplitter(f'name_1'))
+    gm.add_player(PlayerSplitter(f'name_2'))
+    gm.add_player(PlayerSplitter(f'name_3'))
+    gm.add_player(PlayerSplitter(f'name_4'))
     gm.start(number_of_rounds)
     inputs = []
     targets = []

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Will not split a double or triple except 2 and Joker)
+Will not split a double or triple except 2 and Joker
 Also will split the highest cards to stay in the game
 """
 import logging
