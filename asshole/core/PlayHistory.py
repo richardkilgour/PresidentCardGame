@@ -164,12 +164,12 @@ class PlayHistory:
 
         return starting_count - played
 
-    def previous_plays_generator(self, start_pos:int = 0):
+    def previous_plays_generator(self, plays_to_skip:int = 0):
         """
         Generate previous play indices in reverse chronological order.
 
         Args:
-            start_pos: starting position in the memory, and work back from there Default: 0 - take the whole memory
+            plays_to_skip: starting position in the memory, and work back from there Default: 0 - take the whole memory
 
         Yields:
             Tuple of:
@@ -178,10 +178,10 @@ class PlayHistory:
                string representation of the event
         """
         # Determine where to start in the memory
-        if start_pos <= 0:
+        if plays_to_skip <= 0:
             memory = self._memory
         else:
-            memory = self._memory[:-start_pos] if start_pos < len(self._memory) else []  # Remove last n items or return empty list
+            memory = self._memory[:-plays_to_skip] if plays_to_skip < len(self._memory) else []  # Remove last n items or return empty list
 
         # Iterate through memory in reverse order
         for move in reversed(memory):
