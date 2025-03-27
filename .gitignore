@@ -75,3 +75,8 @@ president/test.log
 /.idea/misc.xml
 /.idea/modules.xml
 /.idea/vcs.xml
+
+# Temporary files
+president/RL/best_model.pt
+president/RL/expert_data.pt
+president/test.log
