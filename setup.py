@@ -4,11 +4,11 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name="asshole",
+    name="president",
     version="0.0.1",
     author="Richard Kilgour",
     author_email="richardkilgour@gmail.com",
-    description="Asshole",
+    description="PresidentCardGame",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://",
@@ -22,6 +22,6 @@ setup(
         "Operating System :: OS Independent",
     ],
     entry_points={
-        'console_scripts' : ['play_asshole=asshole.PlayAsshole:main'],
+        'console_scripts' : ['play_president=president.PlayPresident:main'],
     }
 )

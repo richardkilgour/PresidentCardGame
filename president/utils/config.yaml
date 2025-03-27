@@ -1,0 +1,18 @@
+player1:
+    name: Richard
+    type_: PlayerHolder
+    type: PlayerSimple
+player2:
+    name: Silvia
+    type_: ConsolePlayer
+    type: PlayerSimple
+player3:
+    name: Sara
+    type_: PlayerSplitter
+    type: PlayerSimple
+player4:
+    name: snAkbar
+    type: RLSimple
+screen:
+  width: 900
+  height: 600
