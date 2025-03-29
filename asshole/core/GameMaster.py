@@ -119,7 +119,7 @@ class GameMaster:
         self.add_listener(player)
         return position
 
-    def make_player(self, player_type: type[AbstractPlayer], name: str = None) -> AbstractPlayer:
+    def make_player(self, player_type: type[AbstractPlayer], name: str = None) -> AbstractPlayer | None:
         """
         Create a new player and add them to the game.
 
