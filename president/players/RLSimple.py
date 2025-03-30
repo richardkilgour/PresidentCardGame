@@ -1,16 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-The second most simple players type
-Most simple would play possible_plays()[0]
-This one will always play the lowest possible card _unless_ it would split a set.
+Loads a RL model and uses the default history to construct the inputs to the model
+Checks if the output is valid before returning the best card(s) to play.
 """
 import torch
 
 from president.RL.data_utils import hand_to_indices, meld_to_index, index_to_meld
-from president.RL.file_utils import load_model
+from president.RL.grid_model import load_model
 from president.core.AbstractPlayer import AbstractPlayer
-
 
 def masked_argmax(output_probs, valid_indices):
     """
@@ -39,7 +37,6 @@ class RLSimple(AbstractPlayer):
             model_file = "RL/best_model.pt"
         self.trained_model = load_model(filepath = model_file)
 
-    """Concrete players with a simple and stupid strategy - play the lowest possible card"""
     def play(self):
         """
         Given a list of cards, choose a set to play
@@ -66,6 +63,10 @@ class RLSimple(AbstractPlayer):
         # Turn possible plays into a mask
         valid_indices = [meld_to_index(p) for p in possible_plays]
         # Filter the output by the possible plays
+        best_play = net_out.argmax()
         best_meld = masked_argmax(net_out, valid_indices)
+        if best_play != best_meld.item():
+            print(f"Target: {self.target_meld} Hand: {' '.join([c.__str__() for c in self._hand])}")
+            print(f"Wanted to play {index_to_meld(best_play)}, but decided to play {index_to_meld(best_meld.item())}")
         meld = index_to_meld(best_meld)
         return meld
