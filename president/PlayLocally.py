@@ -15,7 +15,7 @@ def main():
 
     gm = GameMaster()
 
-    config = yaml.safe_load(open("utils/config.yaml"))
+    config = yaml.safe_load(open("config/config.yaml"))
     players = [config['player1'], config['player2'], config['player3'], config['player4'], ]
     for i, p in enumerate(players):
         module_name = 'players.' + p['type']  # Assuming the module name matches the class name in lowercase
