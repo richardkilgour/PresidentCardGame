@@ -1,23 +1,31 @@
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
-
+# Input is the last three plays (each one of 56 classes), then 14 inputs representing the current hand (55 classes)
+# Classes are:
+#   0-53 are playing cards. 3 of spades is 0; Red joker is 53
+#   54 is 'Pass' / 'Mask'
+#   55 is 'Waiting'
+# Output the probabilities of each possible card being played (55 possibilities)
 
 class SimpleModel(nn.Module):
     def __init__(self, dropout_rate=0.2):
         super().__init__()
+        historic_embedding_size = 16
+        hand_embedding_size = 16
+        hidden_size = 512
 
         # Embeddings for the previous plays (54 card, pass and waiting)
-        self.play_embedding = nn.Embedding(56, 4)
+        self.play_embedding = nn.Embedding(56, historic_embedding_size)
         # Embeddings for each payer card (54 cards, plus padding if no card)
-        self.hand_embedding = nn.Embedding(55, 4, padding_idx=54)
+        self.hand_embedding = nn.Embedding(55, hand_embedding_size, padding_idx=54)
 
-        embedded_size = 3 * 4 + 14 * 4
+        embedded_size = 3 * historic_embedding_size + 14 * hand_embedding_size
 
         # MLP hidden layers
-        self.hidden = nn.Linear(embedded_size, 128)
+        self.hidden = nn.Linear(embedded_size, hidden_size)
         self.dropout = nn.Dropout(dropout_rate)
-        self.output = nn.Linear(128, 55)
+        self.output = nn.Linear(hidden_size, 55)
 
     def forward(self, inputs):
         """
@@ -44,10 +52,10 @@ class SimpleModel(nn.Module):
         hidden = F.relu(self.hidden(embeddings))
         hidden = self.dropout(hidden)
 
-        mlp_output = self.output(hidden)
+        return self.output(hidden)
 
-        # TODO: Apply skip connection to first 54 outputs?
-        # skip_connection = hand.float()[:, :54]  # Convert to float (batch, 54)
-        # mlp_output[:, :54] += skip_connection  # Add skip-connection values (no dropout applied here)
-
-        return mlp_output
+def load_model(filepath="best_model.pt"):
+    model = SimpleModel()
+    model.load_state_dict(torch.load(filepath))
+    model.eval()  # Set to evaluation mode
+    return model
