@@ -1,34 +1,27 @@
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
+
+from president.models.simple_model import SimpleModel
+
+
 # Each card is represented by 2 inputs:
 #   14 classes + pass + waiting
 #   4 = the number of cards (Always 0 for pass and waiting)
 # Expected input is history of three plays, then 14 inputs representing the hand
 
-class GridModel(nn.Module):
+class GridModel(SimpleModel):
     def __init__(self, dropout_rate=0.2):
-        super().__init__()
-        # Must be a multiple of 4 to avoid round errors in the embedding size calculation
-        historic_embedding_size = 16
-        hand_embedding_size = 16
-        hidden_size = 512
+        super().__init__(dropout_rate)
+        # Handle the embeddings differently from the simple model
+        # Note: embedding sizes must be a multiple of 4 to avoid round errors in the embedding size calculation
+        self.play_value_embedding = nn.Embedding(16, (3 * self.historic_embedding_size) // 4)  # 14 rows → 4-dim embedding
+        self.play_count_embedding = nn.Embedding(4, self.historic_embedding_size // 4)   # 4 cols → 2-dim embedding
+        self.play_fc = nn.Linear(self.historic_embedding_size, self.historic_embedding_size)  # Combine embeddings into a hidden layer
 
-        self.play_value_embedding = nn.Embedding(16, (3 * historic_embedding_size) // 4)  # 14 rows → 4-dim embedding
-        self.play_count_embedding = nn.Embedding(4, historic_embedding_size // 4)   # 4 cols → 2-dim embedding
-        # Or could concat them, but let's capture the interaction here
-        self.play_fc = nn.Linear(historic_embedding_size, historic_embedding_size)  # Combine embeddings into a hidden layer
-
-        self.hand_value_embedding = nn.Embedding(15, (3 * hand_embedding_size) // 4)  # 14 rows → 4-dim embedding
-        self.hand_count_embedding = nn.Embedding(4, hand_embedding_size // 4)   # 4 cols → 2-dim embedding
-        self.hand_fc = nn.Linear(hand_embedding_size, hand_embedding_size)  # Combine embeddings into a hidden layer
-
-        embedded_size = 3 * historic_embedding_size + 14 * hand_embedding_size
-
-        # MLP hidden layers
-        self.hidden = nn.Linear(embedded_size, hidden_size)
-        self.dropout = nn.Dropout(dropout_rate)
-        self.output = nn.Linear(hidden_size, 55)
+        self.hand_value_embedding = nn.Embedding(15, (3 * self.hand_embedding_size) // 4)  # 14 rows → 4-dim embedding
+        self.hand_count_embedding = nn.Embedding(4, self.hand_embedding_size // 4)   # 4 cols → 2-dim embedding
+        self.hand_fc = nn.Linear(self.hand_embedding_size, self.hand_embedding_size)  # Combine embeddings into a hidden layer
 
     @staticmethod
     def class_to_grid(class_idx):
@@ -38,19 +31,12 @@ class GridModel(nn.Module):
         col = torch.where(class_idx < 54, class_idx % 4, torch.tensor(0))
         return row, col
 
-    def forward(self, inputs):
+    def forward(self, prev_plays, hand):
         """
           inputs: Tensor of shape (batch_size, 17)
           First 3 values: {0, ..., 55}
           Last 14 values: {0, ..., 55} (55 is the mask token)
         """
-        # TODO: convert inputs to grids
-        batch_size = inputs.shape[0]
-
-        # Separate first 3 values and last 14 values
-        prev_plays = inputs[:, :3]  # Shape: (batch_size, 3)
-        hand = inputs[:, 3:]  # Shape: (batch_size, 14)
-
         # Convert to grid coordinates
         hist_rows, hist_cols = self.class_to_grid(prev_plays)  # Shape: (batch_size, 3)
         hand_rows, hand_cols = self.class_to_grid(hand)  # Shape: (batch_size, 14)
