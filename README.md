@@ -1,7 +1,5 @@
 # President
 
-This plays a game of President with a console interface vs 3 computer opponents
-
 President is a card game where the player tries to get rid of all their cards
 
 After the first episode, whoever finished first is the President, followed by Vice-President, Citizen and finally the looser, scumbag
@@ -13,11 +11,10 @@ Vice-President swaps one bad card for a good card from the Citizen
 Rules: 
 * Typically played with a 54 card deck (will probably crash otherwise)
 * Cards a ranked from 3 though to King, then Ace. Twos are ranked above Ace, and the two Jokers are the highest cards.
-
 That is: 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, A, 2, Joker
 * Scumbag leads the first 'round' (or whoever has 3 Spades in the first episode where there are no positions)
 
-Leader can play any card (but usally a low one)
+Leader can play any card (but usually a low one)
 
 *Leading a single Card*
 
