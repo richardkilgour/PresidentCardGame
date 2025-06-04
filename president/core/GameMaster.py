@@ -58,6 +58,18 @@ class GameMaster:
         for listener in self.listener_list:
             getattr(listener, notify_func_name)(*args)
 
+    def get_player_status_from_episode(self, player):
+        if player in self.episode.active_players:
+            player_index = self.players.index(player)
+            # If they have played card(s), return that
+            if self.episode.current_melds[player_index] and self.episode.current_melds[player_index] != '␆':
+                return self.episode.current_melds[player_index]
+            else:
+                return "Waiting"
+        else:
+            # No position and not active -> Passed
+            return "Passed"
+
     def get_player_status(self, player: AbstractPlayer) -> str:
         """
         Get the status of a player.
@@ -74,22 +86,23 @@ class GameMaster:
         """
         # Query the Episode and get the current status of the requested player
         if self.episode:
-            if player in self.episode.active_players:
-                player_index = self.players.index(player)
-                # If they have played card(s), return that
-                if self.episode.current_melds[player_index] and self.episode.current_melds[player_index] != '␆':
-                    return self.episode.current_melds[player_index]
-                else:
-                    return "Waiting"
-            else:
-                # No position and not active -> Passed
-                return "Passed"
+            return self.get_player_status_from_episode(player)
         elif player in self.players:
             return "Waiting"
         else:
             return "Absent"
 
-    def add_player(self, player: AbstractPlayer, position:int = None) -> int:
+    def notify_player_joined(self, player: AbstractPlayer, position:int):
+        # Notify everyone of the new player
+        self.notify_listeners("notify_player_joined", player, position)
+        # Notify the new player of the other players (include own position)
+        for i, existing_player in enumerate(self.players):
+            if existing_player:
+                player.notify_player_joined(existing_player, i)
+        self.add_listener(player)
+
+
+    def add_player(self, player: AbstractPlayer, position:int|None = None) -> int:
         """
         Add a player to the game.
 
@@ -109,14 +122,9 @@ class GameMaster:
             print(f"WARNING: Can't replace exiting player {position=}")
             return -1
 
-        # Notify everyone of the new player
-        self.notify_listeners("notify_player_joined", player, position)
-        # Notify the new player of the other players (include own position)
         self.players[position] = player
-        for i, existing_player in enumerate(self.players):
-            if existing_player:
-                player.notify_player_joined(existing_player, i)
-        self.add_listener(player)
+        self.notify_player_joined(player, position)
+
         return position
 
     def make_player(self, player_type: type[AbstractPlayer], name: str = None) -> AbstractPlayer | None:
@@ -170,6 +178,19 @@ class GameMaster:
         self.reset(preset_hands=preset_hands)
         self.notify_listeners("notify_game_stated")
 
+    def setup_new_round(self):
+        self.positions = self.episode.positions
+        logging.info(f"--- Round Finished with positions {self.positions} ---")
+        self.reset()
+        assert len(self.deck) == 54, "Deck size should be 54 after reset"
+        # Keep some stats
+        self.round_number += 1
+        if self.number_of_rounds and self.round_number > self.number_of_rounds:
+            print(self.position_stats_str())
+            self.remove_worst_player()
+            return True
+        return False
+
     def step(self) -> bool:
         """
         Execute a single step of the game.
@@ -182,16 +203,7 @@ class GameMaster:
 
         if self.episode.state == State.FINISHED:
             # Set up a new round
-            self.positions = self.episode.positions
-            logging.info(f"--- Round Finished with positions {self.positions} ---")
-            self.reset()
-            assert len(self.deck) == 54, "Deck size should be 54 after reset"
-            # Keep some stats
-            self.round_number += 1
-            if self.number_of_rounds and self.round_number > self.number_of_rounds:
-                print(self.position_stats_str())
-                self.remove_worst_player()
-                return True
+            return self.setup_new_round()
         else:
             self.episode.step()
         return False

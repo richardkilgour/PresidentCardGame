@@ -75,6 +75,18 @@ class Episode:
                 highest_meld = m
         return highest_meld
 
+    def swap_player_cards(self, low_player, high_player, num_cards):
+        best_n_cards = low_player._hand[-num_cards:]
+        low_player.surrender_cards(best_n_cards, high_player)
+
+        worst_n_cards = high_player._hand[:num_cards]
+        high_player.surrender_cards(worst_n_cards, low_player)
+
+        logging.debug(
+            f'{low_player.name} swapped {", ".join(map(str, best_n_cards))} for {high_player.name}\'s cards {", ".join(map(str, worst_n_cards))}')
+
+        self.notify_listeners("notify_cards_swapped", high_player, low_player, num_cards)
+
     def swap_cards(self) -> None:
         """
         Perform the card swapping between players based on their positions.
@@ -82,21 +94,10 @@ class Episode:
         """
         if all(item is not None for item in self.positions):
             # Use descriptive names for clarity.
-            president, vice_president, citizen, scumbag = self.positions[0], self.positions[1], self.positions[2], self.positions[3]
-            tribute = [scumbag._hand[-2], scumbag._hand[-1]]
-            scumbag.surrender_cards(tribute, president)
-            discard = [president._hand[0], president._hand[1]]
-            president.surrender_cards(discard, scumbag)
-            logging.debug(
-                f'{scumbag.name} swapped {tribute[0]} and {tribute[1]} for {president.name}\'s cards {discard[0]} and {discard[1]}')
-            self.notify_listeners("notify_cards_swapped", president, scumbag, 2)
+            president, vice_president, citizen, scumbag = self.positions
 
-            tribute = [vice_president._hand[-1]]
-            vice_president.surrender_cards(tribute, citizen)
-            discard = [citizen._hand[0]]
-            citizen.surrender_cards(discard, vice_president)
-            logging.debug(f'{vice_president.name} swapped {tribute[0]} for {citizen.name}\'s card {discard[0]}')
-            self.notify_listeners("notify_cards_swapped", vice_president, citizen, 1)
+            self.swap_player_cards(scumbag, president, 2)
+            self.swap_player_cards(citizen, vice_president, 1)
 
             for player in self.players:
                 logging.debug(f'{player.name} has {player}')
@@ -175,7 +176,7 @@ class Episode:
                     return player
         return None
 
-    def players_with_cards(self) -> list[AbstractPlayer]:
+    def get_players_with_cards(self) -> list[AbstractPlayer]:
         """
         Retrieve a list of players who still have cards in hand.
 
@@ -296,7 +297,7 @@ class Episode:
             self.pick_round_starter()
             self.positions = [None, None, None, None]
         if self.state == State.ROUND_STARTING:
-            self.active_players = self.players_with_cards()
+            self.active_players = self.get_players_with_cards()
             self.current_melds = ['␆', '␆', '␆', '␆']
             self.state = State.PLAYING
         if self.state == State.PLAYING:
