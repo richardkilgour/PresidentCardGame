@@ -1,8 +1,9 @@
 import logging
-from random import shuffle
 
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.CardGameListener import CardGameListener
+from president.core.DeckManager import DeckManager
+from president.core.PlayerManager import PlayerManager
 from president.core.PlayingCard import PlayingCard
 from president.core.Episode import Episode, State
 
@@ -21,11 +22,14 @@ class GameMaster:
         Args:
             deck_size: Number of cards in the deck. Defaults to 54.
         """
-        self.players = [None, None, None, None]
-        self.positions = [None, None, None, None]
+        self.player_manager = PlayerManager()
+        # List of the current positions of the players (President, etc)
+        # Put the winning player at the front of the list. Loser is last
+        self.positions = []
+
         # This is a list of all the card objects - they will be moved around
-        self.deck_size: int = deck_size
-        self.deck = [PlayingCard(i) for i in range(deck_size)]
+        self.deck = DeckManager(deck_size)
+
         self.listener_list = []
         self.number_of_rounds = None
         self.round_number = 0
@@ -34,8 +38,6 @@ class GameMaster:
 
     def clear(self) -> None:
         """Reset the GameMaster by clearing all players, positions, and listeners."""
-        self.players = [None, None, None, None]
-        self.positions = [None, None, None, None]
         self.listener_list = []
 
     def add_listener(self, listener: CardGameListener) -> None:
@@ -60,7 +62,7 @@ class GameMaster:
 
     def get_player_status_from_episode(self, player):
         if player in self.episode.active_players:
-            player_index = self.players.index(player)
+            player_index = self.player_manager.players.index(player)
             # If they have played card(s), return that
             if self.episode.current_melds[player_index] and self.episode.current_melds[player_index] != '␆':
                 return self.episode.current_melds[player_index]
@@ -87,7 +89,7 @@ class GameMaster:
         # Query the Episode and get the current status of the requested player
         if self.episode:
             return self.get_player_status_from_episode(player)
-        elif player in self.players:
+        elif player in self.player_manager.players:
             return "Waiting"
         else:
             return "Absent"
@@ -96,54 +98,23 @@ class GameMaster:
         # Notify everyone of the new player
         self.notify_listeners("notify_player_joined", player, position)
         # Notify the new player of the other players (include own position)
-        for i, existing_player in enumerate(self.players):
+        for i, existing_player in enumerate(self.player_manager.players):
             if existing_player:
                 player.notify_player_joined(existing_player, i)
         self.add_listener(player)
 
 
     def add_player(self, player: AbstractPlayer, position:int|None = None) -> int:
-        """
-        Add a player to the game.
-
-        Args:
-            player: The player to add
-            name: Optional name for the player
-            position: Optional position to add the new player there. Otherwise, take the first available one
-        Returns:
-            The index of the new player
-        Raises:
-            Exception: ValueError If there are already 4 players
-            Exception: If a requested position is taken
-        """
-        if not position:
-            position = self.players.index(None)
-        if position and self.players[position]:
-            print(f"WARNING: Can't replace exiting player {position=}")
-            return -1
-
-        self.players[position] = player
+        position = self.player_manager.add_player(player, position)
         self.notify_player_joined(player, position)
-
         return position
 
+
     def make_player(self, player_type: type[AbstractPlayer], name: str = None) -> AbstractPlayer | None:
-        """
-        Create a new player and add them to the game.
-
-        Args:
-            player_type: Either a class or a string (for a saved/serialized player)
-            name: Optional name for the player
-
-        Returns:
-            The newly created player
-        """
-        if not name:
-            name = f'Player {len(self.players)}'
-        new_player = player_type(name)
-        new_player_index = self.add_player(new_player)
-        # Return the new player
-        return self.players[new_player_index]
+        # Forward this to the Player manager
+        new_player =  self.player_manager.make_player(player_type, name)
+        self.add_player(new_player)
+        return new_player
 
     def reset(self, preset_hands: list[PlayingCard] = None) -> None:
         """
@@ -156,8 +127,8 @@ class GameMaster:
         # A client can shuffle the cards themselves (for testing... or cheating?)
         # Shuffle the cards
         if not preset_hands:
-            shuffle(self.deck)
-        self.episode = Episode(self.players, self.positions, self.deck, self.listener_list)
+            self.deck.shuffle()
+        self.episode = Episode(self.player_manager, [], self.deck, self.listener_list)
 
     def start(self, number_of_rounds: int = 100, preset_hands: list[PlayingCard] = None) -> None:
         """
@@ -170,7 +141,7 @@ class GameMaster:
         Raises:
             Exception: If there are not exactly 4 players
         """
-        if None in self.players:
+        if None in self.player_manager.players:
             raise Exception("Not enough Players")
         self.round_number = 0
         self.number_of_rounds = number_of_rounds
@@ -179,10 +150,9 @@ class GameMaster:
         self.notify_listeners("notify_game_stated")
 
     def setup_new_round(self):
-        self.positions = self.episode.positions
+        self.positions = self.episode.ranks
         logging.info(f"--- Round Finished with positions {self.positions} ---")
         self.reset()
-        assert len(self.deck) == 54, "Deck size should be 54 after reset"
         # Keep some stats
         self.round_number += 1
         if self.number_of_rounds and self.round_number > self.number_of_rounds:
@@ -216,7 +186,7 @@ class GameMaster:
             A formatted string with position statistics for each player
         """
         result = []
-        for player in self.players:
+        for player in self.player_manager.players:
             result.append(
                 f'{player.name} was President {player.position_count[0]}; '
                 f'Vice-President {player.position_count[1]}; '
@@ -234,7 +204,7 @@ class GameMaster:
         worst_player = None
         lowest_score = float('inf')  # Start with infinity to find minimum
 
-        for player in self.players:
+        for player in self.player_manager.players:
             score = player.get_score()
             if score < lowest_score:
                 worst_player = player
@@ -242,4 +212,4 @@ class GameMaster:
 
         if worst_player:
             print(f'{worst_player.name} is pissed off and quits')
-            self.players.remove(worst_player)
+            self.player_manager.players.remove(worst_player)
