@@ -4,11 +4,12 @@
 Episode module for controlling a single episode of a card game.
 
 Takes players in their current positions and plays through to new positions.
+
 Responsible for: state machine flow, turn management, rank assignment,
 and notifying listeners of all game events.
 
-Not responsible for: card movement mechanics (see CardHandler),
-serialisation (see GameCheckpoint - future).
+Not responsible for: card movement mechanics (CardHandler),
+serialisation (GameCheckpoint - future).
 """
 import logging
 import pickle
@@ -16,6 +17,7 @@ from enum import Enum
 
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.CardGameListener import CardGameListener
+from president.core.CardHandler import CardHandler
 from president.core.DeckManager import DeckManager
 from president.core.Meld import Meld
 from president.core.PlayerManager import PlayerManager
@@ -32,8 +34,8 @@ class State(Enum):
 
 
 class Episode:
-    def __init__(self, player_manager: PlayerManager, ranks: list[AbstractPlayer], deck: DeckManager,
-                 listener_list: list[CardGameListener]) -> None:
+    def __init__(self, player_manager: PlayerManager, ranks: list[AbstractPlayer],
+                 deck: DeckManager, listener_list: list[CardGameListener]) -> None:
         self.state: State = State.INITIALISED
         self.player_manager = player_manager
         self.ranks = ranks
@@ -42,6 +44,7 @@ class Episode:
         self.active_players = []
         self.deck = deck
         self.listener_list = listener_list
+        self.card_handler = CardHandler(deck, player_manager.discarded_cards)
 
     def clear(self):
         self.state: State = State.INITIALISED
@@ -68,27 +71,12 @@ class Episode:
             "Discards pile is not empty before dealing."
         self.deck.deal_cards(self.player_manager.players)
 
-    def swap_player_cards(self, low_player, high_player, num_cards):
-        # TODO: Move to CardHandler
-        best_n_cards = low_player._hand[-num_cards:]
-        low_player.surrender_cards(best_n_cards, high_player)
-        worst_n_cards = high_player._hand[:num_cards]
-        high_player.surrender_cards(worst_n_cards, low_player)
-        logging.debug(
-            f'{low_player.name} swapped {", ".join(map(str, best_n_cards))} '
-            f'for {high_player.name}\'s cards {", ".join(map(str, worst_n_cards))}'
-        )
-        self.notify_listeners("notify_cards_swapped", high_player, low_player, num_cards)
-
     def swap_cards(self) -> None:
-        """Swap cards between players based on their previous positions."""
-        # TODO: Move to CardHandler
+        """Swap cards between players based on their previous episode rankings."""
+        self.card_handler.swap_for_new_episode(self.ranks)
         if len(self.ranks) == 4:
-            president, vice_president, citizen, scumbag = self.ranks
-            self.swap_player_cards(scumbag, president, 2)
-            self.swap_player_cards(citizen, vice_president, 1)
-            for player in self.player_manager.players:
-                logging.debug(f'{player.name} has {player}')
+            self.notify_listeners("notify_cards_swapped", self.ranks[0], self.ranks[3], 2)
+            self.notify_listeners("notify_cards_swapped", self.ranks[1], self.ranks[2], 1)
 
     def move_to_front(self, front_player: AbstractPlayer) -> None:
         """Rotate the players list until the specified player is at the front."""
@@ -169,13 +157,9 @@ class Episode:
             self.active_players.remove(player)
         else:
             self.notify_listeners("notify_play", player, action)
-            # TODO: Move card movement to CardHandler
-            for card in action.cards:
-                player._hand.remove(card)
-                self.player_manager.discarded_cards.append(card)
+            self.card_handler.play_meld(player, action)
             index = self.player_manager.players.index(player)
             self.current_melds[index] = action
-            logging.debug(f'{player.name} is left with {player}')
             if player.report_remaining_cards() == 0:
                 self.set_player_finished(player)
             self.active_players.append(self.active_players.pop(0))
@@ -185,25 +169,10 @@ class Episode:
     # -------------------------------------------------------------------------
 
     def post_episode_checks(self) -> None:
-        """
-        Finalise the episode: log rankings, move scumbag's cards to discard,
-        and restore the full deck.
-        TODO: Card restoration to move to CardHandler or DeckManager.
-        """
+        """Finalise the episode: log rankings, collect scumbag cards, restore deck."""
         assert len(self.ranks) == 4
-
-        scumbag = self.ranks[-1]
-        logging.info(f'{scumbag.name} is the Scumbag!!! Left with {scumbag._hand}')
-        while scumbag._hand:
-            self.player_manager.discarded_cards.append(scumbag._hand.pop())
-        assert len(self.player_manager.discarded_cards) == 54, \
-            "Discards pile should have 54 cards."
-        assert len(self.deck.deck) == 0, \
-            "Deck should be empty before transferring discards."
-
-        while self.player_manager.discarded_cards:
-            self.deck.deck.append(self.player_manager.discarded_cards.pop())
-
+        self.card_handler.collect_scumbag_cards(self.ranks[-1])
+        self.card_handler.restore_deck()
         assert not any(pos is None for pos in self.ranks), \
             "There should be no empty positions."
         for i, p in enumerate(self.ranks):
@@ -211,8 +180,6 @@ class Episode:
         for p in self.player_manager.players:
             assert p.report_remaining_cards() == 0, \
                 f"{p.name} still has cards remaining."
-        assert len(self.deck.deck) == 54, \
-            "Deck should have 54 cards after restoration."
 
     # -------------------------------------------------------------------------
     # State machine
@@ -241,7 +208,7 @@ class Episode:
         if self.state == State.ROUND_STARTING:
             self.active_players = self.get_players_with_cards()
             self.current_melds = ['␆', '␆', '␆', '␆']
-            # Notify waiting players (those already ranked from a previous hand)
+            # Notify players sitting out this hand
             for player in self.player_manager.players:
                 if player not in self.active_players:
                     self.notify_listeners("notify_waiting", player)
