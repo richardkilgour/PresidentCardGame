@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from functools import total_ordering
 from president.core.PlayingCard import PlayingCard
 
 
+@total_ordering # gives __lt__, __ge__, __ne__ for free
 class Meld:
     """
     Meld is a glorified list of cards
@@ -14,59 +16,77 @@ class Meld:
         if card:
             self.cards = [card]
         if meld:
-            self.cards = meld.cards + [card]
-            # Sort by card index
-            self.cards.sort(key=lambda c: c.get_index())
+            # Sort ascending by card index
+            self.cards = sorted(meld.cards + [card], key=lambda c: c.get_index())
+
+    def __len__(self):
+        return len(self.cards)
+
+    def __eq__(self, other):
+        if not isinstance(other, Meld):
+            return NotImplemented
+        return self.cards == other.cards
+
 
     def __gt__(self, other):
-        """self <= other"""
-        # Empty is lowest
+        """Returns True if self beats other in play."""
+        if not isinstance(other, Meld):
+            return NotImplemented
+
+        # Empty meld (pass) loses to everything
         if not self.cards:
             return False
+
         # Everything beats a pass
         if not other.cards:
             return True
 
-        # In all cases, face value lower or equal is lower
+        # Lower or equal face value cannot win
         if self.cards[0] <= other.cards[0]:
             return False
 
-        # We know that self has a higher face value, so need to check the lengths
+        # self has higher face value — now check length rules
+        self_len = len(self)
+        other_len = len(other)
+        self_val = self.cards[0].get_value()
 
-        # If target length is 1, then any higher single will win
-        if len(other.cards) == 1:
+
+        if other_len == 1:
+            # If target length is 1, then any higher single will win
             # Double's can't beat a single
-            return len(self.cards) == 1
-        elif len(other.cards) == 2:
-            # Special case for 3 and joker
-            if self.cards[0].get_value() >= 12:
-                return len(self.cards) == 1
-            return len(self.cards) == 2
-        elif len(other.cards) == 3:
-            # Special case for 3 and joker
-            if self.cards[0].get_value() == 12:
-                return len(self.cards) == 2
-            if self.cards[0].get_value() == 13:
+            return self_len == 1
+        elif other_len == 2:
+            if self_val >= 12:
+                # A single 2 or Joker beats any pair
+                return self_len == 1
+            return self_len == 2
+        elif other_len == 3:
+            if self_val == 12:
+                # Double 2 beats a triple
+                return self_len == 2
+            if self_val == 13:
                 if other.cards[0] == 12:
-                    # Triple 2 needs 2 Jokers
-                    return len(self.cards) == 2
-                # Otherwise one Joker will be enough
-                return len(self.cards) == 1
-            # Three cards to beat three cards
-            return len(self.cards) == 3
-        elif len(other.cards) == 4:
-            # Special case for 3 and joker
-            if self.cards[0].get_value() == 12:
-                return len(self.cards) == 3
-            if self.cards[0].get_value() == 13:
+                    # 2 Jokers are needed to beat a triple 2
+                    return self_len == 2
+                # 1 Joker beats any other triple
+                return self_len == 1
+            # Three higher cards to beat three cards
+            return self_len == 3
+        elif other_len == 4:
+            # Special cases for 2 and joker
+            if self_val == 12:
+                # Triple 2 beats a quad
+                return self_len == 3
+            if self_val == 13:
                 if other.cards[0] == 12:
-                    # Three jokers? Cheat!!!
-                    assert False
-                return len(self.cards) == 2
-            return len(self.cards) == 4
+                    raise ValueError("Cannot beat quad 2s with Jokers — invalid game state.")
+                return self_len == 2
+            return self_len == 4
 
     def __le__(self, other):
-        # self <= other
+        """Returns True if self does not beat other."""
+        if not isinstance(other, Meld):
+            return NotImplemented
         return not (self > other)
 
     def __str__(self):
