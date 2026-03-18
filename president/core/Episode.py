@@ -12,7 +12,6 @@ Not responsible for: card movement mechanics (CardHandler),
 serialisation (GameCheckpoint - future).
 """
 import logging
-import pickle
 from enum import Enum
 
 from president.core.AbstractPlayer import AbstractPlayer
@@ -229,52 +228,3 @@ class Episode:
                 self.state = State.ROUND_STARTING
 
         return self.ranks
-
-    # -------------------------------------------------------------------------
-    # Serialisation — pending extraction to GameCheckpoint
-    # -------------------------------------------------------------------------
-
-    def save_state(self) -> bytes:
-        """TODO: Move to GameCheckpoint."""
-        game_state = []
-        player_names = []
-        player_types = []
-        for player in self.player_manager.players:
-            game_state.append(player.encode())
-            player_names.append(player.name)
-            player_types.append(player.__class__.__name__)
-        game_state[0][2, 27] = 1
-        return pickle.dumps((player_names, player_types, game_state), protocol=0)
-
-    @staticmethod
-    def split_array(array, num_splits: int):
-        """TODO: Move to GameCheckpoint."""
-        split_size = len(array[0]) // num_splits
-        return [array[:, i * split_size:(i + 1) * split_size] for i in range(num_splits)]
-
-    def restore_state(self, serialized: bytes) -> "Episode":
-        """TODO: Move to GameCheckpoint. WARNING: uses eval — security risk."""
-        deserialized_a = pickle.loads(serialized)
-        self.clear()
-        player_names = deserialized_a[0]
-        player_types = deserialized_a[1]
-        game_state = deserialized_a[2]
-        for i, name in enumerate(player_names):
-            player_class = eval(player_types[i])
-            player = self.make_player(player_class, name)
-            hand_meld = self.split_array(game_state[1], 2)
-            hand = hand_meld[0]
-            meld = hand_meld[0]
-            player._hand = player.decode_hand(hand)
-            if game_state[i][2, 13] == 1:
-                player.set_status("passed")
-            elif game_state[i][3, 13] == 1:
-                player.set_status("waiting")
-            else:
-                player.set_status(player.decode_hand(meld))
-        return self
-
-    def snapshot(self) -> None:
-        """TODO: Move to GameCheckpoint. Currently non-functional."""
-        state = self.save_state()
-        self.restore_state(state)
