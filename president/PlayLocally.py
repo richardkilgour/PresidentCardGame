@@ -79,7 +79,7 @@ def main():
         try:
             done = gm.step()
         except Exception:
-            checkpoint.save_on_error("crash.json")
+            checkpoint.save_on_error(checkpoint.stamped_path("crash"))
             logging.error("Game crashed — checkpoint saved to crash.json")
             break
 

@@ -240,6 +240,16 @@ class GameCheckpoint:
                 f"code expects v{GameCheckpoint.VERSION}."
             )
 
+    @staticmethod
+    def stamped_path(stem: str) -> Path:
+        """
+        Generate a timestamped file path.
+        e.g. stamped_path("crash") -> Path("crash_2026-03-18_14-23-05.json")
+        """
+        from datetime import datetime
+        stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        return Path(f"{stem}_{stamp}.json")
+
     # -------------------------------------------------------------------------
     # Human-readable display — no GameMaster needed
     # -------------------------------------------------------------------------
