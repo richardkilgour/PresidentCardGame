@@ -1,89 +1,154 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Human players is a Player with console output (overloading the callbacks)
-The Play function presents a list of the possible plays, and lets the user decide the move
+ConsolePlayer is a human-controlled player with console input/output.
+
+The play() function presents possible melds and waits for user input.
+Typing 'q' at any prompt saves a checkpoint and exits cleanly.
 """
 import logging
+import sys
+
 from president.core.AbstractPlayer import AbstractPlayer
+from president.core.GameCheckpoint import GameCheckpoint
+from president.core.Meld import Meld
 
 
 class ConsolePlayer(AbstractPlayer):
+
     def __init__(self, name):
-        AbstractPlayer.__init__(self, name)
+        super().__init__(name)
+        self._checkpoint: GameCheckpoint | None = None
+
+    def set_checkpoint(self, checkpoint: GameCheckpoint) -> None:
+        """
+        Attach a GameCheckpoint so the player can save and quit mid-game.
+        Call this after the GameMaster is set up.
+        """
+        self._checkpoint = checkpoint
+
+    # -------------------------------------------------------------------------
+    # Listener callbacks
+    # -------------------------------------------------------------------------
 
     def surrender_cards(self, cards, receiver):
-        # Call super function, but also report on the interaction
-        print(f'Must give {", ".join(c.__str__() for c in cards)} to {receiver.name}')
+        print(f'  ► You must give {", ".join(str(c) for c in cards)} to {receiver.name}')
         super().surrender_cards(cards, receiver)
 
     def award_cards(self, cards, giver):
-        # Call super function, but also report on the interaction
-        print(f'Just got {", ".join(c.__str__() for c in cards)} from {giver.name}')
+        print(f'  ◄ You received {", ".join(str(c) for c in cards)} from {giver.name}')
         super().award_cards(cards, giver)
 
     def notify_hand_won(self, winner):
-        super(ConsolePlayer, self).notify_hand_won(winner)
-        print(f'--{winner.name} wins the round--')
-
-    def notify_played_out(self, player, pos):
-        super(ConsolePlayer, self).notify_played_out(player, pos)
-        if player == self:
-            print(f'You ({player.name}) played out, and is ranked {self.ranking_names[pos]}')
-        else:
-            print(f'{player.name} played out, and is ranked {self.ranking_names[pos]}')
-            self.player_status[self.players.index(player)] = self.ranking_names[pos]
+        super().notify_hand_won(winner)
+        print(f'\n{"─" * 40}')
+        print(f'  {winner.name} wins the hand.')
+        print(f'{"─" * 40}')
 
     def notify_play(self, player, meld):
-        super(ConsolePlayer, self).notify_play(player, meld)
-        # TODO: for some reason the we get notified before the cards are taken from the hand
+        super().notify_play(player, meld)
+        remaining = player.report_remaining_cards() - len(meld)
         if player != self:
-            print(f'{player.name} plays {meld}, leaving {len(player._hand)- len(meld.cards)} cards')
-            self.player_status[self.players.index(player)] = meld
+            print(f'  {player.name} plays {meld}  ({remaining} cards left)')
+        self._update_status(player, meld)
 
-    def show_player(self, index):
-        """Report on the last card played, and the total cards of the opposition @ given index"""
-        opp = self.players[index]
-        tabs = "\t" * ((index - 1) * (3 * index - 4))
-        print(f'{tabs}{opp.name} has {opp.report_remaining_cards()} cards')
-        print(f'{tabs}\t{self.player_status[index]}')
+    def notify_pass(self, player):
+        super().notify_pass(player)
+        if player != self:
+            print(f'  {player.name} passes.')
+            self._update_status(player, Meld())
 
-    def play(self):
-        """Must return a meld (set of cards). Pass is an empty set"""
-        # Show the table
-        print("-" * 20)
-        for i in [2, 1, 0]:
-            self.show_player(i)
-        print(self)
+    def notify_waiting(self, player):
+        super().notify_waiting(player)
+        if player != self:
+            self._update_status(player, None)
 
-        selection = self.possible_plays()
+    def notify_played_out(self, player, pos):
+        super().notify_played_out(player, pos)
+        rank_name = self.ranking_names[pos]
+        if player == self:
+            print(f'\n  ★ You ({player.name}) finished as {rank_name}!')
+        else:
+            print(f'  {player.name} finished as {rank_name}.')
+            self._update_status(player, rank_name)
 
-        card_selection_string = "Select card: \n"
-        for key, value in enumerate(selection):
-            # meld_string = " & ".join([c.__str__() for c in value.cards])
-            # Check to see if this play will be a split (ignore 2s and Js)
-            split_string = ""
-            if len(value.cards) > 0 and self.will_split(value):
-                split_string = " - split"
-            card_selection_string += f'[{key}] : {value}{split_string}\n'
+    # -------------------------------------------------------------------------
+    # Display
+    # -------------------------------------------------------------------------
 
-        # INPUT HERE (Blocking)
-        user_input = input(card_selection_string)
-        # Send noop on input error, and repeat next loop
-        try:
-            # None just return option 0
-            if not user_input:
-                card_index = 0
+    def _update_status(self, player, status) -> None:
+        """Update the display status for a player if they are in our player list."""
+        if player in self.players:
+            self.player_status[self.players.index(player)] = status
+
+    def _show_table(self) -> None:
+        """Print the current table state from this player's perspective."""
+        print(f'\n{"═" * 40}')
+        for i, player in enumerate(self.players):
+            if player is None:
+                continue
+            you_str = "  ◄ you" if player == self else ""
+            status = self.player_status[i]
+            if status is None:
+                status_str = "waiting"
+            elif isinstance(status, Meld):
+                status_str = f'played {status}' if status.cards else 'passed'
+            elif isinstance(status, str):
+                status_str = status
             else:
-                card_index = int(user_input)
-            if card_index > len(selection):
+                status_str = str(status)
+            print(f'  {player.name:15} {player.report_remaining_cards():2} cards   {status_str}{you_str}')
+        print(f'{"─" * 40}')
+        print(f'  Your hand: {self}')
+        print(f'{"═" * 40}\n')
+
+    # -------------------------------------------------------------------------
+    # Play
+    # -------------------------------------------------------------------------
+
+    def play(self) -> Meld:
+        """
+        Present possible melds and prompt the user to select one.
+        Returns a Meld, or '␆' as a no-op if input is not ready.
+        Type 'q' to save a checkpoint and quit.
+        """
+        self._show_table()
+
+        options = self.possible_plays()
+
+        print("Select a play:")
+        for i, meld in enumerate(options):
+            split_str = "  (split)" if meld.cards and self.will_split(meld) else ""
+            print(f'  [{i}] {meld}{split_str}')
+        print("  [q] Save and quit")
+
+        user_input = input("\nYour choice: ").strip().lower()
+
+        if user_input in ('q', 'quit'):
+            self._save_and_quit()
+
+        if not user_input:
+            logging.info(f'{self.name} selects default option 0: {options[0]}')
+            return options[0]
+
+        try:
+            card_index = int(user_input)
+            if card_index < 0 or card_index >= len(options):
+                print(f'  Please enter a number from 0 to {len(options) - 1}.')
                 return '␆'
-        except IndexError:
-            print(f'Oops. Enter number from _0 to {len(selection) - 1}_')
-            return '␆'
         except ValueError:
-            print(f'Oops. Enter _number_ (from 0 to {len(selection) - 1}')
+            print(f'  Please enter a number from 0 to {len(options) - 1}, or q to quit.')
             return '␆'
 
-        logging.info(f'{self.name} tries to play option {card_index} which is a {selection[card_index]}')
-        return selection[card_index]
+        logging.info(f'{self.name} plays option {card_index}: {options[card_index]}')
+        return options[card_index]
+
+    def _save_and_quit(self) -> None:
+        """Save a checkpoint and exit cleanly."""
+        if self._checkpoint:
+            path = GameCheckpoint.stamped_path("quit_save")
+            self._checkpoint.save(path)
+            print(f'\n  Game saved to {path}. Resume with: --restore {path}')
+        else:
+            print('\n  No checkpoint configured — progress will be lost.')
+        sys.exit(0)
