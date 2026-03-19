@@ -48,3 +48,7 @@ class CardGameListener:
         # Notify that one player swapped cards with another.
         # player_good got good card(s) from player_bad and vice versa
         pass
+
+    def notify_illegal_play(self, player, action, reason: str):
+        # A player attempted an illegal play
+        pass

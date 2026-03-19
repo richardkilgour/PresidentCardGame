@@ -1,11 +1,19 @@
 import logging
+from enum import Enum
 
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.CardGameListener import CardGameListener
 from president.core.DeckManager import DeckManager
+from president.core.GameCheckpoint import GameCheckpoint
+from president.core.IllegalPlayError import IllegalPlayError
 from president.core.PlayerManager import PlayerManager
 from president.core.PlayingCard import PlayingCard
 from president.core.Episode import Episode, State
+
+class IllegalPlayPolicy(Enum):
+    TERMINATE  = "terminate"   # Save checkpoint, raise, stop the game
+    DISQUALIFY = "disqualify"  # Save checkpoint, replace with fallback AI, continue
+    PENALISE   = "penalise"    # For RL — force a pass, continue (no checkpoint)
 
 
 class GameMaster:
@@ -19,7 +27,10 @@ class GameMaster:
     card movement mechanics (CardHandler - future).
     """
 
-    def __init__(self, deck_size: int = 54) -> None:
+    def __init__(self, deck_size: int = 54,
+                 policy: IllegalPlayPolicy = IllegalPlayPolicy.DISQUALIFY,
+                 fallback_player_type: type = None
+                 ) -> None:
         self.player_manager = PlayerManager()
         self.positions = []  # Rankings from the last completed episode
         self.deck = DeckManager(deck_size)
@@ -27,10 +38,18 @@ class GameMaster:
         self.number_of_rounds = None
         self.round_number = 0
         self.episode = None
+        self.policy = policy
+        self.fallback_player_type = fallback_player_type
+        self._checkpoint: GameCheckpoint | None = None
+
 
     def clear(self) -> None:
         """Reset listeners. Does not remove players."""
         self.listener_list = []
+
+    def set_checkpoint(self, checkpoint: GameCheckpoint) -> None:
+        self._checkpoint = checkpoint
+
 
     # -------------------------------------------------------------------------
     # Listener management
@@ -125,11 +144,76 @@ class GameMaster:
         if self.episode is None:
             raise RuntimeError("Game has not been started. Call start() first.")
 
-        if self.episode.state == State.FINISHED:
-            return self.setup_new_round()
+        try:
+            if self.episode.state == State.FINISHED:
+                return self.setup_new_round()
+            self.episode.step()
+            return False
+        except IllegalPlayError as e:
+            return self._handle_illegal_play(e)
 
-        self.episode.step()
-        return False
+    def _handle_illegal_play(self, error: IllegalPlayError) -> bool:
+        """
+        Handle an illegal play according to the current policy.
+        Always logs. Always saves a checkpoint except for PENALISE.
+
+        Returns:
+            True if the game should stop, False if it can continue.
+        """
+        logging.error(f"Illegal play: {error}")
+        self.notify_listeners("notify_illegal_play", error.player, error.action, error.reason)
+
+        if self.policy == IllegalPlayPolicy.TERMINATE:
+            if self._checkpoint:
+                self._checkpoint.save_on_error(
+                    GameCheckpoint.stamped_path("illegal_play")
+                )
+            raise error
+
+        elif self.policy == IllegalPlayPolicy.DISQUALIFY:
+            if self._checkpoint:
+                self._checkpoint.save_on_error(
+                    GameCheckpoint.stamped_path("illegal_play")
+                )
+            self._disqualify_player(error.player)
+            return False
+
+        elif self.policy == IllegalPlayPolicy.PENALISE:
+            # Force a pass — no checkpoint needed for RL training
+            logging.warning(
+                f"{error.player.name} penalised — forcing a pass."
+            )
+            self._force_pass(error.player)
+            return False
+
+    def _disqualify_player(self, player) -> None:
+        """Replace a disqualified player with the fallback AI."""
+        from president.players.PlayerNaive import PlayerNaive
+        fallback_type = self.fallback_player_type or PlayerNaive
+        fallback = fallback_type(f"{player.name}[auto]")
+        seat = self.player_manager.players.index(player)
+        # Transfer hand to fallback
+        fallback._hand = player._hand[:]
+        self.player_manager.players[seat] = fallback
+        # Replace in episode active players if present
+        if player in self.episode.active_players:
+            i = self.episode.active_players.index(player)
+            self.episode.active_players[i] = fallback
+        # Replace in listener list
+        if player in self.listener_list:
+            i = self.listener_list.index(player)
+            self.listener_list[i] = fallback
+        logging.warning(
+            f"{player.name} disqualified and replaced with "
+            f"{fallback_type.__name__} at seat {seat}."
+        )
+        self.notify_listeners("notify_player_joined", fallback, seat)
+
+    def _force_pass(self, player) -> None:
+        """Force a pass for a player who made an illegal play."""
+        if player in self.episode.active_players:
+            self.episode.active_players.remove(player)
+        self.notify_listeners("notify_pass", player)
 
     # -------------------------------------------------------------------------
     # Statistics

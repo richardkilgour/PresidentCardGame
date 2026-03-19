@@ -19,6 +19,7 @@ from president.core.CardGameListener import CardGameListener
 from president.core.CardHandler import CardHandler
 from president.core.DeckManager import DeckManager
 from president.core.Meld import Meld
+from president.core.PlayValidator import PlayValidator
 from president.core.PlayerManager import PlayerManager
 
 
@@ -147,11 +148,9 @@ class Episode:
         if action == '␆':  # no-op, async player not ready yet
             return
 
-        if current_target and action.cards and action < current_target:
-            raise ValueError("Invalid play: action meld is lower than current target meld.")
+        PlayValidator.validate(player, action, current_target)
 
         if not action.cards:
-            # Player passed
             self.notify_listeners("notify_pass", player)
             self.active_players.remove(player)
         else:
