@@ -21,17 +21,18 @@ import logging
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.DeckManager import DeckManager
 from president.core.Meld import Meld
+from president.core.PlayingCard import PlayingCard
 
 
 class CardHandler:
-    def __init__(self, deck: DeckManager, discarded_cards: list) -> None:
+    def __init__(self, deck: DeckManager) -> None:
         """
         Args:
             deck: The DeckManager owning the physical cards.
             discarded_cards: Shared reference to PlayerManager.discarded_cards.
         """
         self.deck = deck
-        self.discarded_cards = discarded_cards
+        self.discard_pile: list[PlayingCard] = []
 
     # -------------------------------------------------------------------------
     # Pre-episode card swap
@@ -89,7 +90,7 @@ class CardHandler:
         """
         for card in meld.cards:
             player._hand.remove(card)
-            self.discarded_cards.append(card)
+            self.discard_pile.append(card)
         logging.debug(f'{player.name} is left with {player}')
 
     # -------------------------------------------------------------------------
@@ -105,18 +106,18 @@ class CardHandler:
         """
         logging.info(f'{scumbag.name} is the Scumbag!!! Left with {scumbag._hand}')
         while scumbag._hand:
-            self.discarded_cards.append(scumbag._hand.pop())
+            self.discard_pile.append(scumbag._hand.pop())
 
     def restore_deck(self) -> None:
         """
         Move all discarded cards back into the deck, ready for the next episode.
         Asserts correct card counts before and after.
         """
-        assert len(self.discarded_cards) == 54, \
-            f"Expected 54 discarded cards before restore, got {len(self.discarded_cards)}."
+        assert len(self.discard_pile) == 54, \
+            f"Expected 54 discarded cards before restore, got {len(self.discard_pile)}."
         assert len(self.deck.deck) == 0, \
             "Deck should be empty before restoring from discards."
-        while self.discarded_cards:
-            self.deck.deck.append(self.discarded_cards.pop())
+        while self.discard_pile:
+            self.deck.deck.append(self.discard_pile.pop())
         assert len(self.deck.deck) == 54, \
             "Deck should have 54 cards after restoration."

@@ -131,7 +131,7 @@ class GameCheckpoint:
             active = [p.name for p in episode.active_players]
 
             # Discard checksum
-            discard_count = len(gm.player_manager.discarded_cards)
+            discard_count = len(gm.episode.card_handler.discard_pile)
 
             episode_data = {
                 "state": episode.state.name,

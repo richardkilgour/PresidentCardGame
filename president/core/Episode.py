@@ -44,7 +44,7 @@ class Episode:
         self.active_players = []
         self.deck = deck
         self.listener_list = listener_list
-        self.card_handler = CardHandler(deck, player_manager.discarded_cards)
+        self.card_handler = CardHandler(deck)
 
     def clear(self):
         self.state: State = State.INITIALISED
@@ -67,7 +67,7 @@ class Episode:
         for player in self.player_manager.players:
             assert player.report_remaining_cards() == 0, \
                 f"{player.name} has {player.report_remaining_cards()} remaining cards before dealing."
-        assert len(self.player_manager.discarded_cards) == 0, \
+        assert len(self.card_handler.discard_pile) == 0, \
             "Discards pile is not empty before dealing."
         self.deck.deal_cards(self.player_manager.players)
 
