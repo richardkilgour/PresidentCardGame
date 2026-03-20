@@ -1,18 +1,19 @@
 player1:
-    name: Richard
-    type_: PlayerHolder
-    type: PlayerSimple
+  name: Richard
+  type: Holder
+  console: false
 player2:
-    name: Silvia
-    type_: ConsolePlayer
-    type: PlayerSimple
+  name: Silvia
+  type: Simple
+  console: false
 player3:
-    name: Sara
-    type_: PlayerSplitter
-    type: PlayerSimple
+  name: Sara
+  type: Splitter
+  console: false
 player4:
-    name: snAkbar
-    type: RLSimple
+  name: snAkbar
+  type: Naive
+  console: true
 screen:
   width: 900
   height: 600
