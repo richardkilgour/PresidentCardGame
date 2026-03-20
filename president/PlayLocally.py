@@ -10,27 +10,14 @@ Usage:
     python PlayLocally.py --display crash.json   # display a checkpoint without running
 """
 import argparse
-import importlib
 import logging
+
 import yaml
 
-from president.core.GameMaster import GameMaster
 from president.core.GameCheckpoint import GameCheckpoint
-
-
-def load_player_class(player_config: dict):
-    module = importlib.import_module('players.' + player_config['type'])
-    return getattr(module, player_config['type'])
-
-
-def build_player_registry(config: dict) -> dict:
-    """Load all player classes from config and return a registry mapping type name to class."""
-    registry = {}
-    for key in ['player1', 'player2', 'player3', 'player4']:
-        p = config[key]
-        registry[p['type']] = load_player_class(p)
-    return registry
-
+from president.core.GameMaster import GameMaster
+from president.core.PlayerRegistry import PlayerRegistry
+from president.players.ConsolePlayer import ConsolePlayer
 
 def main():
     parser = argparse.ArgumentParser(description="Play PresidentCardGame locally.")
@@ -59,29 +46,35 @@ def main():
     )
 
     config = yaml.safe_load(open("config/config.yaml"))
-    player_registry = build_player_registry(config)
-
-    gm = GameMaster()
+    registry = PlayerRegistry.from_config(config)
+    gm = GameMaster(registry=registry)
     checkpoint = GameCheckpoint(gm)
+    gm.set_checkpoint(checkpoint)
 
     if args.restore:
         print(f"Restoring from {args.restore}...")
-        print(GameCheckpoint.display(args.restore))  # Show state before restoring
-        GameCheckpoint.restore(args.restore, gm, player_registry)
+        print(GameCheckpoint.display(args.restore))
+        GameCheckpoint.restore(args.restore, gm, registry)
         print("Restore complete — resuming game.")
     else:
-        for p in [config['player1'], config['player2'], config['player3'], config['player4']]:
-            gm.make_player(player_registry[p['type']], p['name'])
+        for key in ['player1', 'player2', 'player3', 'player4']:
+            p = config[key]
+            if p.get('console', False):
+                player = ConsolePlayer(p['name'])
+                player.set_checkpoint(checkpoint)
+                gm.add_player(player)
+            else:
+                gm.make_player(p['type'], p['name'])
         gm.start(number_of_rounds=1000)
+
+    # Wire up checkpoint for console players after restore too
+    for player in gm.player_manager.players:
+        if isinstance(player, ConsolePlayer):
+            player.set_checkpoint(checkpoint)
 
     done = False
     while not done:
-        try:
-            done = gm.step()
-        except Exception:
-            checkpoint.save_on_error(checkpoint.stamped_path("crash"))
-            logging.error("Game crashed — checkpoint saved to crash.json")
-            break
+        done = gm.step()
 
     if done:
         print("Game complete.")

@@ -37,20 +37,6 @@ class PlayerManager:
         self.players[position] = player
         return position
 
-    def make_player(self, player_type: type[AbstractPlayer], name: str = None) -> AbstractPlayer:
-        """
-        Construct a new player of the given type.
-
-        Args:
-            player_type: The player class to instantiate.
-            name: Optional name. Defaults to 'Player N'.
-
-        Returns:
-            The newly constructed player (not yet seated).
-        """
-        if not name:
-            name = f'Player {self.players.count(None)}'
-        return player_type(name)
 
     def find_card_holder(self, target_value: int, target_suit: int) -> AbstractPlayer | None:
         """

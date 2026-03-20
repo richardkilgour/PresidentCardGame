@@ -26,6 +26,11 @@ import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from president.core.PlayerRegistry import PlayerRegistry
+from president.core.PlayingCard import PlayingCard
+from president.core.Meld import Meld
+from president.core.Episode import Episode, State
+
 if TYPE_CHECKING:
     from president.core.GameMaster import GameMaster
 
@@ -155,16 +160,14 @@ class GameCheckpoint:
 
     @staticmethod
     def restore(path: str | Path, game_master: "GameMaster",
-                player_registry: dict[str, type]) -> None:
+                player_registry: "PlayerRegistry") -> None:
         """
         Restore game state from a checkpoint file.
 
         Args:
-            path: Path to the checkpoint JSON file.
-            game_master: A freshly initialised GameMaster to restore into.
-            player_registry: Maps player type name to class, e.g.
-                             {"PlayerSimple": PlayerSimple, "PlayerRL": PlayerRL}
-                             Required to reconstruct player objects.
+            path:         Path to the checkpoint JSON file.
+            game_master:  A freshly initialised GameMaster to restore into.
+            player_registry:     PlayerRegistry used to reconstruct player objects.
         """
         path = Path(path)
         state = json.loads(path.read_text())
@@ -174,15 +177,10 @@ class GameCheckpoint:
         gm = game_master
 
         # --- Restore players ---
-        from president.core.PlayingCard import PlayingCard
-        from president.core.Meld import Meld
-        from president.core.Episode import Episode, State
-
         for player_data in state["players"]:
             if player_data is None:
                 continue
-            player_class = player_registry[player_data["type"]]
-            player = player_class(player_data["name"])
+            player = player_registry.create(player_data["type"], player_data["name"])
             player.position_count = player_data["position_count"]
             for card_index in player_data["hand"]:
                 player.card_to_hand(PlayingCard(card_index))

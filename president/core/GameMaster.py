@@ -1,55 +1,64 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+GameMaster controls the overall flow of the card game across multiple rounds.
+
+Responsibilities: player registration, round lifecycle, listener management,
+illegal play handling, and end-of-tournament statistics.
+
+Not responsible for: turn-by-turn game logic (Episode),
+card movement mechanics (CardHandler).
+"""
 import logging
 from enum import Enum
 
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.CardGameListener import CardGameListener
 from president.core.DeckManager import DeckManager
+from president.core.Episode import Episode, State
 from president.core.GameCheckpoint import GameCheckpoint
 from president.core.IllegalPlayError import IllegalPlayError
 from president.core.PlayerManager import PlayerManager
+from president.core.PlayerRegistry import PlayerRegistry
 from president.core.PlayingCard import PlayingCard
-from president.core.Episode import Episode, State
+
 
 class IllegalPlayPolicy(Enum):
     TERMINATE  = "terminate"   # Save checkpoint, raise, stop the game
-    DISQUALIFY = "disqualify"  # Save checkpoint, replace with fallback AI, continue
-    PENALISE   = "penalise"    # For RL — force a pass, continue (no checkpoint)
+    DISQUALIFY = "disqualify"  # Save checkpoint, replace with fallback, continue
+    PENALISE   = "penalise"    # Force a pass, continue (no checkpoint, for RL)
 
 
 class GameMaster:
-    """
-    Controls the overall flow of the card game across multiple rounds.
-
-    Responsibilities: player registration, round lifecycle, listener
-    management, and end-of-tournament statistics.
-
-    Not responsible for: turn-by-turn game logic (Episode),
-    card movement mechanics (CardHandler - future).
-    """
 
     def __init__(self, deck_size: int = 54,
+                 registry: PlayerRegistry = None,
                  policy: IllegalPlayPolicy = IllegalPlayPolicy.DISQUALIFY,
-                 fallback_player_type: type = None
-                 ) -> None:
+                 fallback_player_name: str = None) -> None:
+        """
+        Args:
+            deck_size:            Number of cards in the deck.
+            registry:             PlayerRegistry used to create players.
+                                  A fresh empty registry is created if not provided.
+            policy:               How to handle illegal plays.
+            fallback_player_name: Registered name of the player type to substitute
+                                  on disqualification. Defaults to the first
+                                  registered entry if not specified.
+        """
         self.player_manager = PlayerManager()
-        self.positions = []  # Rankings from the last completed episode
+        self.positions = []
         self.deck = DeckManager(deck_size)
         self.listener_list = []
         self.number_of_rounds = None
         self.round_number = 0
         self.episode = None
+        self.registry = registry or PlayerRegistry()
         self.policy = policy
-        self.fallback_player_type = fallback_player_type
+        self.fallback_player_name = fallback_player_name
         self._checkpoint: GameCheckpoint | None = None
-
-
-    def clear(self) -> None:
-        """Reset listeners. Does not remove players."""
-        self.listener_list = []
 
     def set_checkpoint(self, checkpoint: GameCheckpoint) -> None:
         self._checkpoint = checkpoint
-
 
     # -------------------------------------------------------------------------
     # Listener management
@@ -67,23 +76,44 @@ class GameMaster:
     # -------------------------------------------------------------------------
 
     def notify_player_joined(self, player: AbstractPlayer, position: int) -> None:
-        """Notify all existing listeners of the new player, then add the player as a listener."""
+        """Notify all existing listeners of the new player, then add as a listener."""
         self.notify_listeners("notify_player_joined", player, position)
-        # Catch the new player up on who is already seated
         for i, existing_player in enumerate(self.player_manager.players):
             if existing_player:
                 player.notify_player_joined(existing_player, i)
         self.add_listener(player)
 
-    def add_player(self, player: AbstractPlayer, position: int | None = None) -> int:
+    def add_player(self, player: AbstractPlayer,
+                   position: int | None = None) -> int:
+        """
+        Add an already-constructed player to the game.
+
+        Args:
+            player:   The player to add.
+            position: Optional seat index.
+
+        Returns:
+            The seat index assigned.
+        """
         position = self.player_manager.add_player(player, position)
         self.notify_player_joined(player, position)
         return position
 
-    def make_player(self, player_type: type[AbstractPlayer], name: str = None) -> AbstractPlayer | None:
-        new_player = self.player_manager.make_player(player_type, name)
-        self.add_player(new_player)
-        return new_player
+    def make_player(self, type_name: str,
+                    player_name: str = None) -> AbstractPlayer:
+        """
+        Create a player from the registry and add them to the game.
+
+        Args:
+            type_name:   Registered type name e.g. "Naive", "RL_v2".
+            player_name: Name for this player instance. Defaults to type_name.
+
+        Returns:
+            The newly created and seated player.
+        """
+        player = self.registry.create(type_name, player_name)
+        self.add_player(player)
+        return player
 
     # -------------------------------------------------------------------------
     # Game lifecycle
@@ -91,15 +121,18 @@ class GameMaster:
 
     def reset(self, preset_hands: list[PlayingCard] = None) -> None:
         """
-        Create a new Episode, passing through the rankings from the previous one
+        Create a new Episode, passing rankings from the previous one
         so card swapping and turn order are set correctly.
         """
         logging.info(f"--- Start of a new Episode --- {self.positions=}")
         if not preset_hands:
             self.deck.shuffle()
-        self.episode = Episode(self.player_manager, self.positions, self.deck, self.listener_list)
+        self.episode = Episode(
+            self.player_manager, self.positions, self.deck, self.listener_list
+        )
 
-    def start(self, number_of_rounds: int = 100, preset_hands: list[PlayingCard] = None) -> None:
+    def start(self, number_of_rounds: int = 100,
+              preset_hands: list[PlayingCard] = None) -> None:
         """
         Start a series of episodes.
 
@@ -110,10 +143,10 @@ class GameMaster:
             Exception: If there are fewer than 4 players.
         """
         if None in self.player_manager.players:
-            raise Exception("Not enough Players")
+            raise Exception("Not enough players — all 4 seats must be filled.")
         self.round_number = 0
         self.number_of_rounds = number_of_rounds
-        self.positions = []  # No rankings for the first episode
+        self.positions = []
         self.reset(preset_hands=preset_hands)
         self.notify_listeners("notify_game_stated")
 
@@ -143,7 +176,6 @@ class GameMaster:
         """
         if self.episode is None:
             raise RuntimeError("Game has not been started. Call start() first.")
-
         try:
             if self.episode.state == State.FINISHED:
                 return self.setup_new_round()
@@ -151,17 +183,30 @@ class GameMaster:
             return False
         except IllegalPlayError as e:
             return self._handle_illegal_play(e)
+        except Exception as e:
+            logging.error(f"Unexpected error during step: {e}", exc_info=True)
+            if self._checkpoint:
+                self._checkpoint.save_on_error(
+                    GameCheckpoint.stamped_path("crash")
+                )
+            raise
+
+    # -------------------------------------------------------------------------
+    # Illegal play handling
+    # -------------------------------------------------------------------------
 
     def _handle_illegal_play(self, error: IllegalPlayError) -> bool:
         """
         Handle an illegal play according to the current policy.
-        Always logs. Always saves a checkpoint except for PENALISE.
+        Always logs. Saves a checkpoint for TERMINATE and DISQUALIFY.
 
         Returns:
             True if the game should stop, False if it can continue.
         """
         logging.error(f"Illegal play: {error}")
-        self.notify_listeners("notify_illegal_play", error.player, error.action, error.reason)
+        self.notify_listeners(
+            "notify_illegal_play", error.player, error.action, error.reason
+        )
 
         if self.policy == IllegalPlayPolicy.TERMINATE:
             if self._checkpoint:
@@ -179,37 +224,38 @@ class GameMaster:
             return False
 
         elif self.policy == IllegalPlayPolicy.PENALISE:
-            # Force a pass — no checkpoint needed for RL training
-            logging.warning(
-                f"{error.player.name} penalised — forcing a pass."
-            )
+            logging.warning(f"{error.player.name} penalised — forcing a pass.")
             self._force_pass(error.player)
             return False
 
-    def _disqualify_player(self, player) -> None:
-        """Replace a disqualified player with the fallback AI."""
-        from president.players.PlayerNaive import PlayerNaive
-        fallback_type = self.fallback_player_type or PlayerNaive
-        fallback = fallback_type(f"{player.name}[auto]")
+    def _disqualify_player(self, player: AbstractPlayer) -> None:
+        """
+        Replace a disqualified player with the fallback type from the registry.
+        Transfers the hand to the replacement.
+        """
+        # Determine fallback type from registry
+        fallback_name = self.fallback_player_name or self.registry.names()[0]
+        fallback = self.registry.create(fallback_name, f"{player.name}[auto]")
+
         seat = self.player_manager.players.index(player)
-        # Transfer hand to fallback
         fallback._hand = player._hand[:]
         self.player_manager.players[seat] = fallback
-        # Replace in episode active players if present
+
         if player in self.episode.active_players:
             i = self.episode.active_players.index(player)
             self.episode.active_players[i] = fallback
-        # Replace in listener list
+
         if player in self.listener_list:
             i = self.listener_list.index(player)
             self.listener_list[i] = fallback
+
         logging.warning(
-            f"{player.name} disqualified and replaced with "
-            f"{fallback_type.__name__} at seat {seat}."
+            f"{player.name} disqualified at seat {seat}, "
+            f"replaced with {fallback_name}."
         )
         self.notify_listeners("notify_player_joined", fallback, seat)
 
-    def _force_pass(self, player) -> None:
+    def _force_pass(self, player: AbstractPlayer) -> None:
         """Force a pass for a player who made an illegal play."""
         if player in self.episode.active_players:
             self.episode.active_players.remove(player)
@@ -234,7 +280,9 @@ class GameMaster:
 
     def remove_worst_player(self) -> None:
         """Remove the player with the lowest cumulative score."""
-        worst_player = min(self.player_manager.players, key=lambda p: p.get_score())
+        worst_player = min(
+            self.player_manager.players, key=lambda p: p.get_score()
+        )
         if worst_player:
             print(f'{worst_player.name} is pissed off and quits')
             self.player_manager.players.remove(worst_player)
