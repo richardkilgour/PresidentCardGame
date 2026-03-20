@@ -99,8 +99,11 @@ class PlayHistory:
         starting_count = 2 if value == 13 else 4
         played = sum(
             len(m.meld)
-            for m in self._memory
-            if m.meld and m.meld.cards and m.meld.cards[0].get_value() == value
+                for m in self._memory
+                    if m.event_type == EventType.MELD
+                    and m.meld
+                    and m.meld.cards
+                    and m.meld.cards[0].get_value() == value
         )
         return starting_count - played
 
