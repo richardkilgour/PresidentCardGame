@@ -1,71 +1,99 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Will save a high card for each low card
-For example, if a 3 is in the hand, then
-Otherwise acts as a splitter
+PlayerHolder extends PlayerSplitter with a card conservation heuristic.
+
+Strategy:
+  - Defer to PlayerSplitter for basic play selection.
+  - Additionally, avoid playing a high card if:
+      1. The candidate is the highest card in hand, AND
+      2. We hold the lowest card still in play (meaning we MUST lead
+         at some point, so we need a high card to win that round).
+  - Exception: always play instant winners (highest remaining card).
+
+Reasoning: a 3 can only be played as a lead. To lead, you must win a
+round. To win a round, you need a high card. So preserve one high card
+for each low card you hold.
 """
 import logging
 
 from president.core.PlayingCard import PlayingCard
 from president.players.PlayerSplitter import PlayerSplitter
 
-DEBUG = False
 
 class PlayerHolder(PlayerSplitter):
+
     def play(self):
-        """
-        Given a list of cards, choose a set to play
-        If no minimum, just play the lowest card(s)
-        Return a list of cards, or None if the desire is to pass
-        """
-        # The card we would play if boing by the parent strategy
         candidate = super().play()
 
+        # No target — defer to PlayerSplitter
         if not self.target_meld:
             return candidate
 
-        # Find the possible melded, and play the lowest one, unless we have a double
-
-        # If pass is the only option, then do that
-        if len(self.possible_plays()) == 1 and not candidate.cards:
-            logging.info("{}'s reaction to the {} is a mandatory {}".format(self.name, self.target_meld, candidate))
+        # Forced pass — no choice
+        if not candidate.cards:
+            logging.info(f'{self.name}: forced to pass against {self.target_meld}')
             return candidate
 
-        # Instant winner? Play for sure!
-        if candidate.cards and self.memory.get_highest_remaining() == candidate.cards[0].get_value:
-            logging.info("{} knows {} is a winner".format(self.name, candidate))
+        # Instant winner — always play it
+        if self.memory.get_highest_remaining() == candidate.cards[0].get_value():
+            logging.info(f'{self.name}: {candidate} is a winner, playing it')
             return candidate
 
-        # Debug only block
-        if DEBUG:
-            lowest_card = self._hand[0]
-            logging.debug("{}'s lowest card is {}".format(self.name, lowest_card))
-            for x in range(0, lowest_card.get_value()):
-                logging.debug("{} knows there are {} x {} out there".format(self.name, self.memory.get_number_remaining(x), PlayingCard(x * 4)))
-            highest_card = self._hand[-1]
-            logging.debug("{}'s highest card is {}".format(self.name, highest_card))
-            for x in range(highest_card.get_value() + 1, 14):
-                logging.debug("{} knows there are {} x {} out there".format(self.name, self.memory.get_number_remaining(x), PlayingCard(x * 4)))
+        self._log_hand_context(candidate)
 
-        # Do we want to wait for a higher card to be played?
-        # 1) Do we have the lowest possible card? No - then play, otherwise
-        # 2) We should only play our highest card if it's a winner
-        if self._hand[-1].get_value() == candidate.cards[0].get_value():
-            save_it = True
-            lowest_card = self._hand[0]
-            for x in range(0, lowest_card.get_value()):
-                if self.memory.get_number_remaining(x) > 0:
-                    # There is at least one lower card, so we can play
-                    save_it = False
-                    break
-            if save_it:
-                for x in range(candidate.cards[0].get_value() + 1, 14):
-                    if self.memory.get_number_remaining(x) > 0:
-                        # Don't risk it!
-                        logging.info("{} decides not to play {} to protect the {}".format(self.name, candidate, lowest_card))
-                        candidate = self.possible_plays()[-1]
-                        break
+        # Conservation heuristic:
+        # If the candidate is our highest card, and we hold the lowest
+        # card still in play, save the high card for when we need to lead
+        if self._should_conserve(candidate):
+            logging.info(
+                f'{self.name}: conserving {candidate} to protect '
+                f'{self._hand[0]} — passing instead'
+            )
+            return self.possible_plays()[-1]  # Pass
 
-        logging.info("{}'s reaction to the {} is a {}".format(self.name, self.target_meld, candidate))
+        logging.info(f'{self.name}: playing {candidate} against {self.target_meld}')
         return candidate
+
+    def _should_conserve(self, candidate) -> bool:
+        """
+        Returns True if we should hold back the candidate and pass instead.
+
+        Conditions (both must be true):
+          1. Candidate is the highest card in our hand
+          2. We hold the lowest card still in play (need a high card to lead it)
+        """
+        # Is the candidate our highest card?
+        if self._hand[-1].get_value() != candidate.cards[0].get_value():
+            return False
+
+        # Do we hold the lowest card still in play?
+        lowest_card_value = self._hand[0].get_value()
+        for value in range(0, lowest_card_value):
+            if self.memory.get_number_remaining(value) > 0:
+                # There is a lower card elsewhere — we are not forced to lead
+                return False
+
+        # Are there higher cards still out there that we'd rather wait for?
+        for value in range(candidate.cards[0].get_value() + 1, 14):
+            if self.memory.get_number_remaining(value) > 0:
+                return True  # Higher cards exist — don't waste ours yet
+
+        return False
+
+    def _log_hand_context(self, candidate) -> None:
+        """Log the cards remaining below and above our hand for debugging."""
+        lowest_card = self._hand[0]
+        highest_card = self._hand[-1]
+        for value in range(0, lowest_card.get_value()):
+            remaining = self.memory.get_number_remaining(value)
+            logging.debug(
+                f'{self.name}: {remaining}x {PlayingCard(value * 4)} remaining '
+                f'(below our lowest {lowest_card})'
+            )
+        for value in range(highest_card.get_value() + 1, 14):
+            remaining = self.memory.get_number_remaining(value)
+            logging.debug(
+                f'{self.name}: {remaining}x {PlayingCard(value * 4)} remaining '
+                f'(above our highest {highest_card})'
+            )
