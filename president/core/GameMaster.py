@@ -157,6 +157,11 @@ class GameMaster:
         Returns:
             True if the tournament is over, False otherwise.
         """
+        self.notify_listeners(
+            "notify_episode_end",
+            self.episode.ranks,
+            self.positions,
+        )
         self.positions = self.episode.ranks
         logging.info(f"--- Episode Finished with positions {self.positions} ---")
         self.round_number += 1

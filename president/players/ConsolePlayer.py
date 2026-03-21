@@ -72,6 +72,10 @@ class ConsolePlayer(AbstractPlayer):
             print(f'  {player.name} finished as {rank_name}.')
             self._update_status(player, rank_name)
 
+    def notify_episode_end(self, final_ranks, starting_ranks):
+        if input("Save this game to your history? [y/n] ").lower() == 'y':
+            super().notify_episode_end(final_ranks, starting_ranks)
+
     # -------------------------------------------------------------------------
     # Display
     # -------------------------------------------------------------------------

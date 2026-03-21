@@ -24,7 +24,8 @@ class GameEvent:
     player: Any
     event_type: EventType
     meld: Any               # Meld for MELD events; rank index for COMPLETE; None otherwise
-    remaining_cards: int
+    remaining_cards: int    # Hand size after the action
+    hand: list | None = None  # Full hand contents at decision time, acting player only
 
     def __str__(self):
         return (f"{self.event_type}\t{self.player=}\t"
@@ -49,6 +50,7 @@ class PlayHistory:
             event_type=EventType.MELD,
             meld=meld,
             remaining_cards=remaining_cards,
+            hand=list(player._hand),  # captured before cards are removed
         ))
 
         if remaining_cards == 0:
@@ -93,6 +95,16 @@ class PlayHistory:
             if self.get_number_remaining(x):
                 return x
         return -1
+
+    def last_event_for(self, player) -> GameEvent | None:
+        """
+        Return the most recent non-waiting event for a player.
+        Returns None if the player has not yet acted this hand.
+        """
+        for event in reversed(self._memory):
+            if event.player is player and event.event_type != EventType.WAITING:
+                return event
+        return None
 
     def get_number_remaining(self, value):
         """Calculate the number of unplayed cards of the given value."""

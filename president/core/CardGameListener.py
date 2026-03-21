@@ -52,3 +52,38 @@ class CardGameListener:
     def notify_illegal_play(self, player, action, reason: str):
         # A player attempted an illegal play
         pass
+
+    def notify_episode_end(self, final_ranks: list, starting_ranks: list) -> None:
+        pass
+
+    def opponents_clockwise(self, player=None) -> list:
+        """
+        Return the other players in clockwise order relative to the given player.
+        If player is None, uses self as the reference point.
+        Can be called by any listener — not just the player themselves.
+
+        Args:
+            player: The player to use as the reference point.
+                    Defaults to self if None.
+
+        Returns:
+            List of the other players in clockwise order.
+
+        Raises:
+            ValueError: If the player is not seated at this table.
+        """
+        reference = player if player is not None else self
+        if reference not in self.players:
+            raise ValueError(
+                f"{getattr(reference, 'name', reference)} is not seated "
+                f"at this table. "
+                f"Seated players: "
+                f"{[p.name for p in self.players if p is not None]}"
+            )
+        seat = self.players.index(reference)
+        n = len(self.players)
+        return [
+            self.players[(seat + i) % n]
+            for i in range(1, n)
+            if self.players[(seat + i) % n] is not None
+        ]
