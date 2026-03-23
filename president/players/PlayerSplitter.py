@@ -30,6 +30,7 @@ class PlayerSplitter(PlayerSimple):
                 if not meld.cards and len(possible_plays) > 1:
                     # Passing is safe but we have other options —
                     # split the highest card to stay in the round
+                    # TODO: maybe not the _highest_, but median or some heuristic?
                     highest = possible_plays[-2]
                     logging.info(
                         f'{self.name}: choosing to split {highest} '
