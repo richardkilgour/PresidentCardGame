@@ -9,6 +9,8 @@ illegal play handling, and end-of-tournament statistics.
 Not responsible for: turn-by-turn game logic (Episode),
 card movement mechanics (CardHandler).
 """
+from __future__ import annotations
+
 import logging
 from enum import Enum
 

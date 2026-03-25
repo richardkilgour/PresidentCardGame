@@ -20,6 +20,8 @@ What is saved:
   - Current melds (playfield)
   - Discard pile checksum (count only, for integrity verification)
 """
+from __future__ import annotations
+
 import json
 import logging
 import traceback

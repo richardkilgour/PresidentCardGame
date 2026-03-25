@@ -5,6 +5,8 @@ Keep enough information that the hand can be replayed later, or rewound.
 Stores cards played, players that have passed and players that have finished.
 Can be used to query the remaining cards that are somewhere, and the value of the highest unplayed card.
 """
+from __future__ import annotations
+
 from president.core.Meld import Meld
 
 from dataclasses import dataclass

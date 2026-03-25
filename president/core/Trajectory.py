@@ -16,6 +16,8 @@ Used for:
 File format: one JSON record per trajectory, appended to a per-policy
 .jsonl file. Human readable and appendable without loading the full file.
 """
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
 from datetime import datetime

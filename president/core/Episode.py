@@ -11,6 +11,8 @@ and notifying listeners of all game events.
 Not responsible for: card movement mechanics (CardHandler),
 serialisation (GameCheckpoint - future).
 """
+from __future__ import annotations
+
 import logging
 from enum import Enum
 

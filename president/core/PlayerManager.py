@@ -11,6 +11,8 @@ Responsibilities:
 Not responsible for: card movement, game state, or player status.
 Those concerns belong to CardHandler and Episode respectively.
 """
+from __future__ import annotations
+
 from president.core.AbstractPlayer import AbstractPlayer
 
 

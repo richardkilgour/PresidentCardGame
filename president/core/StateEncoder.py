@@ -26,6 +26,8 @@ Action / meld vector (54 bits, one-hot):
 All state is derived from PlayHistory and GameEvent.hand.
 No live player state is used.
 """
+from __future__ import annotations
+
 import numpy as np
 from collections import Counter
 
