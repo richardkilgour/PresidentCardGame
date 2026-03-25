@@ -6,6 +6,7 @@ policy to play President.
 
 Loads the best model saved by EvalCallback during RL training.
 Falls back to the first legal play if the model predicts an illegal action.
+Uses direct policy network inference for speed — bypasses SB3 overhead.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+import torch
 from sb3_contrib import MaskablePPO
 
 from president.core.AbstractPlayer import AbstractPlayer
@@ -23,25 +25,34 @@ MODEL_PATH  = Path(__file__).parent.parent / "models" / "best_model.zip"
 MELD_BITS   = 54
 ACTION_BITS = 55
 
+_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class PlayerRLSplitter(AbstractPlayer):
     """Plays using the RL-trained MaskablePPO policy."""
 
-    _model = MaskablePPO.load(MODEL_PATH)
+    _device = _device
+    _model  = MaskablePPO.load(MODEL_PATH, device=_device)
 
     def play(self) -> Meld:
-        obs         = self._get_observation()
-        action_mask = self._get_action_mask()
+        obs  = self._get_observation()
+        mask = self._get_action_mask()
 
-        action, _ = self._model.predict(
-            obs,
-            action_masks=action_mask,
-            deterministic=True,
-        )
+        with torch.no_grad():
+            obs_tensor  = torch.tensor(obs,  dtype=torch.float32).unsqueeze(0).to(self._device)
+            mask_tensor = torch.tensor(mask, dtype=torch.bool   ).unsqueeze(0).to(self._device)
 
-        meld = self._action_to_meld(int(action))
+            # Get logits directly from the policy network
+            distribution = self._model.policy.get_distribution(obs_tensor)
+            logits       = distribution.distribution.logits.clone()
 
+            # Mask illegal actions
+            logits[~mask_tensor] = float("-inf")
+            action = logits.argmax(dim=1).item()
+
+        meld  = self._action_to_meld(action)
         legal = self.possible_plays()
+
         if meld in legal:
             return meld
 
