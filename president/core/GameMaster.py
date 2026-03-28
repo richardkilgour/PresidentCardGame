@@ -133,7 +133,7 @@ class GameMaster:
             self.player_manager, self.positions, self.deck, self.listener_list
         )
 
-    def start(self, number_of_rounds: int = 100, positions = None) -> None:
+    def start(self, number_of_rounds: int = 100, positions=None) -> None:
         """
         Start a series of episodes.
 
@@ -142,12 +142,14 @@ class GameMaster:
             positions: Starting positions (Default - no positions)
 
         Raises:
-            Exception: If there are fewer than 4 players.
+            Exception: If any seat is unfilled.
         """
         if positions is None:
             positions = []
         if None in self.player_manager.players:
-            raise Exception("Not enough players — all 4 seats must be filled.")
+            raise Exception(
+                f"Not enough players — all {len(self.player_manager.players)} seats must be filled."
+            )
         self.round_number = 0
         self.number_of_rounds = number_of_rounds
         self.positions = positions
@@ -242,7 +244,6 @@ class GameMaster:
         Replace a disqualified player with the fallback type from the registry.
         Transfers the hand to the replacement.
         """
-        # Determine fallback type from registry
         fallback_name = self.fallback_player_name or self.registry.names()[0]
         fallback = self.registry.create(fallback_name, f"{player.name}[auto]")
 
@@ -278,20 +279,20 @@ class GameMaster:
         """Return a formatted summary of each player's position counts and score."""
         result = []
         for player in self.player_manager.players:
-            result.append(
-                f'{player.name} was President {player.position_count[0]}; '
-                f'Vice-President {player.position_count[1]}; '
-                f'Citizen {player.position_count[2]} and '
-                f'Scumbag {player.position_count[3]}. '
-                f'Score = {player.get_score()}'
+            if player is None:
+                continue
+            rank_parts = '; '.join(
+                f'{player.ranking_names[i]} {count}'
+                for i, count in enumerate(player.position_count)
             )
+            result.append(f'{player.name}: {rank_parts}. Score = {player.get_score()}')
         return '\n'.join(result)
 
     def remove_worst_player(self) -> None:
         """Remove the player with the lowest cumulative score."""
         worst_player = min(
-            self.player_manager.players, key=lambda p: p.get_score()
+            (p for p in self.player_manager.players if p is not None),
+            key=lambda p: p.get_score()
         )
-        if worst_player:
-            print(f'{worst_player.name} is pissed off and quits')
-            self.player_manager.players.remove(worst_player)
+        logger.info(f'{worst_player.name} is pissed off and quits')
+        self.player_manager.players.remove(worst_player)
