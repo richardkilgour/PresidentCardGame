@@ -22,8 +22,9 @@ from president.core.GameCheckpoint import GameCheckpoint
 from president.core.IllegalPlayError import IllegalPlayError
 from president.core.PlayerManager import PlayerManager
 from president.core.PlayerRegistry import PlayerRegistry
-from president.core.PlayingCard import PlayingCard
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class IllegalPlayPolicy(Enum):
     TERMINATE  = "terminate"   # Save checkpoint, raise, stop the game
@@ -126,36 +127,39 @@ class GameMaster:
         Create a new Episode, passing rankings from the previous one
         so card swapping and turn order are set correctly.
         """
-        logging.info(f"--- Start of a new Episode --- {self.positions=}")
+        logger.info(f"--- Start of a new Episode --- {self.positions=}")
         self.deck.shuffle()
         self.episode = Episode(
             self.player_manager, self.positions, self.deck, self.listener_list
         )
 
-    def start(self, number_of_rounds: int = 100) -> None:
+    def start(self, number_of_rounds: int = 100, positions = None) -> None:
         """
         Start a series of episodes.
 
         Args:
             number_of_rounds: Number of episodes to play. None for infinite.
+            positions: Starting positions (Default - no positions)
 
         Raises:
             Exception: If there are fewer than 4 players.
         """
+        if positions is None:
+            positions = []
         if None in self.player_manager.players:
             raise Exception("Not enough players — all 4 seats must be filled.")
         self.round_number = 0
         self.number_of_rounds = number_of_rounds
-        self.positions = []
+        self.positions = positions
         self.reset()
         self.notify_listeners("notify_game_stated")
 
-    def setup_new_round(self) -> bool:
+    def on_round_completed(self) -> bool:
         """
         Finalise the current episode and set up the next one.
 
         Returns:
-            True if the tournament is over, False otherwise.
+            True if the game is over, False otherwise.
         """
         self.notify_listeners(
             "notify_episode_end",
@@ -163,11 +167,11 @@ class GameMaster:
             self.positions,
         )
         self.positions = self.episode.ranks
-        logging.info(f"--- Episode Finished with positions {self.positions} ---")
+        logger.info(f"--- Episode Finished with positions {self.positions} ---")
         self.round_number += 1
         if self.number_of_rounds and self.round_number >= self.number_of_rounds:
-            print(self.position_stats_str())
-            self.remove_worst_player()
+            #print(self.position_stats_str())
+            #self.remove_worst_player()
             return True
         self.reset()
         return False
@@ -183,13 +187,13 @@ class GameMaster:
             raise RuntimeError("Game has not been started. Call start() first.")
         try:
             if self.episode.state == State.FINISHED:
-                return self.setup_new_round()
+                return self.on_round_completed()
             self.episode.step()
             return False
         except IllegalPlayError as e:
             return self._handle_illegal_play(e)
         except Exception as e:
-            logging.error(f"Unexpected error during step: {e}", exc_info=True)
+            logger.error(f"Unexpected error during step: {e}", exc_info=True)
             if self._checkpoint:
                 self._checkpoint.save_on_error(
                     GameCheckpoint.stamped_path("crash")
@@ -208,7 +212,7 @@ class GameMaster:
         Returns:
             True if the game should stop, False if it can continue.
         """
-        logging.error(f"Illegal play: {error}")
+        logger.error(f"Illegal play: {error}")
         self.notify_listeners(
             "notify_illegal_play", error.player, error.action, error.reason
         )
@@ -229,7 +233,7 @@ class GameMaster:
             return False
 
         elif self.policy == IllegalPlayPolicy.PENALISE:
-            logging.warning(f"{error.player.name} penalised — forcing a pass.")
+            logger.warning(f"{error.player.name} penalised — forcing a pass.")
             self._force_pass(error.player)
             return False
 
@@ -254,7 +258,7 @@ class GameMaster:
             i = self.listener_list.index(player)
             self.listener_list[i] = fallback
 
-        logging.warning(
+        logger.warning(
             f"{player.name} disqualified at seat {seat}, "
             f"replaced with {fallback_name}."
         )
