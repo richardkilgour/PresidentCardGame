@@ -49,9 +49,8 @@ class Episode:
         # ranks: accumulated finishing order for the current episode, built up as
         # players play out. Empty until the episode completes.
         self.ranks: list[AbstractPlayer] = []
-        n = len(self.player_manager.players)
         # '␆' represents "not played yet"; external dependency, refactor separately
-        self.current_melds: list = ['␆'] * n
+        self.current_melds: list = ['␆'] * self.player_manager.player_count
         self.active_players: list[AbstractPlayer] = []
         self.deck = deck
         self.listener_list = listener_list
@@ -191,7 +190,7 @@ class Episode:
 
     def post_episode_checks(self) -> None:
         """Finalise the episode: log rankings, collect scumbag cards, restore deck."""
-        n = len(self.player_manager.players)
+        n = self.player_manager.player_count
         assert len(self.ranks) == n, \
             f"Expected {n} ranked players, got {len(self.ranks)}."
         self.card_handler.collect_scumbag_cards(self.ranks[-1])
@@ -237,8 +236,7 @@ class Episode:
 
         elif self.state == State.ROUND_STARTING:
             self.active_players = self.get_players_with_cards()
-            n = len(self.player_manager.players)
-            self.current_melds = ['␆'] * n
+            self.current_melds = ['␆'] * self.player_manager.player_count
             # Notify players sitting out this hand
             for player in self.player_manager.players:
                 if player not in self.active_players:
@@ -251,8 +249,7 @@ class Episode:
                 self.state = State.HAND_WON
 
         elif self.state == State.HAND_WON:
-            n = len(self.player_manager.players)
-            if len(self.ranks) == n:
+            if len(self.ranks) == self.player_manager.player_count:
                 self.post_episode_checks()
                 self.state = State.FINISHED
             else:

@@ -13,12 +13,21 @@ Those concerns belong to CardHandler and Episode respectively.
 """
 from __future__ import annotations
 
+import logging
+
 from president.core.AbstractPlayer import AbstractPlayer
+
+logger = logging.getLogger(__name__)
 
 
 class PlayerManager:
-    def __init__(self) -> None:
-        self.players: list[AbstractPlayer | None] = [None, None, None, None]
+    def __init__(self, capacity: int = 4) -> None:
+        self.players: list[AbstractPlayer | None] = [None] * capacity
+
+    @property
+    def player_count(self) -> int:
+        """Return the number of seats occupied by an actual player."""
+        return sum(1 for p in self.players if p is not None)
 
     def add_player(self, player: AbstractPlayer, position: int | None = None) -> int:
         """
@@ -29,16 +38,15 @@ class PlayerManager:
             position: Optional seat index. Uses first empty seat if not given.
 
         Returns:
-            The seat index the player was assigned to.
+            The seat index the player was assigned to, or -1 on failure.
         """
         if position is None:
             position = self.players.index(None)
         if self.players[position]:
-            print(f"WARNING: Can't replace existing player at {position=}")
+            logger.warning("Can't replace existing player at position=%d", position)
             return -1
         self.players[position] = player
         return position
-
 
     def find_card_holder(self, target_value: int, target_suit: int) -> AbstractPlayer | None:
         """
