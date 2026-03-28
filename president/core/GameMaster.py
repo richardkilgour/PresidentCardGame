@@ -121,20 +121,18 @@ class GameMaster:
     # Game lifecycle
     # -------------------------------------------------------------------------
 
-    def reset(self, preset_hands: list[PlayingCard] = None) -> None:
+    def reset(self) -> None:
         """
         Create a new Episode, passing rankings from the previous one
         so card swapping and turn order are set correctly.
         """
         logging.info(f"--- Start of a new Episode --- {self.positions=}")
-        if not preset_hands:
-            self.deck.shuffle()
+        self.deck.shuffle()
         self.episode = Episode(
             self.player_manager, self.positions, self.deck, self.listener_list
         )
 
-    def start(self, number_of_rounds: int = 100,
-              preset_hands: list[PlayingCard] = None) -> None:
+    def start(self, number_of_rounds: int = 100) -> None:
         """
         Start a series of episodes.
 
@@ -149,7 +147,7 @@ class GameMaster:
         self.round_number = 0
         self.number_of_rounds = number_of_rounds
         self.positions = []
-        self.reset(preset_hands=preset_hands)
+        self.reset()
         self.notify_listeners("notify_game_stated")
 
     def setup_new_round(self) -> bool:
@@ -167,7 +165,7 @@ class GameMaster:
         self.positions = self.episode.ranks
         logging.info(f"--- Episode Finished with positions {self.positions} ---")
         self.round_number += 1
-        if self.number_of_rounds and self.round_number > self.number_of_rounds:
+        if self.number_of_rounds and self.round_number >= self.number_of_rounds:
             print(self.position_stats_str())
             self.remove_worst_player()
             return True
