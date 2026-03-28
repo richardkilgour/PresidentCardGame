@@ -147,9 +147,6 @@ class Tournament:
                    starting_rank_indices):
         """Run 4 rotated episodes for one position combination."""
         for rotation in range(4):
-            if rotation > 0:
-                self._deck.rotate()
-
             final_ranks = self._run_episode(
                 players=players,
                 starting_ranks=starting_ranks,
@@ -164,6 +161,8 @@ class Tournament:
                 sr = starting_rank_indices[i] \
                     if starting_rank_indices is not None else None
                 results[i].record(starting_rank=sr, final_rank=final_ranks[i])
+            self._deck.rotate()
+
 
     def _run_episode(self, players, starting_ranks):
         for p in players:
@@ -180,8 +179,7 @@ class Tournament:
         for p in players:
             gm.add_player(p)
 
-        gm.positions = starting_ranks
-        gm.start(number_of_rounds=1)
+        gm.start(number_of_rounds=1, positions=starting_ranks)
 
         done = False
         while not done:
@@ -239,7 +237,7 @@ if __name__ == "__main__":
         help=f"Path to config file (default: {default_config_path})",
     )
 
-    default_num_tournaments = 1
+    default_num_tournaments = 10
     parser.add_argument(
         "--tournaments",
         type=int,
