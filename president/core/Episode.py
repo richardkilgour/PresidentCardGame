@@ -25,7 +25,7 @@ from president.core.PlayValidator import PlayValidator
 from president.core.PlayerManager import PlayerManager
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.ERROR)
 # Create a console handler for this module
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.DEBUG)
