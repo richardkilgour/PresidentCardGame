@@ -24,6 +24,16 @@ from president.core.Meld import Meld
 from president.core.PlayValidator import PlayValidator
 from president.core.PlayerManager import PlayerManager
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# Create a console handler for this module
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+# Add handler to your logger
+logger.addHandler(console_handler)
+
 
 class State(Enum):
     INITIALISED = 1
@@ -121,23 +131,23 @@ class Episode:
         """Assign a rank to a player who has played out and notify listeners."""
         ranking = len(self.ranks)
         self.ranks.append(player)
-        logging.info(f"{player.name} played out and is ranked {player.ranking_names[ranking]}")
+        logger.info(f"{player.name} played out and is ranked {player.ranking_names[ranking]}")
         player.set_position(ranking)
         self.notify_listeners("notify_played_out", player, ranking)
         player_names = ' '.join(p.name if p else '' for p in self.ranks)
-        logging.info(f"Positions: {player_names}")
+        logger.info(f"Positions: {player_names}")
 
     def player_turn(self) -> None:
         """Execute a single turn for the current active player."""
         assert self.active_players, "No active players available for turn."
-        logging.info(f"Players who have not passed = {' '.join(x.name for x in self.active_players)}")
+        logger.info(f"Players who have not passed = {' '.join(x.name for x in self.active_players)}")
 
         if len(self.active_players) == 1:
             self.set_player_finished(self.active_players[0])
             return
 
         current_target = self.target_meld()
-        logging.info(f'Currently played highest card = {current_target}')
+        logger.info(f'Currently played highest card = {current_target}')
 
         player = self.active_players[0]
         if player.report_remaining_cards() == 0:
@@ -176,7 +186,7 @@ class Episode:
         assert not any(pos is None for pos in self.ranks), \
             "There should be no empty positions."
         for i, p in enumerate(self.ranks):
-            logging.info(f"{p.name} is ranked as {p.ranking_names[i]}")
+            logger.info(f"{p.name} is ranked as {p.ranking_names[i]}")
         for p in self.player_manager.players:
             assert p.report_remaining_cards() == 0, \
                 f"{p.name} still has cards remaining."
@@ -199,9 +209,11 @@ class Episode:
         if self.state == State.DEALING:
             self.state = State.SWAPPING
             for player in self.player_manager.players:
-                logging.debug(f'{player.name} has {player}')
+                logger.debug(f'Start: {player}')
             self.swap_cards()
         if self.state == State.SWAPPING:
+            for player in self.player_manager.players:
+                logger.debug(f'Sw: {player}')
             self.state = State.ROUND_STARTING
             self.pick_round_starter()
             self.ranks = []
