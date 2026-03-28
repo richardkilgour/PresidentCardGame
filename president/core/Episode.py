@@ -14,6 +14,7 @@ serialisation (GameCheckpoint - future).
 from __future__ import annotations
 
 import logging
+from collections import deque
 from enum import Enum
 
 from president.core.AbstractPlayer import AbstractPlayer
@@ -25,14 +26,6 @@ from president.core.PlayValidator import PlayValidator
 from president.core.PlayerManager import PlayerManager
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.ERROR)
-# Create a console handler for this module
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-# Add handler to your logger
-logger.addHandler(console_handler)
 
 
 class State(Enum):
@@ -46,25 +39,23 @@ class State(Enum):
 
 
 class Episode:
-    def __init__(self, player_manager: PlayerManager, ranks: list[AbstractPlayer],
+    def __init__(self, player_manager: PlayerManager, starting_ranks: list[AbstractPlayer],
                  deck: DeckManager, listener_list: list[CardGameListener]) -> None:
         self.state: State = State.INITIALISED
         self.player_manager = player_manager
-        self.ranks = ranks
+        # starting_ranks: rankings from the previous episode, used for card swapping
+        # and to determine who starts. Empty list on the very first episode.
+        self.starting_ranks: list[AbstractPlayer] = starting_ranks
+        # ranks: accumulated finishing order for the current episode, built up as
+        # players play out. Empty until the episode completes.
+        self.ranks: list[AbstractPlayer] = []
+        n = len(self.player_manager.players)
         # '␆' represents "not played yet"; external dependency, refactor separately
-        self.current_melds = ['␆', '␆', '␆', '␆']
-        self.active_players = []
+        self.current_melds: list = ['␆'] * n
+        self.active_players: list[AbstractPlayer] = []
         self.deck = deck
         self.listener_list = listener_list
         self.card_handler = CardHandler(deck)
-
-    def clear(self):
-        self.state: State = State.INITIALISED
-        self.player_manager = None
-        self.current_melds = ['␆', '␆', '␆', '␆']
-        self.active_players = []
-        self.deck = []
-        self.listener_list = []
 
     def notify_listeners(self, notify_func_name: str, *args) -> None:
         for p in self.listener_list:
@@ -85,20 +76,30 @@ class Episode:
 
     def swap_cards(self) -> None:
         """Swap cards between players based on their previous episode rankings."""
-        self.card_handler.swap_for_new_episode(self.ranks)
-        if len(self.ranks) == 4:
-            self.notify_listeners("notify_cards_swapped", self.ranks[0], self.ranks[3], 2)
-            self.notify_listeners("notify_cards_swapped", self.ranks[1], self.ranks[2], 1)
+        n = len(self.starting_ranks)
+        self.card_handler.swap_for_new_episode(self.starting_ranks)
+        # Notify listeners for each symmetric swap pair: rank 0 swaps with rank n-1,
+        # rank 1 swaps with rank n-2, etc. Only notify for the upper half to avoid
+        # duplicate notifications.
+        for i in range(n // 2):
+            j = n - 1 - i
+            num_cards = (n // 2) - i
+            self.notify_listeners("notify_cards_swapped",
+                                  self.starting_ranks[i], self.starting_ranks[j], num_cards)
 
     def move_to_front(self, front_player: AbstractPlayer) -> None:
-        """Rotate the players list until the specified player is at the front."""
-        while self.player_manager.players[0] != front_player:
-            self.player_manager.players.append(self.player_manager.players.pop(0))
+        """Rotate the players deque until the specified player is at the front."""
+        players = deque(self.player_manager.players)
+        # index() is O(n) but rotate() is O(k) — avoids repeated pop(0)/append
+        idx = players.index(front_player)
+        players.rotate(-idx)
+        self.player_manager.players = list(players)
 
     def pick_round_starter(self) -> None:
         """Set the starting player and notify listeners that a new hand is beginning."""
-        if len(self.ranks) == 4:
-            starting_player = self.ranks[3]  # Scumbag starts
+        n = len(self.starting_ranks)
+        if n > 0:
+            starting_player = self.starting_ranks[-1]  # Lowest rank (scumbag) starts
         else:
             starting_player = self.player_manager.find_card_holder(0, 0)  # Holder of 3♠
         self.move_to_front(starting_player)
@@ -118,7 +119,11 @@ class Episode:
         return highest_meld
 
     def get_players_with_cards(self) -> list[AbstractPlayer]:
-        """Return all players who still have cards in hand."""
+        """Return all players who still have cards in hand.
+
+        Invariant: any player with no cards at this point must already have a rank,
+        meaning they finished in a previous hand of this episode.
+        """
         active_players = []
         for player in self.player_manager.players:
             if player.report_remaining_cards() == 0:
@@ -138,7 +143,13 @@ class Episode:
         logger.info(f"Positions: {player_names}")
 
     def player_turn(self) -> None:
-        """Execute a single turn for the current active player."""
+        """Execute a single turn for the current active player.
+
+        Note: when only one active player remains, they are declared finished
+        immediately without calling notify_player_turn or play(). This is intentional
+        — the last player has no meaningful choice to make — but means listeners will
+        not receive a turn notification for that player's final "turn".
+        """
         assert self.active_players, "No active players available for turn."
         logger.info(f"Players who have not passed = {' '.join(x.name for x in self.active_players)}")
 
@@ -180,7 +191,9 @@ class Episode:
 
     def post_episode_checks(self) -> None:
         """Finalise the episode: log rankings, collect scumbag cards, restore deck."""
-        assert len(self.ranks) == 4
+        n = len(self.player_manager.players)
+        assert len(self.ranks) == n, \
+            f"Expected {n} ranked players, got {len(self.ranks)}."
         self.card_handler.collect_scumbag_cards(self.ranks[-1])
         self.card_handler.restore_deck()
         assert not any(pos is None for pos in self.ranks), \
@@ -195,42 +208,51 @@ class Episode:
     # State machine
     # -------------------------------------------------------------------------
 
-    def step(self) -> list[AbstractPlayer | None]:
+    def step(self) -> list[AbstractPlayer]:
         """
         Advance the episode state machine by one step.
 
+        Each call advances exactly one state. PLAYING may be called many times
+        (once per player turn) before transitioning to HAND_WON.
+
         Returns:
-            Current rankings. Empty until episode is finished.
+            Current rankings (self.ranks). Empty until the episode is finished.
         """
         if self.state == State.INITIALISED:
             self.deck.shuffle()
             self.state = State.DEALING
+
+        elif self.state == State.DEALING:
             self.deal()
-        if self.state == State.DEALING:
-            self.state = State.SWAPPING
             for player in self.player_manager.players:
                 logger.debug(f'Start: {player}')
+            self.state = State.SWAPPING
+
+        elif self.state == State.SWAPPING:
             self.swap_cards()
-        if self.state == State.SWAPPING:
             for player in self.player_manager.players:
                 logger.debug(f'Sw: {player}')
-            self.state = State.ROUND_STARTING
             self.pick_round_starter()
-            self.ranks = []
-        if self.state == State.ROUND_STARTING:
+            self.state = State.ROUND_STARTING
+
+        elif self.state == State.ROUND_STARTING:
             self.active_players = self.get_players_with_cards()
-            self.current_melds = ['␆', '␆', '␆', '␆']
+            n = len(self.player_manager.players)
+            self.current_melds = ['␆'] * n
             # Notify players sitting out this hand
             for player in self.player_manager.players:
                 if player not in self.active_players:
                     self.notify_listeners("notify_waiting", player)
             self.state = State.PLAYING
-        if self.state == State.PLAYING:
+
+        elif self.state == State.PLAYING:
             self.player_turn()
             if len(self.active_players) == 1:
                 self.state = State.HAND_WON
-        if self.state == State.HAND_WON:
-            if len(self.ranks) == 4:
+
+        elif self.state == State.HAND_WON:
+            n = len(self.player_manager.players)
+            if len(self.ranks) == n:
                 self.post_episode_checks()
                 self.state = State.FINISHED
             else:
