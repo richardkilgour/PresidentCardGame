@@ -11,7 +11,7 @@ from president.core.AbstractPlayer import AbstractPlayer
 from president.core.Meld import Meld
 from president.core.StateEncoder import StateEncoder
 
-MODEL_PATH = Path(__file__).parent.parent / "models" / "player_splitter_mlp.pt"
+MODEL_PATH = Path(__file__).parent.parent / "models" / "splitter_clone_v1.pt"
 MELD_BITS  = 54
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

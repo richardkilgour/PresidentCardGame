@@ -1,0 +1,16 @@
+{
+    "data": {
+        "train_hands": 100000,
+        "val_hands":   12000,
+        "test_hands":  12000,
+        "seed":        7
+    },
+    "input_size":   108,
+    "output_size":  55,
+    "hidden_sizes": [256, 256],
+    "activation":   "relu",
+    "batch_size":   256,
+    "lr":           1e-3,
+    "max_epochs":   50,
+    "patience":     5
+}

@@ -3,12 +3,12 @@ import torch.optim as optim
 import yaml
 from torch.utils.data import DataLoader
 
-from president.RL.data_utils import index_to_meld, generate_data, ExpertDataset, generate_random_input
-from president.RL.file_utils import save_expert_data
-from president.models.grid_attn_model import AttentionGridModel, load_model
+from president.training.RL.data_utils import index_to_meld, generate_data, ExpertDataset, generate_random_input
+from president.training.RL.file_utils import save_expert_data
+from president.models.grid_attn_model import load_model
 from president.models.simple_model import SelectiveLabelSmoothingLoss, get_allowed_classes
 
-PROFILE = True
+PROFILE = False
 
 if torch.cuda.is_available():
     device = 'cuda'
@@ -44,7 +44,7 @@ def get_model(model_name, dropout_rate):
 
 def train(model, dataloader, epochs=60, lr=0.001):
     if EXTRA_TESTING:
-        from president.RL.data_utils import PASS_INDEX
+        from president.training.RL.data_utils import PASS_INDEX
 
         for inputs, targets in dataloader:
             # Some tests

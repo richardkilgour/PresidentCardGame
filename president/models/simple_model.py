@@ -2,7 +2,7 @@ import torch
 from torch import nn as nn
 from torch.nn import functional as F
 
-from president.training.train_constant_length_model import LABEL_PAD
+from president.training.reinforcement.train_constant_length_model import LABEL_PAD
 
 # Input is the last three plays (each one of 56 classes), then 14 inputs representing the current hand (55 classes)
 # Classes are:

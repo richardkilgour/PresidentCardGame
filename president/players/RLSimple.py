@@ -6,7 +6,7 @@ Checks if the output is valid before returning the best card(s) to play.
 """
 import torch
 
-from president.RL.data_utils import hand_to_indices, meld_to_index, index_to_meld
+from president.training.RL.data_utils import hand_to_indices, meld_to_index, index_to_meld
 from president.RL.grid_model import load_model
 from president.core.AbstractPlayer import AbstractPlayer
 

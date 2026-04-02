@@ -24,7 +24,7 @@ from president.core.PlayerManager import PlayerManager
 from president.core.PlayerRegistry import PlayerRegistry
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.ERROR)
 
 class IllegalPlayPolicy(Enum):
     TERMINATE  = "terminate"   # Save checkpoint, raise, stop the game

@@ -3,26 +3,74 @@
 """
 Generate training, validation, and test datasets for cloning PlayerSplitter.
 
+Usage:
+    python generate_splitter_data.py <experiment_name> [--force]
+
+Reads config from:
+    training/experiments/<experiment_name>/config.json
+
+Writes data to:
+    training/experiments/<experiment_name>/data/
+        X_train.npy  Y_train.npy
+        X_val.npy    Y_val.npy
+        X_test.npy   Y_test.npy
+
+Skips generation if all six files already exist (unless --force is passed).
+
 Training:   exhaustive (hand, target) pairs for N hands
 Validation: random     (hand, target) pairs for M hands
 Test:       random     (hand, target) pairs for M hands
 
 Hands in all three sets are disjoint.
 """
+import argparse
+import json
 import random
-from pathlib import Path
-import numpy as np
+import sys
 from collections import Counter
+from pathlib import Path
+
+import numpy as np
+
 from president.players.PlayerSplitter import PlayerSplitter
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
 from president.core.StateEncoder import StateEncoder
 
-ACTION_BITS = 55  # 0-53 melds, 54 = pass
+ACTION_BITS = 55   # 0-53 melds, 54 = pass
 MELD_BITS   = 54
 JOKER_VALUE = 13
 
-DATA = Path(__file__).parent.parent / "data"
+EXPERIMENTS_DIR = Path(__file__).parent.parent / "experiments"
+
+DATA_FILES = [
+    "X_train.npy", "Y_train.npy",
+    "X_val.npy",   "Y_val.npy",
+    "X_test.npy",  "Y_test.npy",
+]
+
+DEFAULT_DATA_CONFIG = {
+    "train_hands": 10_000,
+    "val_hands":   12_000,
+    "test_hands":  12_000,
+    "seed":        42,
+}
+
+
+# ─────────────────────────────────────────────
+# Config
+# ─────────────────────────────────────────────
+
+def load_data_config(exp_dir: Path) -> dict:
+    config_path = exp_dir / "config.json"
+    if not config_path.exists():
+        sys.exit(f"config.json not found in {exp_dir}")
+    with open(config_path) as f:
+        cfg = json.load(f)
+    data_cfg = cfg.get("data", {})
+    for key, value in DEFAULT_DATA_CONFIG.items():
+        data_cfg.setdefault(key, value)
+    return data_cfg
 
 
 # ─────────────────────────────────────────────
@@ -156,30 +204,67 @@ def build_random_set(n_hands: int, player: PlayerSplitter) -> tuple:
 # Main
 # ─────────────────────────────────────────────
 
-if __name__ == "__main__":
-    random.seed(42)
-    np.random.seed(42)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate splitter clone training data for an experiment."
+    )
+    parser.add_argument("experiment", help="Experiment name under training/experiments/")
+    parser.add_argument("--force", action="store_true",
+                        help="Regenerate data even if it already exists")
+    args = parser.parse_args()
+
+    exp_dir  = EXPERIMENTS_DIR / args.experiment
+    if not exp_dir.is_dir():
+        sys.exit(f"Experiment directory not found: {exp_dir}")
+
+    data_dir = exp_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+
+    # ── Skip if data already complete ─────────
+    existing = [f for f in DATA_FILES if (data_dir / f).exists()]
+    if len(existing) == len(DATA_FILES) and not args.force:
+        print(f"Data already exists in {data_dir} — skipping generation.")
+        print("Pass --force to regenerate.")
+        return
+
+    if args.force and existing:
+        print(f"--force passed; regenerating {len(existing)} existing file(s).")
+
+    # ── Config ────────────────────────────────
+    cfg = load_data_config(exp_dir)
+    print(f"Experiment  : {args.experiment}")
+    print(f"Data config : {json.dumps(cfg, indent=2)}\n")
+
+    random.seed(cfg["seed"])
+    np.random.seed(cfg["seed"])
 
     player = PlayerSplitter("oracle")
 
-    print("Generating training set  (10 000 hands, exhaustive)...")
-    X_train, Y_train = build_training_set(n_hands=10_000, player=player)
+    # ── Generate ──────────────────────────────
+    print(f"Generating training set   ({cfg['train_hands']:,} hands, exhaustive)...")
+    X_train, Y_train = build_training_set(n_hands=cfg["train_hands"], player=player)
 
-    print("Generating validation set (12 000 hands, random)...")
-    X_val, Y_val = build_random_set(n_hands=12_000, player=player)
+    print(f"Generating validation set ({cfg['val_hands']:,} hands, random)...")
+    X_val, Y_val = build_random_set(n_hands=cfg["val_hands"], player=player)
 
-    print("Generating test set       (12 000 hands, random)...")
-    X_test, Y_test = build_random_set(n_hands=12_000, player=player)
+    print(f"Generating test set       ({cfg['test_hands']:,} hands, random)...")
+    X_test, Y_test = build_random_set(n_hands=cfg["test_hands"], player=player)
 
+    # ── Report ────────────────────────────────
     print(f"\nTraining:   {len(X_train):>7,} examples")
     print(f"Validation: {len(X_val):>7,} examples")
     print(f"Test:       {len(X_test):>7,} examples")
 
-    np.save(DATA / "X_train.npy", X_train)
-    np.save(DATA / "Y_train.npy", Y_train)
-    np.save(DATA / "X_val.npy",   X_val)
-    np.save(DATA / "Y_val.npy",   Y_val)
-    np.save(DATA / "X_test.npy",  X_test)
-    np.save(DATA / "Y_test.npy",  Y_test)
+    # ── Save ──────────────────────────────────
+    np.save(data_dir / "X_train.npy", X_train)
+    np.save(data_dir / "Y_train.npy", Y_train)
+    np.save(data_dir / "X_val.npy",   X_val)
+    np.save(data_dir / "Y_val.npy",   Y_val)
+    np.save(data_dir / "X_test.npy",  X_test)
+    np.save(data_dir / "Y_test.npy",  Y_test)
 
-    print(f"\nSaved to {DATA}")
+    print(f"\nSaved to {data_dir}")
+
+
+if __name__ == "__main__":
+    main()
