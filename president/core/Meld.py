@@ -49,6 +49,7 @@ class Meld:
         self_len = len(self)
         other_len = len(other)
         self_val = self.cards[0].get_value()
+        other_val = other.cards[0].get_value()
 
 
         if other_len == 1:
@@ -65,7 +66,7 @@ class Meld:
                 # Double 2 beats a triple
                 return self_len == 2
             if self_val == 13:
-                if other.cards[0] == 12:
+                if other_val == 12:
                     # 2 Jokers are needed to beat a triple 2
                     return self_len == 2
                 # 1 Joker beats any other triple
@@ -78,7 +79,7 @@ class Meld:
                 # Triple 2 beats a quad
                 return self_len == 3
             if self_val == 13:
-                if other.cards[0] == 12:
+                if other_val == 12:
                     raise ValueError("Cannot beat quad 2s with Jokers — invalid game state.")
                 return self_len == 2
             return self_len == 4
