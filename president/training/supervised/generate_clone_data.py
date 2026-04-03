@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Generate training, validation, and test datasets for cloning a card player oracle.
+Generate training, validation, and test datasets for cloning a card player.
 
 Usage:
     python generate_clone_data.py <experiment_name> [--force]
@@ -9,12 +9,12 @@ Usage:
 Reads config from:
     training/experiments/<experiment_name>/config.json
 
-The oracle player is specified in config["oracle"]["class"] (dotted module.ClassName).
+The target player is specified in config["target_player"]["class"] (dotted module.ClassName).
 Example:
     {
-      "oracle": {
+      "target_player": {
         "class": "president.players.PlayerSimple.PlayerSimple",
-        "name": "oracle"
+        "name": "simple"
       }
     }
 
@@ -32,12 +32,12 @@ Test:       random     (hand, target) pairs for M hands
 
 Hands in all three sets are disjoint.
 
-Oracle state setup
+Player state setup
 ------------------
-query_oracle() accepts an OracleSetupFn — a callable (player, hand, target) -> None
-that configures the oracle's internal state before play() is called.
+query_player() accepts a PlayerSetupFn — a callable (player, hand, target) -> None
+that configures the player's internal state before play() is called.
 
-simple_oracle_setup (the default) sets _hand and target_meld, which is sufficient
+simple_player_setup (the default) sets _hand and target_meld, which is sufficient
 for any rule-based player.
 
 For players whose play() reads additional state (e.g. full game history, opponent
@@ -79,9 +79,9 @@ DEFAULT_DATA_CONFIG = {
     "seed":        42,
 }
 
-# Callable that configures an oracle player for a given (hand, target) scenario.
+# Callable that configures the target player for a given (hand, target) scenario.
 # Signature: (player, hand, target_meld_or_None) -> None
-OracleSetupFn = Callable[[AbstractPlayer, list, Optional[Meld]], None]
+PlayerSetupFn = Callable[[AbstractPlayer, list, Optional[Meld]], None]
 
 
 # ─────────────────────────────────────────────
@@ -100,23 +100,23 @@ def load_config(exp_dir: Path) -> dict:
         data_cfg.setdefault(key, value)
     cfg["data"] = data_cfg
 
-    oracle_cfg = cfg.get("oracle")
-    if oracle_cfg is None or "class" not in oracle_cfg:
+    player_cfg = cfg.get("target_player")
+    if player_cfg is None or "class" not in player_cfg:
         sys.exit(
-            "config.json must contain an 'oracle' section with a 'class' key.\n"
-            "Example: {\"oracle\": {\"class\": \"president.players.PlayerSimple.PlayerSimple\"}}"
+            "config.json must contain a 'target_player' section with a 'class' key.\n"
+            "Example: {\"target_player\": {\"class\": \"president.players.PlayerSimple.PlayerSimple\"}}"
         )
-    oracle_cfg.setdefault("name", "oracle")
-    cfg["oracle"] = oracle_cfg
+    player_cfg.setdefault("name", "player")
+    cfg["target_player"] = player_cfg
 
     return cfg
 
 
 # ─────────────────────────────────────────────
-# Oracle
+# Target player
 # ─────────────────────────────────────────────
 
-def simple_oracle_setup(player: AbstractPlayer, hand: list, target) -> None:
+def simple_player_setup(player: AbstractPlayer, hand: list, target) -> None:
     """
     Default state-setup for players that only need _hand and target_meld.
     Suitable for rule-based players.
@@ -125,34 +125,34 @@ def simple_oracle_setup(player: AbstractPlayer, hand: list, target) -> None:
     player.target_meld = target
 
 
-def load_oracle(oracle_cfg: dict) -> AbstractPlayer:
+def load_player(player_cfg: dict) -> AbstractPlayer:
     """
-    Instantiate an oracle player from config.
+    Instantiate the target player from config.
 
     Required config key:
         class  – dotted module.ClassName
                  e.g. "president.players.PlayerSimple.PlayerSimple"
     Optional config key:
-        name   – player name string (default "oracle")
+        name   – player name string (default "player")
     """
-    dotted = oracle_cfg["class"]
+    dotted = player_cfg["class"]
     module_path, class_name = dotted.rsplit(".", 1)
     try:
         module = importlib.import_module(module_path)
         cls = getattr(module, class_name)
     except (ModuleNotFoundError, AttributeError) as exc:
-        sys.exit(f"Cannot load oracle class '{dotted}': {exc}")
-    return cls(oracle_cfg.get("name", "oracle"))
+        sys.exit(f"Cannot load target player class '{dotted}': {exc}")
+    return cls(player_cfg.get("name", "player"))
 
 
-def query_oracle(
+def query_player(
     player: AbstractPlayer,
     hand: list,
     target,
-    setup_fn: OracleSetupFn = simple_oracle_setup,
+    setup_fn: PlayerSetupFn = simple_player_setup,
 ) -> np.ndarray:
     """
-    Ask the oracle what it would play given hand and target.
+    Ask the target player what it would play given hand and target.
 
     setup_fn is called first to configure the player's internal state.
     For simple rule-based players this means setting _hand and target_meld.
@@ -247,7 +247,7 @@ def encode_action(meld) -> np.ndarray:
 def build_training_set(
     n_hands: int,
     player: AbstractPlayer,
-    setup_fn: OracleSetupFn = simple_oracle_setup,
+    setup_fn: PlayerSetupFn = simple_player_setup,
 ) -> tuple:
     """
     Exhaustive: every valid (hand, target) pair for each hand.
@@ -258,7 +258,7 @@ def build_training_set(
         hand = random_hand(random_hand_size())
         for target in valid_targets_for_hand(hand):
             hand_enc, target_enc = encode_example(hand, target)
-            action_enc = query_oracle(player, hand, target, setup_fn)
+            action_enc = query_player(player, hand, target, setup_fn)
             X.append(np.concatenate([hand_enc, target_enc]))
             Y.append(action_enc)
     return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
@@ -267,7 +267,7 @@ def build_training_set(
 def build_random_set(
     n_hands: int,
     player: AbstractPlayer,
-    setup_fn: OracleSetupFn = simple_oracle_setup,
+    setup_fn: PlayerSetupFn = simple_player_setup,
 ) -> tuple:
     """
     Random: one random target per hand.
@@ -279,7 +279,7 @@ def build_random_set(
         hand   = random_hand(random_hand_size())
         target = random_target_for_hand(hand)
         hand_enc, target_enc = encode_example(hand, target)
-        action_enc = query_oracle(player, hand, target, setup_fn)
+        action_enc = query_player(player, hand, target, setup_fn)
         X.append(np.concatenate([hand_enc, target_enc]))
         Y.append(action_enc)
     return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
@@ -291,7 +291,7 @@ def build_random_set(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate clone training data for a card player oracle."
+        description="Generate clone training data for a card player."
     )
     parser.add_argument("experiment", help="Experiment name under training/experiments/")
     parser.add_argument("--force", action="store_true",
@@ -318,20 +318,20 @@ def main():
     # ── Config ────────────────────────────────
     cfg        = load_config(exp_dir)
     data_cfg   = cfg["data"]
-    oracle_cfg = cfg["oracle"]
+    player_cfg = cfg["target_player"]
 
-    print(f"Experiment  : {args.experiment}")
-    print(f"Oracle      : {oracle_cfg['class']} (name={oracle_cfg['name']!r})")
-    print(f"Data config : {json.dumps(data_cfg, indent=2)}\n")
+    print(f"Experiment    : {args.experiment}")
+    print(f"Target player : {player_cfg['class']} (name={player_cfg['name']!r})")
+    print(f"Data config   : {json.dumps(data_cfg, indent=2)}\n")
 
     random.seed(data_cfg["seed"])
     np.random.seed(data_cfg["seed"])
 
-    # ── Oracle ────────────────────────────────
-    player   = load_oracle(oracle_cfg)
-    setup_fn = simple_oracle_setup
+    # ── Target player ─────────────────────────
+    player   = load_player(player_cfg)
+    setup_fn = simple_player_setup
     # For players that need richer state, replace setup_fn here or derive it
-    # from oracle_cfg (e.g. a "setup" key pointing to a custom callable).
+    # from player_cfg (e.g. a "setup" key pointing to a custom callable).
 
     # ── Generate ──────────────────────────────
     print(f"Generating training set   ({data_cfg['train_hands']:,} hands, exhaustive)...")

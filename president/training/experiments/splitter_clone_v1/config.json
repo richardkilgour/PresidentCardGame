@@ -1,7 +1,7 @@
 {
-    "oracle": {
+    "target_player": {
         "class": "president.players.PlayerSplitter.PlayerSplitter",
-        "name":  "oracle"
+        "name":  "splitter"
     },
     "data": {
         "train_hands": 100000,
