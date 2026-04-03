@@ -1,8 +1,12 @@
 """
-training/supervised/train_splitter_clone.py
+training/supervised/train_clone_player.py
+
+Train an MLP to clone a card player oracle from pre-generated (X, Y) data.
+The oracle identity is irrelevant here — any dataset produced by
+generate_clone_data.py is accepted.
 
 Usage:
-    python train_splitter_clone.py <experiment_name>
+    python train_clone_player.py <experiment_name>
 
 Loads config from:
     training/experiments/<experiment_name>/config.json
@@ -12,8 +16,8 @@ Reads data from:
 
 Writes to:
     training/experiments/<experiment_name>/
-        splitter_clone_v1.pt   – best checkpoint
-        metrics.csv              – per-epoch loss/acc
+        <experiment_name>.pt  – best checkpoint (keyed by val accuracy)
+        metrics.csv           – per-epoch loss/acc
 """
 from __future__ import annotations
 
@@ -67,7 +71,6 @@ def load_config(exp_dir: Path) -> dict:
         sys.exit(f"config.json not found in {exp_dir}")
     with open(config_path) as f:
         cfg = json.load(f)
-    # Fill in any keys not present in the file with defaults
     for key, value in DEFAULT_CONFIG.items():
         cfg.setdefault(key, value)
     return cfg
@@ -107,8 +110,8 @@ def load_split(data_dir: Path, split: str, batch_size: int, shuffle: bool) -> Da
 # ─────────────────────────────────────────────
 
 ACTIVATIONS = {
-    "relu":    nn.ReLU,
-    "tanh":    nn.Tanh,
+    "relu":      nn.ReLU,
+    "tanh":      nn.Tanh,
     "leakyrelu": nn.LeakyReLU,
 }
 
@@ -168,7 +171,7 @@ def run_epoch(
 # ─────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Clone expert system into an MLP.")
+    parser = argparse.ArgumentParser(description="Train an MLP clone of a card player oracle.")
     parser.add_argument("experiment", help="Name of the experiment directory under training/experiments/")
     args = parser.parse_args()
 
@@ -229,7 +232,6 @@ def main():
                 best_val_acc     = val_acc
                 patience_counter = 0
                 torch.save(model.state_dict(), checkpoint_path)
-                # Keep a copy of the config that produced this checkpoint
                 shutil.copy(exp_dir / "config.json", exp_dir / "config_checkpoint.json")
             else:
                 patience_counter += 1
@@ -242,7 +244,6 @@ def main():
     _, test_acc = run_epoch(model, test_loader, loss_fn, None, device, desc="Test")
     print(f"\nTest accuracy: {test_acc:.4f}")
 
-    # Append test result to metrics
     with open(metrics_path, "a", newline="") as csvfile:
         csv.writer(csvfile).writerow(["test", "", "", "", test_acc])
 

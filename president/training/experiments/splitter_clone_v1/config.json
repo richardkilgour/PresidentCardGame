@@ -1,4 +1,8 @@
 {
+    "oracle": {
+        "class": "president.players.PlayerSplitter.PlayerSplitter",
+        "name":  "oracle"
+    },
     "data": {
         "train_hands": 100000,
         "val_hands":   12000,

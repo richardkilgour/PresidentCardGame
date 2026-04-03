@@ -1,13 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Generate training, validation, and test datasets for cloning PlayerSplitter.
+Generate training, validation, and test datasets for cloning a card player oracle.
 
 Usage:
-    python generate_splitter_data.py <experiment_name> [--force]
+    python generate_clone_data.py <experiment_name> [--force]
 
 Reads config from:
     training/experiments/<experiment_name>/config.json
+
+The oracle player is specified in config["oracle"]["class"] (dotted module.ClassName).
+Example:
+    {
+      "oracle": {
+        "class": "president.players.PlayerSimple.PlayerSimple",
+        "name": "oracle"
+      }
+    }
 
 Writes data to:
     training/experiments/<experiment_name>/data/
@@ -22,17 +31,31 @@ Validation: random     (hand, target) pairs for M hands
 Test:       random     (hand, target) pairs for M hands
 
 Hands in all three sets are disjoint.
+
+Oracle state setup
+------------------
+query_oracle() accepts an OracleSetupFn — a callable (player, hand, target) -> None
+that configures the oracle's internal state before play() is called.
+
+simple_oracle_setup (the default) sets _hand and target_meld, which is sufficient
+for any rule-based player.
+
+For players whose play() reads additional state (e.g. full game history, opponent
+card counts, network hidden state), pass a custom setup_fn that populates that
+state appropriately for the synthetic single-decision context.
 """
 import argparse
+import importlib
 import json
 import random
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Callable, Optional
 
 import numpy as np
 
-from president.players.PlayerSplitter import PlayerSplitter
+from president.core.AbstractPlayer import AbstractPlayer
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
 from president.core.StateEncoder import StateEncoder
@@ -56,21 +79,88 @@ DEFAULT_DATA_CONFIG = {
     "seed":        42,
 }
 
+# Callable that configures an oracle player for a given (hand, target) scenario.
+# Signature: (player, hand, target_meld_or_None) -> None
+OracleSetupFn = Callable[[AbstractPlayer, list, Optional[Meld]], None]
+
 
 # ─────────────────────────────────────────────
 # Config
 # ─────────────────────────────────────────────
 
-def load_data_config(exp_dir: Path) -> dict:
+def load_config(exp_dir: Path) -> dict:
     config_path = exp_dir / "config.json"
     if not config_path.exists():
         sys.exit(f"config.json not found in {exp_dir}")
     with open(config_path) as f:
         cfg = json.load(f)
+
     data_cfg = cfg.get("data", {})
     for key, value in DEFAULT_DATA_CONFIG.items():
         data_cfg.setdefault(key, value)
-    return data_cfg
+    cfg["data"] = data_cfg
+
+    oracle_cfg = cfg.get("oracle")
+    if oracle_cfg is None or "class" not in oracle_cfg:
+        sys.exit(
+            "config.json must contain an 'oracle' section with a 'class' key.\n"
+            "Example: {\"oracle\": {\"class\": \"president.players.PlayerSimple.PlayerSimple\"}}"
+        )
+    oracle_cfg.setdefault("name", "oracle")
+    cfg["oracle"] = oracle_cfg
+
+    return cfg
+
+
+# ─────────────────────────────────────────────
+# Oracle
+# ─────────────────────────────────────────────
+
+def simple_oracle_setup(player: AbstractPlayer, hand: list, target) -> None:
+    """
+    Default state-setup for players that only need _hand and target_meld.
+    Suitable for rule-based players.
+    """
+    player._hand = sorted(hand, key=lambda c: c.get_index())
+    player.target_meld = target
+
+
+def load_oracle(oracle_cfg: dict) -> AbstractPlayer:
+    """
+    Instantiate an oracle player from config.
+
+    Required config key:
+        class  – dotted module.ClassName
+                 e.g. "president.players.PlayerSimple.PlayerSimple"
+    Optional config key:
+        name   – player name string (default "oracle")
+    """
+    dotted = oracle_cfg["class"]
+    module_path, class_name = dotted.rsplit(".", 1)
+    try:
+        module = importlib.import_module(module_path)
+        cls = getattr(module, class_name)
+    except (ModuleNotFoundError, AttributeError) as exc:
+        sys.exit(f"Cannot load oracle class '{dotted}': {exc}")
+    return cls(oracle_cfg.get("name", "oracle"))
+
+
+def query_oracle(
+    player: AbstractPlayer,
+    hand: list,
+    target,
+    setup_fn: OracleSetupFn = simple_oracle_setup,
+) -> np.ndarray:
+    """
+    Ask the oracle what it would play given hand and target.
+
+    setup_fn is called first to configure the player's internal state.
+    For simple rule-based players this means setting _hand and target_meld.
+    For more complex players (e.g. those that condition on game history or
+    carry recurrent state), provide a custom setup_fn.
+    """
+    setup_fn(player, hand, target)
+    return encode_action(player.play())
 
 
 # ─────────────────────────────────────────────
@@ -151,23 +241,14 @@ def encode_action(meld) -> np.ndarray:
 
 
 # ─────────────────────────────────────────────
-# Oracle
-# ─────────────────────────────────────────────
-
-def query_oracle(player: PlayerSplitter, hand: list, target) -> np.ndarray:
-    """Ask PlayerSplitter what it would play given hand and target."""
-    player._hand = list(hand)
-    player._hand.sort(key=lambda c: c.get_index())
-    player.target_meld = target
-    action = player.play()
-    return encode_action(action)
-
-
-# ─────────────────────────────────────────────
 # Dataset builders
 # ─────────────────────────────────────────────
 
-def build_training_set(n_hands: int, player: PlayerSplitter) -> tuple:
+def build_training_set(
+    n_hands: int,
+    player: AbstractPlayer,
+    setup_fn: OracleSetupFn = simple_oracle_setup,
+) -> tuple:
     """
     Exhaustive: every valid (hand, target) pair for each hand.
     Returns X (N, 108), Y (N, 55).
@@ -177,13 +258,17 @@ def build_training_set(n_hands: int, player: PlayerSplitter) -> tuple:
         hand = random_hand(random_hand_size())
         for target in valid_targets_for_hand(hand):
             hand_enc, target_enc = encode_example(hand, target)
-            action_enc = query_oracle(player, hand, target)
+            action_enc = query_oracle(player, hand, target, setup_fn)
             X.append(np.concatenate([hand_enc, target_enc]))
             Y.append(action_enc)
     return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
 
 
-def build_random_set(n_hands: int, player: PlayerSplitter) -> tuple:
+def build_random_set(
+    n_hands: int,
+    player: AbstractPlayer,
+    setup_fn: OracleSetupFn = simple_oracle_setup,
+) -> tuple:
     """
     Random: one random target per hand.
     Used for validation and test sets.
@@ -194,7 +279,7 @@ def build_random_set(n_hands: int, player: PlayerSplitter) -> tuple:
         hand   = random_hand(random_hand_size())
         target = random_target_for_hand(hand)
         hand_enc, target_enc = encode_example(hand, target)
-        action_enc = query_oracle(player, hand, target)
+        action_enc = query_oracle(player, hand, target, setup_fn)
         X.append(np.concatenate([hand_enc, target_enc]))
         Y.append(action_enc)
     return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
@@ -206,14 +291,14 @@ def build_random_set(n_hands: int, player: PlayerSplitter) -> tuple:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate splitter clone training data for an experiment."
+        description="Generate clone training data for a card player oracle."
     )
     parser.add_argument("experiment", help="Experiment name under training/experiments/")
     parser.add_argument("--force", action="store_true",
                         help="Regenerate data even if it already exists")
     args = parser.parse_args()
 
-    exp_dir  = EXPERIMENTS_DIR / args.experiment
+    exp_dir = EXPERIMENTS_DIR / args.experiment
     if not exp_dir.is_dir():
         sys.exit(f"Experiment directory not found: {exp_dir}")
 
@@ -231,24 +316,32 @@ def main():
         print(f"--force passed; regenerating {len(existing)} existing file(s).")
 
     # ── Config ────────────────────────────────
-    cfg = load_data_config(exp_dir)
+    cfg        = load_config(exp_dir)
+    data_cfg   = cfg["data"]
+    oracle_cfg = cfg["oracle"]
+
     print(f"Experiment  : {args.experiment}")
-    print(f"Data config : {json.dumps(cfg, indent=2)}\n")
+    print(f"Oracle      : {oracle_cfg['class']} (name={oracle_cfg['name']!r})")
+    print(f"Data config : {json.dumps(data_cfg, indent=2)}\n")
 
-    random.seed(cfg["seed"])
-    np.random.seed(cfg["seed"])
+    random.seed(data_cfg["seed"])
+    np.random.seed(data_cfg["seed"])
 
-    player = PlayerSplitter("oracle")
+    # ── Oracle ────────────────────────────────
+    player   = load_oracle(oracle_cfg)
+    setup_fn = simple_oracle_setup
+    # For players that need richer state, replace setup_fn here or derive it
+    # from oracle_cfg (e.g. a "setup" key pointing to a custom callable).
 
     # ── Generate ──────────────────────────────
-    print(f"Generating training set   ({cfg['train_hands']:,} hands, exhaustive)...")
-    X_train, Y_train = build_training_set(n_hands=cfg["train_hands"], player=player)
+    print(f"Generating training set   ({data_cfg['train_hands']:,} hands, exhaustive)...")
+    X_train, Y_train = build_training_set(data_cfg["train_hands"], player, setup_fn)
 
-    print(f"Generating validation set ({cfg['val_hands']:,} hands, random)...")
-    X_val, Y_val = build_random_set(n_hands=cfg["val_hands"], player=player)
+    print(f"Generating validation set ({data_cfg['val_hands']:,} hands, random)...")
+    X_val, Y_val = build_random_set(data_cfg["val_hands"], player, setup_fn)
 
-    print(f"Generating test set       ({cfg['test_hands']:,} hands, random)...")
-    X_test, Y_test = build_random_set(n_hands=cfg["test_hands"], player=player)
+    print(f"Generating test set       ({data_cfg['test_hands']:,} hands, random)...")
+    X_test, Y_test = build_random_set(data_cfg["test_hands"], player, setup_fn)
 
     # ── Report ────────────────────────────────
     print(f"\nTraining:   {len(X_train):>7,} examples")
