@@ -76,6 +76,15 @@ president/.idea/
 /.idea/vcs.xml
 
 # Temporary files
-president/RL/best_model.pt
-president/RL/expert_data.pt
+president/training/RL/best_model.pt
+president/training/RL/expert_data.pt
 president/test.log
+
+# Training experiment outputs — data, checkpoints, metrics
+president/training/experiments/**/data/
+president/training/experiments/**/*.npy
+president/training/experiments/**/*.pt
+president/training/experiments/**/*.zip
+president/training/experiments/**/checkpoints/
+president/training/experiments/**/metrics.csv
+president/training/experiments/**/config_checkpoint.json
