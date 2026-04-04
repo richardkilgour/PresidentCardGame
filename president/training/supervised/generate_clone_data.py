@@ -61,10 +61,9 @@ from president.core.Meld import Meld
 from president.core.StateEncoder import StateEncoder
 
 ACTION_BITS = 55   # 0-53 melds, 54 = pass
-MELD_BITS   = 54
 JOKER_VALUE = 13
 
-EXPERIMENTS_DIR = Path(__file__).parent.parent / "experiments"
+EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
 
 DATA_FILES = [
     "X_train.npy", "Y_train.npy",
@@ -109,6 +108,14 @@ def load_config(exp_dir: Path) -> dict:
     player_cfg.setdefault("name", "player")
     cfg["target_player"] = player_cfg
 
+    model_cfg = cfg.get("model")
+    if model_cfg is None or "class" not in model_cfg:
+        sys.exit(
+            "config.json must contain a 'model' section with a 'class' key.\n"
+            "Example: {\"model\": {\"class\": \"president.models.single_meld_mlp.SingleMeldMLP\"}}"
+        )
+    cfg["model"] = model_cfg
+
     return cfg
 
 
@@ -143,6 +150,24 @@ def load_player(player_cfg: dict) -> AbstractPlayer:
     except (ModuleNotFoundError, AttributeError) as exc:
         sys.exit(f"Cannot load target player class '{dotted}': {exc}")
     return cls(player_cfg.get("name", "player"))
+
+
+def load_model_class(model_cfg: dict):
+    """
+    Import and return the model class specified in config.
+
+    Required config key:
+        class  – dotted module.ClassName
+                 e.g. "president.models.single_meld_mlp.SingleMeldMLP"
+    """
+    dotted = model_cfg["class"]
+    module_path, class_name = dotted.rsplit(".", 1)
+    try:
+        module = importlib.import_module(module_path)
+        cls = getattr(module, class_name)
+    except (ModuleNotFoundError, AttributeError) as exc:
+        sys.exit(f"Cannot load model class '{dotted}': {exc}")
+    return cls
 
 
 def query_player(
@@ -223,13 +248,6 @@ def _build_meld(value: int, size: int) -> Meld:
 # Encoding
 # ─────────────────────────────────────────────
 
-def encode_example(hand: list, target) -> tuple[np.ndarray, np.ndarray]:
-    hand_enc   = StateEncoder._encode_hand(hand)
-    target_enc = StateEncoder.encode_meld(target) if target is not None \
-                 else np.zeros(MELD_BITS, dtype=np.int8)
-    return hand_enc, target_enc
-
-
 def encode_action(meld) -> np.ndarray:
     """55-class one-hot: 0-53 are melds, 54 is pass."""
     vec = np.zeros(ACTION_BITS, dtype=np.int8)
@@ -247,19 +265,20 @@ def encode_action(meld) -> np.ndarray:
 def build_training_set(
     n_hands: int,
     player: AbstractPlayer,
+    model_cls,
     setup_fn: PlayerSetupFn = simple_player_setup,
 ) -> tuple:
     """
     Exhaustive: every valid (hand, target) pair for each hand.
-    Returns X (N, 108), Y (N, 55).
+    X shape is determined by model_cls.encode_state().
     """
     X, Y = [], []
     for _ in range(n_hands):
         hand = random_hand(random_hand_size())
         for target in valid_targets_for_hand(hand):
-            hand_enc, target_enc = encode_example(hand, target)
+            state_enc  = model_cls.encode_state(hand, target)
             action_enc = query_player(player, hand, target, setup_fn)
-            X.append(np.concatenate([hand_enc, target_enc]))
+            X.append(state_enc)
             Y.append(action_enc)
     return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
 
@@ -267,20 +286,21 @@ def build_training_set(
 def build_random_set(
     n_hands: int,
     player: AbstractPlayer,
+    model_cls,
     setup_fn: PlayerSetupFn = simple_player_setup,
 ) -> tuple:
     """
     Random: one random target per hand.
     Used for validation and test sets.
-    Returns X (N, 108), Y (N, 55).
+    X shape is determined by model_cls.encode_state().
     """
     X, Y = [], []
     for _ in range(n_hands):
         hand   = random_hand(random_hand_size())
         target = random_target_for_hand(hand)
-        hand_enc, target_enc = encode_example(hand, target)
+        state_enc  = model_cls.encode_state(hand, target)
         action_enc = query_player(player, hand, target, setup_fn)
-        X.append(np.concatenate([hand_enc, target_enc]))
+        X.append(state_enc)
         Y.append(action_enc)
     return np.array(X, dtype=np.int8), np.array(Y, dtype=np.int8)
 
@@ -298,7 +318,7 @@ def main():
                         help="Regenerate data even if it already exists")
     args = parser.parse_args()
 
-    exp_dir = EXPERIMENTS_DIR / args.experiment
+    exp_dir = (EXPERIMENTS_DIR / args.experiment).resolve()
     if not exp_dir.is_dir():
         sys.exit(f"Experiment directory not found: {exp_dir}")
 
@@ -319,13 +339,18 @@ def main():
     cfg        = load_config(exp_dir)
     data_cfg   = cfg["data"]
     player_cfg = cfg["target_player"]
+    model_cfg  = cfg["model"]
 
     print(f"Experiment    : {args.experiment}")
     print(f"Target player : {player_cfg['class']} (name={player_cfg['name']!r})")
+    print(f"Model class   : {model_cfg['class']}")
     print(f"Data config   : {json.dumps(data_cfg, indent=2)}\n")
 
     random.seed(data_cfg["seed"])
     np.random.seed(data_cfg["seed"])
+
+    # ── Model class ───────────────────────────
+    model_cls = load_model_class(model_cfg)
 
     # ── Target player ─────────────────────────
     player   = load_player(player_cfg)
@@ -335,13 +360,13 @@ def main():
 
     # ── Generate ──────────────────────────────
     print(f"Generating training set   ({data_cfg['train_hands']:,} hands, exhaustive)...")
-    X_train, Y_train = build_training_set(data_cfg["train_hands"], player, setup_fn)
+    X_train, Y_train = build_training_set(data_cfg["train_hands"], player, model_cls, setup_fn)
 
     print(f"Generating validation set ({data_cfg['val_hands']:,} hands, random)...")
-    X_val, Y_val = build_random_set(data_cfg["val_hands"], player, setup_fn)
+    X_val, Y_val = build_random_set(data_cfg["val_hands"], player, model_cls, setup_fn)
 
     print(f"Generating test set       ({data_cfg['test_hands']:,} hands, random)...")
-    X_test, Y_test = build_random_set(data_cfg["test_hands"], player, setup_fn)
+    X_test, Y_test = build_random_set(data_cfg["test_hands"], player, model_cls, setup_fn)
 
     # ── Report ────────────────────────────────
     print(f"\nTraining:   {len(X_train):>7,} examples")

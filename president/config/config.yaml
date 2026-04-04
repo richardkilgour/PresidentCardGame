@@ -1,19 +1,24 @@
 player1:
-  name: Richard
-  type: Holder
+  name: snAkbar
+  type_: Splitter
+  type: Splitter
   console: false
 player2:
-  name: Silvia
-  type: Simple
+  name: Richard
+  type_: Holder
+  type: Splitter
   console: false
 player3:
-  name: Sara
+  name: Silvia
+  type_: Simple
   type: Splitter
   console: false
 player4:
-  name: snAkbar
-  type: Naive
-  console: true
+  name: Sara
+  type_: Naive
+  type: Network
+  model: splitter_clone_v1
+  console: false
 screen:
   width: 900
   height: 600

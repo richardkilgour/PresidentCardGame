@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import importlib
 import json
 import shutil
 import sys
@@ -38,12 +39,11 @@ from tqdm import tqdm
 # Paths
 # ─────────────────────────────────────────────
 
-SUPERVISED_DIR  = Path(__file__).parent
-EXPERIMENTS_DIR = SUPERVISED_DIR.parent / "experiments"
+EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
 
 
 def experiment_dir(name: str) -> Path:
-    d = EXPERIMENTS_DIR / name
+    d = (EXPERIMENTS_DIR / name).resolve()
     if not d.is_dir():
         sys.exit(f"Experiment directory not found: {d}")
     return d
@@ -53,16 +53,24 @@ def experiment_dir(name: str) -> Path:
 # Config
 # ─────────────────────────────────────────────
 
-DEFAULT_CONFIG = {
-    "input_size":   108,
-    "output_size":  55,
-    "hidden_sizes": [256, 256],
-    "activation":   "relu",
-    "batch_size":   256,
-    "lr":           1e-3,
-    "max_epochs":   50,
-    "patience":     5,
+DEFAULT_TRAINING_CONFIG = {
+    "batch_size": 256,
+    "lr":         1e-3,
+    "max_epochs": 50,
+    "patience":   5,
 }
+
+
+def load_model_class(model_cfg: dict):
+    """Import and return the model class specified in config."""
+    dotted = model_cfg["class"]
+    module_path, class_name = dotted.rsplit(".", 1)
+    try:
+        module = importlib.import_module(module_path)
+        cls = getattr(module, class_name)
+    except (ModuleNotFoundError, AttributeError) as exc:
+        sys.exit(f"Cannot load model class '{dotted}': {exc}")
+    return cls
 
 
 def load_config(exp_dir: Path) -> dict:
@@ -71,8 +79,20 @@ def load_config(exp_dir: Path) -> dict:
         sys.exit(f"config.json not found in {exp_dir}")
     with open(config_path) as f:
         cfg = json.load(f)
-    for key, value in DEFAULT_CONFIG.items():
-        cfg.setdefault(key, value)
+
+    model_cfg = cfg.get("model")
+    if model_cfg is None or "class" not in model_cfg:
+        sys.exit(
+            "config.json must contain a 'model' section with a 'class' key.\n"
+            "Example: {\"model\": {\"class\": \"president.models.single_meld_mlp.SingleMeldMLP\"}}"
+        )
+    cfg["model"] = model_cfg
+
+    training_cfg = cfg.get("training", {})
+    for key, value in DEFAULT_TRAINING_CONFIG.items():
+        training_cfg.setdefault(key, value)
+    cfg["training"] = training_cfg
+
     return cfg
 
 
@@ -103,31 +123,6 @@ def load_split(data_dir: Path, split: str, batch_size: int, shuffle: bool) -> Da
     Y = torch.tensor(np.load(data_dir / f"Y_{split}.npy"), dtype=torch.float32)
     print(f"{len(X):,} examples")
     return DataLoader(TensorDataset(X, Y), batch_size=batch_size, shuffle=shuffle)
-
-
-# ─────────────────────────────────────────────
-# Model
-# ─────────────────────────────────────────────
-
-ACTIVATIONS = {
-    "relu":      nn.ReLU,
-    "tanh":      nn.Tanh,
-    "leakyrelu": nn.LeakyReLU,
-}
-
-
-def build_model(cfg: dict) -> nn.Module:
-    act_cls = ACTIVATIONS.get(cfg["activation"].lower())
-    if act_cls is None:
-        sys.exit(f"Unknown activation '{cfg['activation']}'. Choose from: {list(ACTIVATIONS)}")
-
-    layers: list[nn.Module] = []
-    in_size = cfg["input_size"]
-    for hidden in cfg["hidden_sizes"]:
-        layers += [nn.Linear(in_size, hidden), act_cls()]
-        in_size = hidden
-    layers.append(nn.Linear(in_size, cfg["output_size"]))
-    return nn.Sequential(*layers)
 
 
 # ─────────────────────────────────────────────
@@ -176,8 +171,12 @@ def main():
     args = parser.parse_args()
 
     exp_dir  = experiment_dir(args.experiment)
+
     cfg      = load_config(exp_dir)
     data_dir = exp_dir / "data"
+
+    training_cfg = cfg["training"]
+    model_cfg    = cfg["model"]
 
     print(f"\nExperiment : {args.experiment}")
     print(f"Config     : {json.dumps(cfg, indent=2)}\n")
@@ -185,19 +184,22 @@ def main():
     device = resolve_device()
 
     # Data
-    train_loader = load_split(data_dir, "train", cfg["batch_size"], shuffle=True)
-    val_loader   = load_split(data_dir, "val",   cfg["batch_size"], shuffle=False)
-    test_loader  = load_split(data_dir, "test",  cfg["batch_size"], shuffle=False)
+    batch_size = training_cfg["batch_size"]
+    train_loader = load_split(data_dir, "train", batch_size, shuffle=True)
+    val_loader   = load_split(data_dir, "val",   batch_size, shuffle=False)
+    test_loader  = load_split(data_dir, "test",  batch_size, shuffle=False)
 
     # Model
-    model = build_model(cfg).to(device)
+    model_cls = load_model_class(model_cfg)
+    model = model_cls(**model_cfg.get("architecture", {})).to(device)
     print(f"\nArchitecture:\n{model}")
     print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}\n")
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg["lr"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=training_cfg["lr"])
     loss_fn   = nn.CrossEntropyLoss()
 
-    checkpoint_path = exp_dir / f"{args.experiment}.pt"
+    exp_name        = exp_dir.name
+    checkpoint_path = exp_dir / f"{exp_name}.pt"
     metrics_path    = exp_dir / "metrics.csv"
 
     best_val_acc     = 0.0
@@ -207,7 +209,7 @@ def main():
         writer = csv.writer(csvfile)
         writer.writerow(["epoch", "train_loss", "train_acc", "val_loss", "val_acc"])
 
-        for epoch in range(1, cfg["max_epochs"] + 1):
+        for epoch in range(1, training_cfg["max_epochs"] + 1):
             train_loss, train_acc = run_epoch(
                 model, train_loader, loss_fn, optimizer, device,
                 desc=f"Epoch {epoch:>2} train",
@@ -235,7 +237,7 @@ def main():
                 shutil.copy(exp_dir / "config.json", exp_dir / "config_checkpoint.json")
             else:
                 patience_counter += 1
-                if patience_counter >= cfg["patience"]:
+                if patience_counter >= training_cfg["patience"]:
                     print(f"\nEarly stopping at epoch {epoch}")
                     break
 

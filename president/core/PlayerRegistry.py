@@ -72,7 +72,9 @@ class PlayerRegistry:
                 continue
             module = importlib.import_module(f'president.players.Player{type_name}')
             player_class = getattr(module, f'Player{type_name}')
-            registry.register(player_class, name=type_name)
+            kwargs = {k: v for k, v in p.items()
+                      if k not in ('name', 'type', 'type_', 'console')}
+            registry.register(player_class, name=type_name, **kwargs)
             seen.add(type_name)
         return registry
 
