@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import importlib
 import json
-import logging
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from president.core.AbstractPlayer import AbstractPlayer
@@ -38,7 +38,6 @@ class PlayerNetwork(AbstractPlayer):
         if not exp_dir.is_dir():
             raise FileNotFoundError(f"Experiment directory not found: {exp_dir}")
 
-        # Load model class from experiment config
         config_path = exp_dir / "config.json"
         if not config_path.exists():
             raise FileNotFoundError(f"config.json not found in {exp_dir}")
@@ -54,7 +53,6 @@ class PlayerNetwork(AbstractPlayer):
         module    = importlib.import_module(module_path)
         model_cls = getattr(module, class_name)
 
-        # Load weights
         weights_path = exp_dir / f"{exp_dir.name}.pt"
         if not weights_path.exists():
             raise FileNotFoundError(f"Weights not found: {weights_path}")
@@ -76,37 +74,36 @@ class PlayerNetwork(AbstractPlayer):
             device=self._device,
         ).unsqueeze(0)
 
+        mask = torch.tensor(
+            self._action_mask(), dtype=torch.bool, device=self._device
+        ).unsqueeze(0)
+
         with torch.no_grad():
-            pred = self._model(x).argmax(dim=1).item()
+            logits = self._model(x)
+            logits[~mask] = float("-inf")
+            pred = logits.argmax(dim=1).item()
 
-        if pred == 54:
+        return self._action_to_meld(pred)
+
+    def _action_mask(self) -> np.ndarray:
+        mask = np.zeros(55, dtype=bool)
+        for meld in self.possible_plays():
+            mask[self._meld_to_action(meld)] = True
+        return mask
+
+    def _action_to_meld(self, action: int) -> Meld:
+        if action == 54:
             return Meld()
-
-        if pred >= 52:
-            value = 13  # joker
-            count = pred - 52 + 1
-        else:
-            value = pred // 4
-            count = pred % 4 + 1
-
-        predicted_meld = self._meld_from_hand(value, count)
-        legal          = self.possible_plays()
-
-        if predicted_meld is not None and predicted_meld in legal:
-            return predicted_meld
-
-        logging.warning(
-            f"{self.name}: network predicted illegal meld "
-            f"(value={value}, count={count}), falling back. "
-            f"Hand: {self._hand}, target: {self.target_meld}"
-        )
-        return legal[0]
-
-    def _meld_from_hand(self, value: int, count: int) -> Meld | None:
+        value = action // 4
+        count = action % 4 + 1
         candidates = [c for c in self._hand if c.get_value() == value]
-        if len(candidates) < count:
-            return None
         meld = None
         for card in candidates[:count]:
             meld = Meld(card, meld) if meld else Meld(card)
         return meld
+
+    @staticmethod
+    def _meld_to_action(meld: Meld) -> int:
+        if not meld.cards:
+            return 54
+        return meld.cards[0].get_value() * 4 + len(meld.cards) - 1
