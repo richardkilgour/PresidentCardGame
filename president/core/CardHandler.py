@@ -17,6 +17,7 @@ Notification is handled by Episode, which calls CardHandler methods
 and then notifies listeners itself.
 """
 import logging
+from typing import Optional, Any
 
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.DeckManager import DeckManager
@@ -38,7 +39,7 @@ class CardHandler:
     # Pre-episode card swap
     # -------------------------------------------------------------------------
 
-    def swap_for_new_episode(self, ranks: list[AbstractPlayer]) -> None:
+    def swap_for_new_episode(self, ranks: list[AbstractPlayer]) -> Optional[tuple[tuple[Any, Any], tuple[Any, Any]]]:
         """
         Swap cards between players based on their rankings from the previous episode.
         President receives 2 best cards from Scumbag.
