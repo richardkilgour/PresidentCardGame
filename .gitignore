@@ -88,3 +88,27 @@ president/training/experiments/**/*.zip
 president/training/experiments/**/checkpoints/
 president/training/experiments/**/metrics.csv
 president/training/experiments/**/config_checkpoint.json
+president/training/experiments/**/rl_logs/
+president/training/experiments/**/*.npz
+
+# Model weights (belong in experiments, not source control)
+president/models/*.pt
+president/models/*.zip
+
+# Stray data directories
+data/
+president/data/
+president/training/supervised/data/
+president/training/reinforcement/data/
+
+# App runtime database
+president/app/db/
+
+# Python generated files
+__pycache__/
+*.pyc
+*.pyo
+president.egg-info/
+
+# Logs
+president/tournament.log
