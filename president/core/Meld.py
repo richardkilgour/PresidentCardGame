@@ -41,18 +41,16 @@ class Meld:
         if not other.cards:
             return True
 
-        # Lower or equal face value cannot win
-        if self.cards[0] <= other.cards[0]:
-            return False
-
         # self has higher face value — now check length rules
         self_len = len(self)
         other_len = len(other)
         self_val = self.cards[0].get_value()
         other_val = other.cards[0].get_value()
 
-
-        if other_len == 1:
+        # Lower or equal face value cannot win
+        if self_val <= other_val:
+            return False
+        elif other_len == 1:
             # If target length is 1, then any higher single will win
             # Double's can't beat a single
             return self_len == 1
@@ -60,6 +58,7 @@ class Meld:
             if self_val >= 12:
                 # A single 2 or Joker beats any pair
                 return self_len == 1
+            # Beaten by a higher pair
             return self_len == 2
         elif other_len == 3:
             if self_val == 12:
@@ -80,7 +79,9 @@ class Meld:
                 return self_len == 3
             if self_val == 13:
                 if other_val == 12:
-                    raise ValueError("Cannot beat quad 2s with Jokers — invalid game state.")
+                    # Cannot beat quad 2s with anything - not even 2 Jokers!
+                    return False
+                # Double Joker wins
                 return self_len == 2
             return self_len == 4
 
