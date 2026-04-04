@@ -181,7 +181,7 @@ def main():
                 tensorboard_log=str(log_dir),
             )
         else:
-            print("No saved model found — creating new model.")
+            print("No previous RL model found - creating new model.")
             model = MaskablePPO(
                 "MlpPolicy",
                 env,

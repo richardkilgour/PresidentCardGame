@@ -1,4 +1,8 @@
 {
+    "model": {
+        "class": "president.models.single_meld_mlp.SingleMeldMLP",
+        "architecture": {"hidden_sizes": [256, 256], "activation": "relu", "dropout": 0.0}
+    },
     "rl": {
         "clone":           "splitter_clone_v1",
         "net_arch":        [256, 256],
