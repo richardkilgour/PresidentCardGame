@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-PlayerRLSplitter — an AbstractPlayer that uses the RL-trained MaskablePPO
-policy to play President.
+PlayerRL — a generic RL-trained player using MaskablePPO.
 
-Loads the best model saved by EvalCallback during RL training.
-Falls back to the first legal play if the model predicts an illegal action.
+Takes an experiment name and loads the best_model.zip saved by EvalCallback.
 Uses direct policy network inference for speed — bypasses SB3 overhead.
+Falls back to the first legal play if the model predicts an illegal action.
 """
 from __future__ import annotations
 
@@ -19,34 +18,37 @@ from sb3_contrib import MaskablePPO
 
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.Meld import Meld
-from president.core.StateEncoder import StateEncoder
+from president.models.single_meld_mlp import encode_state
 
-MODEL_PATH  = Path(__file__).parent.parent / "models" / "best_model.zip"
-MELD_BITS   = 54
+EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "training" / "experiments").resolve()
+
 ACTION_BITS = 55
 
 _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class PlayerRLSplitter(AbstractPlayer):
-    """Plays using the RL-trained MaskablePPO policy."""
+class PlayerRL(AbstractPlayer):
+    """Plays using an RL-trained MaskablePPO policy."""
 
-    _device = _device
-    _model  = MaskablePPO.load(MODEL_PATH, device=_device)
+    def __init__(self, name: str, model: str):
+        super().__init__(name)
+        exp_dir    = (EXPERIMENTS_DIR / model).resolve()
+        model_path = exp_dir / "best_model.zip"
+        if not model_path.exists():
+            raise FileNotFoundError(f"RL model not found: {model_path}")
+        self._device = _device
+        self._model  = MaskablePPO.load(model_path, device=_device)
 
     def play(self) -> Meld:
-        obs  = self._get_observation()
+        obs  = encode_state(self._hand, self.target_meld).astype(np.float32)
         mask = self._get_action_mask()
 
         with torch.no_grad():
             obs_tensor  = torch.tensor(obs,  dtype=torch.float32).unsqueeze(0).to(self._device)
             mask_tensor = torch.tensor(mask, dtype=torch.bool   ).unsqueeze(0).to(self._device)
 
-            # Get logits directly from the policy network
             distribution = self._model.policy.get_distribution(obs_tensor)
             logits       = distribution.distribution.logits.clone()
-
-            # Mask illegal actions
             logits[~mask_tensor] = float("-inf")
             action = logits.argmax(dim=1).item()
 
@@ -62,17 +64,6 @@ class PlayerRLSplitter(AbstractPlayer):
         )
         return legal[0]
 
-    # ─────────────────────────────────────────────
-    # Helpers
-    # ─────────────────────────────────────────────
-
-    def _get_observation(self) -> np.ndarray:
-        hand_enc   = StateEncoder._encode_hand(self._hand)
-        target_enc = StateEncoder.encode_meld(self.target_meld) \
-                     if self.target_meld is not None \
-                     else np.zeros(MELD_BITS, dtype=np.float32)
-        return np.concatenate([hand_enc, target_enc]).astype(np.float32)
-
     def _get_action_mask(self) -> np.ndarray:
         mask  = np.zeros(ACTION_BITS, dtype=bool)
         legal = self.possible_plays()
@@ -83,8 +74,8 @@ class PlayerRLSplitter(AbstractPlayer):
     def _action_to_meld(self, action: int) -> Meld:
         if action == 54:
             return Meld()
-        value = action // 4
-        count = action % 4 + 1
+        value      = action // 4
+        count      = action % 4 + 1
         candidates = [c for c in self._hand if c.get_value() == value]
         if len(candidates) < count:
             return Meld()

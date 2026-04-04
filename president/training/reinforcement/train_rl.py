@@ -39,7 +39,7 @@ from stable_baselines3.common.callbacks import (
 
 from president.training.reinforcement.PresidentEnv import PresidentEnv
 
-EXPERIMENTS_DIR = Path(__file__).parent.parent / "experiments"
+EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
 
 DEFAULT_RL_CONFIG = {
     "total_timesteps": 5_000_000,
@@ -77,19 +77,21 @@ def warm_start(model: MaskablePPO, clone_exp_dir: Path) -> None:
     The value network is left random — it learns quickly once the
     policy is reasonable.
     """
-    checkpoint = clone_exp_dir / f"{clone_exp_dir}.pt"
-    config_path = clone_exp_dir / "config_checkpoint.json"
+    clone_exp_dir = clone_exp_dir.resolve()
+    checkpoint    = clone_exp_dir / f"{clone_exp_dir.name}.pt"
+    config_path   = clone_exp_dir / "config.json"
 
     if not checkpoint.exists():
         print(f"No supervised clone found at {checkpoint} — training from scratch.")
         return
     if not config_path.exists():
-        sys.exit(f"config_checkpoint.json not found in {clone_exp_dir} — cannot safely map weights.")
+        sys.exit(f"config.json not found in {clone_exp_dir} — cannot safely map weights.")
 
     with open(config_path) as f:
         clone_cfg = json.load(f)
 
-    clone_arch = clone_cfg.get("hidden_sizes", [])
+    # Architecture lives under model.architecture.hidden_sizes
+    clone_arch = clone_cfg.get("model", {}).get("architecture", {}).get("hidden_sizes", [])
     rl_arch    = model.policy.mlp_extractor.policy_net
     rl_layers  = [m for m in rl_arch if isinstance(m, torch.nn.Linear)]
 
@@ -102,18 +104,18 @@ def warm_start(model: MaskablePPO, clone_exp_dir: Path) -> None:
     supervised   = torch.load(checkpoint, weights_only=True, map_location="cpu")
     policy_state = model.policy.state_dict()
 
-    # Map hidden layers: clone layer i lives at index 2i in the Sequential
-    # (Linear at 0, ReLU at 1, Linear at 2, ReLU at 3, ...)
+    # SingleMeldMLP wraps layers in self.net, so keys are net.0, net.2, ...
+    # (Linear at 0, activation at 1, Linear at 2, activation at 3, ...)
     for i in range(len(clone_arch)):
-        src = f"{i * 2}"   # supervised Sequential index
+        src = f"net.{i * 2}"
         dst = f"mlp_extractor.policy_net.{i * 2}"
         policy_state[f"{dst}.weight"] = supervised[f"{src}.weight"]
         policy_state[f"{dst}.bias"]   = supervised[f"{src}.bias"]
 
-    # Action head: last layer of supervised network
+    # Action head: final Linear in supervised net
     last_idx = len(clone_arch) * 2
-    policy_state["action_net.weight"] = supervised[f"{last_idx}.weight"]
-    policy_state["action_net.bias"]   = supervised[f"{last_idx}.bias"]
+    policy_state["action_net.weight"] = supervised[f"net.{last_idx}.weight"]
+    policy_state["action_net.bias"]   = supervised[f"net.{last_idx}.bias"]
 
     model.policy.load_state_dict(policy_state)
     print(f"Warm-started from supervised clone: {checkpoint}")
@@ -139,7 +141,7 @@ def main():
                              "Falls back to 'clone' key in config.json if not given.")
     args = parser.parse_args()
 
-    exp_dir = EXPERIMENTS_DIR / args.experiment
+    exp_dir = (EXPERIMENTS_DIR / args.experiment).resolve()
     if not exp_dir.is_dir():
         sys.exit(f"Experiment directory not found: {exp_dir}")
 
@@ -148,8 +150,8 @@ def main():
     print(f"RL config  : {json.dumps(rl_cfg, indent=2)}\n")
 
     # Resolve clone experiment
-    clone_name = args.clone or rl_cfg.get("clone")
-    clone_exp_dir = EXPERIMENTS_DIR / clone_name if clone_name else None
+    clone_name    = args.clone or rl_cfg.get("clone")
+    clone_exp_dir = (EXPERIMENTS_DIR / clone_name).resolve() if clone_name else None
 
     log_dir        = exp_dir / "rl_logs"
     checkpoint_dir = exp_dir / "checkpoints"

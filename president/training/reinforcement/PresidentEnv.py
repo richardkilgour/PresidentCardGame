@@ -22,12 +22,11 @@ from gymnasium import spaces
 from president.core.GameMaster import GameMaster, IllegalPlayPolicy
 from president.core.Meld import Meld
 from president.core.PlayerRegistry import PlayerRegistry
-from president.core.StateEncoder import StateEncoder
+from president.models.single_meld_mlp import SingleMeldMLP, encode_state
 from president.players.PlayerSplitter import PlayerSplitter
 
-MELD_BITS   = 54
 ACTION_BITS = 55   # 0-53 melds, 54 = pass
-OBS_BITS    = 108  # 54 hand + 54 target
+OBS_BITS    = SingleMeldMLP.INPUT_SIZE
 
 RANK_REWARDS = {0: 2.0, 1: 1.0, 2: -1.0, 3: -2.0}
 
@@ -114,11 +113,10 @@ class PresidentEnv(gym.Env):
         return mask
 
     def _get_observation(self) -> np.ndarray:
-        hand_enc   = StateEncoder._encode_hand(self._agent._hand_snapshot)
-        target_enc = StateEncoder.encode_meld(self._agent._target_snapshot) \
-                     if self._agent._target_snapshot is not None \
-                     else np.zeros(MELD_BITS, dtype=np.float32)
-        return np.concatenate([hand_enc, target_enc]).astype(np.float32)
+        return encode_state(
+            self._agent._hand_snapshot,
+            self._agent._target_snapshot,
+        ).astype(np.float32)
 
     def _get_reward(self) -> float:
         if not self._done:
