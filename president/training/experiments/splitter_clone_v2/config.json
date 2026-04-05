@@ -1,0 +1,31 @@
+{
+    "target_player": {
+        "class": "president.players.PlayerSplitter.PlayerSplitter",
+        "name":  "splitter"
+    },
+    "opponents": [
+        {"class": "president.players.PlayerSplitter.PlayerSplitter", "name": "opp_0"},
+        {"class": "president.players.PlayerSplitter.PlayerSplitter", "name": "opp_1"},
+        {"class": "president.players.PlayerSplitter.PlayerSplitter", "name": "opp_2"}
+    ],
+    "data": {
+        "train_episodes": 5000,
+        "val_episodes":   1000,
+        "test_episodes":  1000,
+        "seed":           7
+    },
+    "model": {
+        "class": "president.models.multi_meld_mlp.MultiMeldMLP",
+        "architecture": {
+            "hidden_sizes": [256, 256],
+            "activation":   "relu",
+            "dropout":      0.0
+        }
+    },
+    "training": {
+        "batch_size": 256,
+        "lr":         1e-3,
+        "max_epochs": 50,
+        "patience":   5
+    }
+}
