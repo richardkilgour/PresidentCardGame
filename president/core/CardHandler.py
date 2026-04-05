@@ -105,7 +105,7 @@ class CardHandler:
         Args:
             scumbag: The last-placed player who still holds cards.
         """
-        logging.info(f'{scumbag.name} is the Scumbag!!! Left with {scumbag._hand}')
+        logging.info(f'{scumbag.name} is the Scumbag!!! Left with {" ".join(str(c) for c in scumbag._hand)}')
         while scumbag._hand:
             self.discard_pile.append(scumbag._hand.pop())
 
