@@ -25,6 +25,7 @@ class AbstractPlayer(CardGameListener):
         super().__init__()
         self.name = name
         self._hand = []
+        self._starting_hand = []
         # TODO: ask the GM?
         self.target_meld = None
         self.position_count = [0, 0, 0, 0]
@@ -47,6 +48,10 @@ class AbstractPlayer(CardGameListener):
     def get_hand_indices(self):
         # Useful for exact matching
         return [c.get_index() for c in self._hand]
+
+    def notify_hand_start(self):
+        super().notify_hand_start()
+        self._starting_hand = list(self._hand)
 
     def notify_hand_won(self, winner):
         # Someone just won the hand
