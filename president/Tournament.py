@@ -27,7 +27,6 @@ from dataclasses import dataclass, field
 
 import yaml
 
-from president.core.DeckManager import DeckManager
 from president.core.GameMaster import GameMaster, IllegalPlayPolicy
 from president.core.PlayerRegistry import PlayerRegistry
 from president.core.TournamentDeck import TournamentDeck
@@ -116,48 +115,47 @@ class Tournament:
         """
         Run one tournament: 25 position combos × 4 hand rotations = 100 episodes.
         """
-        # Use the same deck and hands for the whole tournament.
-        # Just rotate the hands for each combo
         self._deck.new_deal()
 
         # ── Neutral position combo ────────────────────────────────────
-        self._run_combo(
-            players=players,
-            results=results,
-            starting_ranks=[],
-        )
-
-        # Establish base ranks from a fresh neutral episode for permutations
-        # Use the first neutral rotation's result as the base
-        base_ranks = self._last_base_ranks
+        base_ranks, player_records = self._run_combo(players, starting_ranks=[])
+        self._accumulate(results, player_records)
 
         # ── 24 permutation combos ─────────────────────────────────────
         for perm in self._permutations:
             starting_ranks = [base_ranks[perm[i]] for i in range(4)]
-            self._run_combo(
-                players=players,
-                results=results,
-                starting_ranks=starting_ranks,
-            )
+            _, player_records = self._run_combo(players, starting_ranks)
+            self._accumulate(results, player_records)
 
-    def _run_combo(self, players, results, starting_ranks):
-        """Run 4 rotated episodes for one position combination."""
+    def _run_combo(self, players, starting_ranks):
+        """Run 4 rotated episodes for one position combination.
+
+        Returns (base_ranks, player_records) where:
+          - base_ranks: players ordered by rank after the first rotation
+                        (only meaningful for the neutral combo, else None)
+          - player_records: list of (starting_rank, final_rank) tuples per player
+        """
         ranked_combo = len(starting_ranks) > 0
+        base_ranks = None
+        player_records = [[] for _ in range(4)]
         for rotation in range(4):
-            final_ranks = self._run_episode(
-                players=players,
-                starting_ranks=starting_ranks,
-            )
+            final_ranks = self._run_episode(players, starting_ranks)
 
             if not ranked_combo and rotation == 0:
-                self._last_base_ranks = self._ranks_to_player_list(
-                    players, final_ranks
-                )
+                base_ranks = self._ranks_to_player_list(players, final_ranks)
 
             for i in range(4):
                 sr = starting_ranks.index(players[i]) if ranked_combo else None
-                results[i].record(starting_rank=sr, final_rank=final_ranks[i])
+                player_records[i].append((sr, final_ranks[i]))
             self._deck.rotate()
+        return base_ranks, player_records
+
+    @staticmethod
+    def _accumulate(results: list[PlayerResult],
+                    player_records: list[list[tuple]]) -> None:
+        for i, records in enumerate(player_records):
+            for sr, fr in records:
+                results[i].record(starting_rank=sr, final_rank=fr)
 
 
     def _run_episode(self, players, starting_ranks):
@@ -183,24 +181,6 @@ class Tournament:
 
         final_rank_list = gm.episode.ranks
         return [final_rank_list.index(p) for p in players]
-
-    def _deal_hands(self, deck: DeckManager) -> list[list]:
-        """
-        Deal cards from the deck into 4 hands without using the full
-        game machinery — returns raw card lists for preset use.
-        """
-        from president.core.PlayingCard import PlayingCard
-        cards = [PlayingCard(i) for i in range(54)]
-        # Shuffle order mirrors DeckManager internals
-        import random
-        random.shuffle(cards)
-        # Deal 13-14 cards each (54 cards, 4 players)
-        hands = [[], [], [], []]
-        for i, card in enumerate(cards):
-            hands[i % 4].append(card)
-        for hand in hands:
-            hand.sort(key=lambda c: c.get_index())
-        return hands
 
 
     @staticmethod
@@ -247,7 +227,8 @@ if __name__ == "__main__":
         level=logging.NOTSET,
     )
 
-    config = yaml.safe_load(open(args.config))
+    with open(args.config, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
 
     t = Tournament(config=config, n_tournaments=args.tournaments)
     results = t.run()
