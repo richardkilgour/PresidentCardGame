@@ -38,15 +38,53 @@ class PlayHistory:
     def __init__(self):
         self._memory = []
         self._finished_players = []
+        self._players = []             # Seated order for clockwise validation
+        self._last_play_player = None  # Last player to act (meld or pass)
 
     def clear(self):
         self._memory = []
         self._finished_players = []
+        self._last_play_player = None
+        # _players is preserved — seating doesn't change between hands
+
+    def set_players(self, players):
+        """Record the seated player order (excluding empty seats)."""
+        self._players = [p for p in players if p is not None]
+
+    def _get_expected_next_player(self):
+        """Return the one valid next player: first clockwise from last who hasn't passed or finished."""
+        if not self._players or self._last_play_player is None:
+            return None
+        if self._last_play_player not in self._players:
+            return None
+        # Collect players who passed in the current round (since last ROUND_WON)
+        passed_this_round = set()
+        for event in reversed(self._memory):
+            if event.event_type == EventType.ROUND_WON:
+                break
+            if event.event_type == EventType.MELD and event.meld is not None and not event.meld.cards:
+                passed_this_round.add(event.player)
+        finished = set(self._finished_players)
+        n = len(self._players)
+        last_idx = self._players.index(self._last_play_player)
+        for i in range(1, n):
+            candidate = self._players[(last_idx + i) % n]
+            if candidate not in passed_this_round and candidate not in finished:
+                return candidate
+        return None
 
     def add_play(self, player, meld: Meld):
-        """Record a meld or pass. Called before the cards are removed from the player's hand."""
-        remaining_cards = player.report_remaining_cards() - len(meld)
+        """Record a meld or pass. Validates clockwise order. Called before cards are removed."""
+        expected = self._get_expected_next_player()
+        if expected is not None and player is not expected:
+            raise ValueError(
+                f"Clockwise order violation: expected "
+                f"{getattr(expected, 'name', expected)} but got "
+                f"{getattr(player, 'name', player)}"
+            )
+        self._last_play_player = player
 
+        remaining_cards = player.report_remaining_cards() - len(meld)
         self._memory.append(GameEvent(
             player=player,
             event_type=EventType.MELD,
@@ -54,12 +92,12 @@ class PlayHistory:
             remaining_cards=remaining_cards,
             hand=list(player._hand),  # captured before cards are removed
         ))
-
         if remaining_cards == 0:
             self._handle_player_finished(player)
 
     def add_round_won(self, player):
         """Record that a player has won the round and becomes the new lead."""
+        self._last_play_player = None  # Reset: winner may start the next round
         self._memory.append(GameEvent(
             player=player,
             event_type=EventType.ROUND_WON,
@@ -90,6 +128,28 @@ class PlayHistory:
     def _handle_player_finished(self, player):
         if player not in self._finished_players:
             self._finished_players.append(player)
+
+    def reconstruct_hand(self, player, existing_cards=None):
+        """
+        Reconstruct a player's starting hand from the play history.
+
+        Add back every meld the player played to existing_cards (which
+        represents cards they still hold — [] for everyone except the
+        scumbag, whose leftover cards should be passed in before they
+        are discarded).
+
+        Returns:
+            Sorted list of PlayingCard matching the player's original hand.
+        """
+        cards = list(existing_cards) if existing_cards else []
+        for event in self._memory:
+            if (event.player is player
+                    and event.event_type == EventType.MELD
+                    and event.meld is not None
+                    and event.meld.cards):
+                cards.extend(event.meld.cards)
+        cards.sort(key=lambda c: c.get_index())
+        return cards
 
     def get_highest_remaining(self):
         """Return the value of the highest card not yet played, or -1 if none."""

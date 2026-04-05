@@ -16,6 +16,7 @@ class CardGameListener:
     def notify_player_joined(self, new_player, position):
         self.players[position] = new_player
         self.player_status[position] = 'Waiting'
+        self.memory.set_players(self.players)
 
     def notify_game_stated(self):
         pass
