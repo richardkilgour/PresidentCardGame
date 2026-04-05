@@ -24,7 +24,6 @@ import argparse
 import itertools
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
 
 import yaml
 
@@ -248,7 +247,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(
         handlers=[logging.FileHandler("tournament.log", "w", "utf-8")],
-        level=logging.WARNING,
+        level=logging.NOTSET,
     )
 
     config = yaml.safe_load(open(args.config))
