@@ -125,7 +125,6 @@ class Tournament:
             players=players,
             results=results,
             starting_ranks=[],
-            starting_rank_indices=None,
         )
 
         # Establish base ranks from a fresh neutral episode for permutations
@@ -139,26 +138,24 @@ class Tournament:
                 players=players,
                 results=results,
                 starting_ranks=starting_ranks,
-                starting_rank_indices=list(perm),
             )
 
-    def _run_combo(self, players, results, starting_ranks,
-                   starting_rank_indices):
+    def _run_combo(self, players, results, starting_ranks):
         """Run 4 rotated episodes for one position combination."""
+        ranked_combo = len(starting_ranks) > 0
         for rotation in range(4):
             final_ranks = self._run_episode(
                 players=players,
                 starting_ranks=starting_ranks,
             )
 
-            if starting_rank_indices is None and rotation == 0:
+            if not ranked_combo and rotation == 0:
                 self._last_base_ranks = self._ranks_to_player_list(
                     players, final_ranks
                 )
 
             for i in range(4):
-                sr = starting_rank_indices[i] \
-                    if starting_rank_indices is not None else None
+                sr = starting_ranks.index(players[i]) if ranked_combo else None
                 results[i].record(starting_rank=sr, final_rank=final_ranks[i])
             self._deck.rotate()
 
