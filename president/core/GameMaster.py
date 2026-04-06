@@ -16,6 +16,7 @@ from enum import Enum
 
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.CardGameListener import CardGameListener
+from president.core.CardHandler import CardHandler
 from president.core.DeckManager import DeckManager
 from president.core.Episode import Episode, State
 from president.core.GameCheckpoint import GameCheckpoint
@@ -130,7 +131,8 @@ class GameMaster:
         logger.info(f"--- Start of a new Episode --- {self.positions=}")
         self.deck.shuffle()
         self.episode = Episode(
-            self.player_manager, self.positions, self.deck, self.listener_list
+            self.player_manager, self.positions, self.deck, self.listener_list,
+            CardHandler(self.deck),
         )
 
     def start(self, number_of_rounds: int = 100, positions=None) -> None:

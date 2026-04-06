@@ -21,6 +21,7 @@ from president.core.AbstractPlayer import AbstractPlayer
 from president.core.CardGameListener import CardGameListener
 from president.core.CardHandler import CardHandler
 from president.core.DeckManager import DeckManager
+from president.core.HandIntegrityChecker import HandIntegrityChecker
 from president.core.Meld import Meld
 from president.core.PlayValidator import PlayValidator
 from president.core.PlayerManager import PlayerManager
@@ -41,7 +42,8 @@ class State(Enum):
 
 class Episode:
     def __init__(self, player_manager: PlayerManager, starting_ranks: list[AbstractPlayer],
-                 deck: DeckManager, listener_list: list[CardGameListener]) -> None:
+                 deck: DeckManager, listener_list: list[CardGameListener],
+                 card_handler: CardHandler) -> None:
         self.state: State = State.INITIALISED
         self.player_manager = player_manager
         # starting_ranks: rankings from the previous episode, used for card swapping
@@ -55,7 +57,7 @@ class Episode:
         self.active_players: list[AbstractPlayer] = []
         self.deck = deck
         self.listener_list = listener_list
-        self.card_handler = CardHandler(deck)
+        self.card_handler = card_handler
 
     def notify_listeners(self, notify_func_name: str, *args) -> None:
         for p in self.listener_list:
@@ -194,8 +196,7 @@ class Episode:
         n = self.player_manager.player_count
         assert len(self.ranks) == n, \
             f"Expected {n} ranked players, got {len(self.ranks)}."
-        scumbag_remaining = list(self.ranks[-1]._hand)
-        self._verify_hand_integrity(scumbag_remaining)
+        HandIntegrityChecker.verify(self.player_manager, self.ranks)
         self.card_handler.collect_scumbag_cards(self.ranks[-1])
         self.card_handler.restore_deck()
         assert not any(pos is None for pos in self.ranks), \
@@ -205,26 +206,6 @@ class Episode:
         for p in self.player_manager.players:
             assert p.report_remaining_cards() == 0, \
                 f"{p.name} still has cards remaining."
-
-    def _verify_hand_integrity(self, scumbag_remaining: list) -> None:
-        """
-        Cross-check every player's play history against their recorded starting hand.
-        Each player's PlayHistory is checked independently as a cross-validation.
-        """
-        for source in self.player_manager.players:
-            memory = source.memory
-            for player in self.player_manager.players:
-                existing = scumbag_remaining if player is self.ranks[-1] else []
-                reconstructed = memory.reconstruct_hand(player, existing)
-                expected = player._starting_hand
-                if [c.get_index() for c in reconstructed] != [c.get_index() for c in expected]:
-                    raise AssertionError(
-                        f"Hand integrity failed for {player.name} "
-                        f"(checked via {source.name}'s memory): "
-                        f"reconstructed {[str(c) for c in reconstructed]} "
-                        f"!= starting hand {[str(c) for c in expected]}"
-                    )
-        logger.info("Hand integrity check passed for all players.")
 
     # -------------------------------------------------------------------------
     # State machine

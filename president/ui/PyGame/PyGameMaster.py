@@ -8,6 +8,7 @@ import math
 
 # Only for making the list of Sprites
 import pygame
+from president.core.CardHandler import CardHandler
 from president.core.Episode import Episode, State
 from president.core.GameMaster import GameMaster
 from president.ui.PyGame import PyGameCard, PlayerNameLabel
@@ -68,7 +69,8 @@ class PyGameMaster(GameMaster):
         # check for any action, and display the current play field
         if not self.episode:
             # Create a new episode
-            self.episode = Episode(self.players, self.positions, self.deck, self.listener_list)
+            self.episode = Episode(self.players, self.positions, self.deck, self.listener_list,
+                                   CardHandler(self.deck))
 
         self.positions = self.episode.step()
         if self.episode.state == State.INITIALISED:

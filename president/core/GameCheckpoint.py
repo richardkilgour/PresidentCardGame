@@ -28,6 +28,7 @@ import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from president.core.CardHandler import CardHandler
 from president.core.PlayerRegistry import PlayerRegistry
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
@@ -205,6 +206,7 @@ class GameCheckpoint:
                 [player_by_name[name] for name in episode_data["ranks"]],
                 gm.deck,
                 gm.listener_list,
+                CardHandler(gm.deck),
             )
             episode.state = State[episode_data["state"]]
             episode.active_players = [
