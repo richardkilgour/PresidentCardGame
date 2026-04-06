@@ -40,6 +40,8 @@ class PlayHistory:
         self._finished_players = []
         self._players = []             # Seated order for clockwise validation
         self._last_play_player = None  # Last player to act (meld or pass)
+        self._starting_positions = {}  # player → rank index at episode start (empty = neutral)
+        self._final_positions = {}     # player → rank index at episode end
 
     def clear(self):
         self._memory = []
@@ -115,6 +117,34 @@ class PlayHistory:
             remaining_cards=player.report_remaining_cards()
         ))
 
+    def record_swap(self, player_good, player_bad, num_cards):
+        """
+        Infer and record starting positions from a card-swap notification.
+
+        The swap with the most cards (num_cards == n // 2) is always the first
+        notification of a new episode, so it resets both position dicts.
+
+        Rank inference (mirrors Episode.swap_cards):
+            rank_good = n // 2 - num_cards   (0 = President, 1 = VP, …)
+            rank_bad  = n - 1 - n // 2 + num_cards   (n-1 = Scumbag, …)
+        """
+        n = len(self._players)
+        if num_cards == n // 2:          # First swap of a new episode
+            self._starting_positions = {}
+            self._final_positions = {}
+        rank_good = n // 2 - num_cards
+        rank_bad  = n - 1 - n // 2 + num_cards
+        self._starting_positions[player_good] = rank_good
+        self._starting_positions[player_bad]  = rank_bad
+
+    def starting_position(self, player) -> int | None:
+        """Return the player's rank index at the start of this episode, or None if neutral."""
+        return self._starting_positions.get(player)
+
+    def final_position(self, player) -> int | None:
+        """Return the player's rank index at the end of this episode, or None if not yet finished."""
+        return self._final_positions.get(player)
+
     def add_player_finished(self, player, rank):
         """Record that a player has played out and assign their rank."""
         self._memory.append(GameEvent(
@@ -123,6 +153,7 @@ class PlayHistory:
             meld=rank,
             remaining_cards=0,
         ))
+        self._final_positions[player] = rank
         self._handle_player_finished(player)
 
     def _handle_player_finished(self, player):

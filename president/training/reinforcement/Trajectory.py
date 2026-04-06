@@ -54,15 +54,16 @@ class OpponentInfo:
         }
 
     @staticmethod
-    def from_player(player, starting_ranks: list,
-                    final_ranks: list) -> "OpponentInfo":
-        """Build from a live player object and rank lists."""
+    def from_player(player, memory) -> "OpponentInfo":
+        """
+        Build from a live player object and the recording player's memory.
+        Starting and final ranks are read directly from PlayHistory.
+        """
         return OpponentInfo(
             name=player.name,
             policy=player.__class__.__name__,
-            starting_rank=starting_ranks.index(player)
-                if player in starting_ranks else None,
-            final_rank=final_ranks.index(player),
+            starting_rank=memory.starting_position(player),
+            final_rank=memory.final_position(player),
         )
 
     @staticmethod
@@ -113,28 +114,25 @@ class TrajectoryMetadata:
         return RANK_NAMES[self.final_rank]
 
     @staticmethod
-    def build(player, final_ranks: list, starting_ranks: list,
-              opponents: list) -> "TrajectoryMetadata":
+    def build(player, opponents: list, memory) -> "TrajectoryMetadata":
         """
-        Build metadata at episode end.
+        Build metadata at episode end from PlayHistory.
 
         Args:
-            player:         The player whose trajectory this is.
-            final_ranks:    All players in finishing order.
-            starting_ranks: All players in starting order from previous
-                            episode. Empty if first episode.
-            opponents:      Other players in clockwise order.
+            player:    The player whose trajectory this is.
+            opponents: Other players in clockwise order.
+            memory:    The recording player's PlayHistory — contains
+                       starting and final positions for all players.
         """
         return TrajectoryMetadata(
             policy=player.__class__.__name__,
             player_name=player.name,
             episode_id=str(uuid.uuid4()),
             timestamp=datetime.now().isoformat(),
-            starting_rank=starting_ranks.index(player)
-                if player in starting_ranks else None,
-            final_rank=final_ranks.index(player),
+            starting_rank=memory.starting_position(player),
+            final_rank=memory.final_position(player),
             opponents=[
-                OpponentInfo.from_player(o, starting_ranks, final_ranks)
+                OpponentInfo.from_player(o, memory)
                 for o in opponents
             ],
         )

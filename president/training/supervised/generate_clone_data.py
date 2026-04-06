@@ -49,7 +49,7 @@ import numpy as np
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
-from president.core.StateEncoder import StateEncoder
+from president.training.data.StateEncoder import StateEncoder
 
 ACTION_BITS = 55   # 0-53 melds, 54 = pass
 JOKER_VALUE = 13

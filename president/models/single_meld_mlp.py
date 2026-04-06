@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 
 from president.core.Meld import Meld
-from president.core.StateEncoder import StateEncoder, MELD_BITS
+from president.training.data.StateEncoder import StateEncoder, MELD_BITS
 
 ACTIVATIONS = {
     "relu":      nn.ReLU,

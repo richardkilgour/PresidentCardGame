@@ -13,21 +13,20 @@ using metadata.final_rank.
 All state is derived from PlayHistory alone — no live player state
 is used except name and class for metadata.
 
+Starting and final positions are read directly from PlayHistory
+(populated by notify_cards_swapped and add_player_finished) — they
+no longer need to be passed in as separate arguments.
+
 Usage:
     encoder = EpisodeEncoder()
-    trajectory = encoder.encode(
-        player=player,
-        final_ranks=episode.ranks,
-        starting_ranks=game_master.positions,
-        opponents=opponents,
-    )
+    trajectory = encoder.encode(player=player, opponents=opponents)
     TrajectoryStore.append(trajectory)
 """
 import numpy as np
 
 from president.core.PlayHistory import EventType, PlayHistory
-from president.core.StateEncoder import StateEncoder, MELD_BITS, TOTAL_BITS
-from president.core.Trajectory import Trajectory, TrajectoryMetadata
+from president.training.data.StateEncoder import StateEncoder, MELD_BITS, TOTAL_BITS
+from president.training.reinforcement.Trajectory import Trajectory, TrajectoryMetadata
 
 
 class EpisodeEncoder:
@@ -41,19 +40,15 @@ class EpisodeEncoder:
     def __init__(self) -> None:
         self._state_encoder = StateEncoder()
 
-    def encode(self, player, final_ranks: list,
-               starting_ranks: list, opponents: list) -> Trajectory:
+    def encode(self, player, opponents: list) -> Trajectory:
         """
         Encode the full episode from one player's perspective.
 
         Args:
-            player:         The player whose trajectory to encode.
-                            Only player.memory (PlayHistory) and
-                            player identity are used — no live state.
-            final_ranks:    All players in finishing order.
-            starting_ranks: All players in starting order from the
-                            previous episode. Empty if first episode.
-            opponents:      Other players in clockwise order.
+            player:    The player whose trajectory to encode.
+                       Only player.memory (PlayHistory) and
+                       player identity are used — no live state.
+            opponents: Other players in clockwise order (for metadata).
 
         Returns:
             A complete Trajectory ready for saving or training.
@@ -90,9 +85,8 @@ class EpisodeEncoder:
 
         metadata = TrajectoryMetadata.build(
             player=player,
-            final_ranks=final_ranks,
-            starting_ranks=starting_ranks,
             opponents=opponents,
+            memory=history,
         )
 
         return Trajectory(

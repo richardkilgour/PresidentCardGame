@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-from president.core.Trajectory import Trajectory
+from president.training.reinforcement.Trajectory import Trajectory
 
 
 DEFAULT_DATA_DIR = Path("data/trajectories")

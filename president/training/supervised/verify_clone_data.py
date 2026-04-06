@@ -27,7 +27,7 @@ import numpy as np
 
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
-from president.core.StateEncoder import StateEncoder, MELD_BITS, HAND_BITS, JOKER_OFFSET, MAX_REGULAR_VALUE
+from president.training.data.StateEncoder import StateEncoder, MELD_BITS, HAND_BITS, JOKER_OFFSET, MAX_REGULAR_VALUE
 
 EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
 
