@@ -11,12 +11,16 @@ Usage:
     python debug/display_trajectory.py data/trajectories/PlayerSplitter.jsonl --last 5
     python debug/display_trajectory.py data/trajectories/PlayerSplitter.jsonl --verbose
 """
+from __future__ import annotations
+
 import argparse
 import json
 import sys
 from pathlib import Path
 
 import numpy as np
+
+from president.training.reinforcement.Trajectory import Trajectory, RANK_NAMES
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -27,7 +31,6 @@ from president.core.StateEncoder import (
     IDX_WAITING, IDX_HAS_PLAYED, IDX_WON_ROUND,
     JOKER_OFFSET,
 )
-from president.core.Trajectory import Trajectory, RANK_NAMES
 
 STATE_NAMES  = ["waiting", "has_played", "won_round"]
 RANK_SYMBOLS = ["👑", "🥈", "👤", "💩"]
