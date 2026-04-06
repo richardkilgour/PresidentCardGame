@@ -47,8 +47,9 @@ class CardGameListener:
 
     def notify_cards_swapped(self, player_good, player_bad, num_cards):
         # Notify that one player swapped cards with another.
-        # player_good got good card(s) from player_bad and vice versa
-        pass
+        # player_good got good card(s) from player_bad and vice versa.
+        # PlayHistory infers starting positions (President/VP/Citizen/Scumbag) from these calls.
+        self.memory.record_swap(player_good, player_bad, num_cards)
 
     def notify_illegal_play(self, player, action, reason: str):
         # A player attempted an illegal play
