@@ -4,16 +4,12 @@ import logging
 from abc import abstractmethod
 import numpy as np
 
-from president.core.EpisodeEncoder import EpisodeEncoder
 from president.core.Meld import Meld
 from president.core.CardGameListener import CardGameListener
 from president.core.PlayingCard import PlayingCard
-from president.core.TrajectoryStore import TrajectoryStore
 
 
 class AbstractPlayer(CardGameListener):
-    _store   = TrajectoryStore()
-    _encoder = EpisodeEncoder()
 
     # the listener keeps track of all cards played
     ranking_names = ["President",
@@ -67,17 +63,11 @@ class AbstractPlayer(CardGameListener):
     def notify_episode_end(self, final_ranks: list,
                            starting_ranks: list) -> None:
         """
-        Called at episode end. Builds and saves a trajectory by default.
-        Override to customise or disable saving.
+        Called at episode end.
+        Trajectory collection is handled by TrajectoryCollector — add that
+        listener to the GameMaster when training data is needed.
         """
-        opponents = self.opponents_clockwise()  # self is reference, no argument needed
-        trajectory = self._encoder.encode(
-            player=self,
-            final_ranks=final_ranks,
-            starting_ranks=starting_ranks,
-            opponents=opponents,
-        )
-        self._store.append(trajectory)
+        pass
 
     def possible_plays(self):
         """
