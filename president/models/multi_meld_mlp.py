@@ -23,11 +23,9 @@ Output: 55-class logits (0-53 melds, 54 = pass)
 
 MultiMeldMLP.encode_state() is the single source of truth for this generation's
 input format. Any alternative architecture over the same input (e.g. MultiMeldTransformer)
-should import and reuse encode_state() from this module rather than redefining it.
+should import and reuse MultiMeldMLP.encode_state() rather than redefining it.
 """
 from __future__ import annotations
-
-from typing import Optional
 
 import numpy as np
 import torch
@@ -51,37 +49,6 @@ IDX_WAITING  = MELD_BITS + 2        # 56
 
 INPUT_SIZE  = 54 + NUM_MELDS * SLOT_BITS   # 54 hand + 4 × 57 = 282
 OUTPUT_SIZE = 55                           # 0-53 melds, 54 = pass
-
-
-# ─────────────────────────────────────────────
-# Input encoding — shared by all generation-2 architectures
-# ─────────────────────────────────────────────
-
-def encode_state(
-    hand: list,
-    melds: list,
-) -> np.ndarray:
-    """
-    Encode (hand, [meld_right, meld_opposite, meld_left, meld_self]) into the
-    270-bit input vector for this generation.
-
-    Args:
-        hand:  list of PlayingCard
-        melds: list of 4 Optional[Meld] — [meld_right, meld_opposite, meld_left, meld_self]
-               zeros are used for any slot that is None
-
-    Returns:
-        np.ndarray of shape (270,), dtype int8
-    """
-    if len(melds) != NUM_MELDS:
-        raise ValueError(f"encode_state expects {NUM_MELDS} melds, got {len(melds)}")
-
-    hand_enc = StateEncoder._encode_hand(hand)
-    meld_encs = [
-        StateEncoder.encode_meld(m) if m is not None else np.zeros(MELD_BITS, dtype=np.int8)
-        for m in melds
-    ]
-    return np.concatenate([hand_enc] + meld_encs)
 
 
 # ─────────────────────────────────────────────
