@@ -22,6 +22,7 @@ import torch
 import torch.nn as nn
 
 from president.core.Meld import Meld
+from president.core.PlayHistory import PlayHistory
 from president.training.data.StateEncoder import StateEncoder, MELD_BITS
 
 ACTIVATIONS = {
@@ -108,6 +109,6 @@ class SingleMeldMLP(nn.Module):
         return self.net(x)
 
     @staticmethod
-    def encode_state(hand: list, target: Optional[Meld]) -> np.ndarray:
-        """Convenience alias — delegates to module-level encode_state()."""
-        return encode_state(hand, target)
+    def encode_state(play_history: PlayHistory, player) -> np.ndarray:
+        """Encode state from a PlayHistory and the acting player."""
+        return encode_state(player._hand, play_history.current_target())

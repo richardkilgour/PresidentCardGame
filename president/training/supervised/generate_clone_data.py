@@ -49,10 +49,22 @@ import numpy as np
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
+from president.core.PlayHistory import PlayHistory, GameEvent, EventType
 from president.training.data.StateEncoder import StateEncoder
 
 ACTION_BITS = 55   # 0-53 melds, 54 = pass
 JOKER_VALUE = 13
+
+
+class _EncodePlayer:
+    """Minimal player stub used to call encode_state during offline data generation."""
+
+    def __init__(self, hand: list, opponents: list = None):
+        self._hand = hand
+        self._opponents = opponents or []
+
+    def opponents_clockwise(self) -> list:
+        return self._opponents
 
 EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
 
@@ -267,7 +279,12 @@ def build_training_set(
     for _ in range(n_hands):
         hand = random_hand(random_hand_size())
         for target in valid_targets_for_hand(hand):
-            state_enc  = model_cls.encode_state(hand, target)
+            ph = PlayHistory()
+            if target is not None:
+                ph._memory.append(
+                    GameEvent(player=None, event_type=EventType.MELD, meld=target, remaining_cards=0)
+                )
+            state_enc  = model_cls.encode_state(ph, _EncodePlayer(hand))
             action_enc = query_player(player, hand, target, setup_fn)
             X.append(state_enc)
             Y.append(action_enc)
@@ -289,7 +306,12 @@ def build_random_set(
     for _ in range(n_hands):
         hand   = random_hand(random_hand_size())
         target = random_target_for_hand(hand)
-        state_enc  = model_cls.encode_state(hand, target)
+        ph = PlayHistory()
+        if target is not None:
+            ph._memory.append(
+                GameEvent(player=None, event_type=EventType.MELD, meld=target, remaining_cards=0)
+            )
+        state_enc  = model_cls.encode_state(ph, _EncodePlayer(hand))
         action_enc = query_player(player, hand, target, setup_fn)
         X.append(state_enc)
         Y.append(action_enc)
@@ -335,7 +357,17 @@ def build_episode_set(
 
     X, Y = [], []
     for dp in collector.flat_decision_points():
-        x = model_cls.encode_state(dp.hand, dp.melds)
+        p_right = _EncodePlayer([])
+        p_opp   = _EncodePlayer([])
+        p_left  = _EncodePlayer([])
+        p_self  = _EncodePlayer(dp.hand, opponents=[p_right, p_opp, p_left])
+        ph = PlayHistory()
+        for p, meld in zip([p_right, p_opp, p_left, p_self], dp.melds):
+            if meld is not None and meld.cards:
+                ph._memory.append(
+                    GameEvent(player=p, event_type=EventType.MELD, meld=meld, remaining_cards=0)
+                )
+        x = model_cls.encode_state(ph, p_self)
         y = encode_action(dp.action)
         X.append(x)
         Y.append(y)

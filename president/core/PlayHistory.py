@@ -189,6 +189,20 @@ class PlayHistory:
                 return x
         return -1
 
+    def current_target(self) -> Meld | None:
+        """
+        Return the meld that must currently be beaten, or None for an opening lead.
+
+        Scans backwards through memory and returns the most recent non-pass meld,
+        stopping at the last ROUND_WON boundary.
+        """
+        for event in reversed(self._memory):
+            if event.event_type == EventType.ROUND_WON:
+                return None
+            if event.event_type == EventType.MELD and event.meld and event.meld.cards:
+                return event.meld
+        return None
+
     def last_event_for(self, player) -> GameEvent | None:
         """
         Return the most recent non-waiting event for a player.

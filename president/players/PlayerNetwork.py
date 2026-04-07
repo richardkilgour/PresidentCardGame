@@ -69,7 +69,7 @@ class PlayerNetwork(AbstractPlayer):
 
     def play(self) -> Meld:
         x = torch.tensor(
-            self._model_cls.encode_state(self._hand, self.target_meld),
+            self._model_cls.encode_state(self.memory, self),
             dtype=torch.float32,
             device=self._device,
         ).unsqueeze(0)

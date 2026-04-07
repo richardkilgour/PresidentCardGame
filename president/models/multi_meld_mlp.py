@@ -26,7 +26,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from president.core.Meld import Meld
+from president.core.PlayHistory import PlayHistory, EventType
 from president.training.data.StateEncoder import StateEncoder, MELD_BITS
 
 ACTIVATIONS = {
@@ -130,6 +130,22 @@ class MultiMeldMLP(nn.Module):
         return self.net(x)
 
     @staticmethod
-    def encode_state(hand: list, melds: list) -> np.ndarray:
-        """Convenience alias — delegates to module-level encode_state()."""
-        return encode_state(hand, melds)
+    def encode_state(play_history: PlayHistory, player) -> np.ndarray:
+        """Encode state from a PlayHistory and the acting player.
+
+        Derives the 4 meld context slots from each player's last play:
+        [right, opposite, left, self] in clockwise order.
+        """
+        opponents = player.opponents_clockwise()   # [right, opposite, left]
+        players_in_order = opponents + [player]    # 4 slots
+        melds = []
+        for p in players_in_order:
+            event = play_history.last_event_for(p)
+            if (event is not None
+                    and event.event_type == EventType.MELD
+                    and event.meld is not None
+                    and event.meld.cards):
+                melds.append(event.meld)
+            else:
+                melds.append(None)
+        return encode_state(player._hand, melds)
