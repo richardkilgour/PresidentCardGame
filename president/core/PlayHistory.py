@@ -247,14 +247,15 @@ class PlayHistory:
             memory = self._memory[:-plays_to_skip] if plays_to_skip < len(self._memory) else []
 
         for move in reversed(memory):
+            name = getattr(move.player, 'name', '<unknown>')
             if move.event_type == EventType.MELD:
-                yield move.player, move.meld, f"{move.player.name} PLAYED {move.meld}"
+                yield move.player, move.meld, f"{name} PLAYED {move.meld}"
             elif move.event_type == EventType.ROUND_WON:
-                yield move.player, -1, f"{move.player.name} WON THE ROUND"
+                yield move.player, -1, f"{name} WON THE ROUND"
             elif move.event_type == EventType.COMPLETE:
                 yield move.player, move.meld, f"PLAYER IS FINISHED IN POS {move.meld}"
             elif move.event_type == EventType.WAITING:
-                yield move.player, None, f"{move.player.name} IS WAITING"
+                yield move.player, None, f"{name} IS WAITING"
 
         # Three players are waiting at the start of history
         for i in range(0, 3):
