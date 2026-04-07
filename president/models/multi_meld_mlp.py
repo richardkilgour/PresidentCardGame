@@ -1,21 +1,28 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-multi_meld_mlp.py — Generation 2 network: hand + last 4 plays → action logits.
+multi_meld_mlp.py — Generation 2 network: hand + last 4 actions → action logits.
 
-Input encoding (270 bits = 5 × 54):
-    hand          : 54 bits — cumulative count per value (StateEncoder._encode_hand)
-    meld_right    : 54 bits — last play by player 1 step counter-clockwise (current target)
-    meld_opposite : 54 bits — last play by player 2 steps counter-clockwise
-    meld_left     : 54 bits — last play by player 3 steps counter-clockwise
-    meld_self     : 54 bits — player's own last play (4 steps counter-clockwise)
+Input encoding (282 bits = 54 + 4 × 57):
+    hand : 54 bits — cumulative count per value (StateEncoder._encode_hand)
+    t-1  : 57 bits — action 1 step back (counterclockwise from current player)
+    t-2  : 57 bits — action 2 steps back
+    t-3  : 57 bits — action 3 steps back
+    t-4  : 57 bits — current player's own last action
 
-Each meld slot uses StateEncoder.encode_meld(), zeros if no play yet (opening lead / pass).
+Each slot is one-hot (57 bits):
+    bits 0–53 : valid meld (StateEncoder.encode_meld)
+    bit 54    : pass
+    bit 55    : finished
+    bit 56    : waiting (also used when history is exhausted)
+
+ROUND_WON markers are skipped; only player actions count as time steps.
+If fewer than 4 actions exist in history, remaining slots are encoded as waiting.
 
 Output: 55-class logits (0-53 melds, 54 = pass)
 
-encode_state() is the single source of truth for this generation's input format.
-Any alternative architecture over the same input (e.g. MultiMeldTransformer)
+MultiMeldMLP.encode_state() is the single source of truth for this generation's
+input format. Any alternative architecture over the same input (e.g. MultiMeldTransformer)
 should import and reuse encode_state() from this module rather than redefining it.
 """
 from __future__ import annotations
@@ -26,6 +33,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from president.core.Meld import Meld
 from president.core.PlayHistory import PlayHistory, EventType
 from president.training.data.StateEncoder import StateEncoder, MELD_BITS
 
@@ -35,11 +43,14 @@ ACTIVATIONS = {
     "leakyrelu": nn.LeakyReLU,
 }
 
-INPUT_SIZE  = 270   # 54 hand + 4 × 54 meld history
-OUTPUT_SIZE = 55    # 0-53 melds, 54 = pass
+NUM_MELDS    = 4
+SLOT_BITS    = MELD_BITS + 3        # 57: meld(54) | pass(1) | finished(1) | waiting(1)
+IDX_PASS     = MELD_BITS            # 54
+IDX_FINISHED = MELD_BITS + 1        # 55
+IDX_WAITING  = MELD_BITS + 2        # 56
 
-# Number of meld context slots (right, opposite, left, self)
-NUM_MELDS = 4
+INPUT_SIZE  = 54 + NUM_MELDS * SLOT_BITS   # 54 hand + 4 × 57 = 282
+OUTPUT_SIZE = 55                           # 0-53 melds, 54 = pass
 
 
 # ─────────────────────────────────────────────
@@ -123,7 +134,7 @@ class MultiMeldMLP(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: (batch, 270) float tensor
+            x: (batch, 282) float tensor
         Returns:
             logits: (batch, 55) float tensor
         """
@@ -131,21 +142,40 @@ class MultiMeldMLP(nn.Module):
 
     @staticmethod
     def encode_state(play_history: PlayHistory, player) -> np.ndarray:
-        """Encode state from a PlayHistory and the acting player.
-
-        Derives the 4 meld context slots from each player's last play:
-        [right, opposite, left, self] in clockwise order.
         """
-        opponents = player.opponents_clockwise()   # [right, opposite, left]
-        players_in_order = opponents + [player]    # 4 slots
-        melds = []
-        for p in players_in_order:
-            event = play_history.last_event_for(p)
-            if (event is not None
-                    and event.event_type == EventType.MELD
-                    and event.meld is not None
-                    and event.meld.cards):
-                melds.append(event.meld)
-            else:
-                melds.append(None)
-        return encode_state(player._hand, melds)
+        Encode state by stepping back through the last 4 player actions.
+
+        Steps counterclockwise through time (t-1, t-2, t-3, t-4) using
+        previous_plays_generator. ROUND_WON markers are skipped.
+
+        Each slot is one-hot over 57 bits:
+            bits 0–53 : valid meld
+            bit 54    : pass
+            bit 55    : finished
+            bit 56    : waiting (also used when history is exhausted)
+        """
+        slots = []
+        for _, meld_or_code, _ in play_history.previous_plays_generator():
+            if meld_or_code == -1:          # ROUND_WON — not a player action
+                continue
+            slot = np.zeros(SLOT_BITS, dtype=np.int8)
+            if isinstance(meld_or_code, Meld):
+                if meld_or_code.cards:
+                    slot[:MELD_BITS] = StateEncoder.encode_meld(meld_or_code)
+                else:
+                    slot[IDX_PASS] = 1
+            elif isinstance(meld_or_code, int):  # COMPLETE (rank index)
+                slot[IDX_FINISHED] = 1
+            else:                               # None — WAITING
+                slot[IDX_WAITING] = 1
+            slots.append(slot)
+            if len(slots) == NUM_MELDS:
+                break
+
+        while len(slots) < NUM_MELDS:
+            slot = np.zeros(SLOT_BITS, dtype=np.int8)
+            slot[IDX_WAITING] = 1
+            slots.append(slot)
+
+        hand_enc = StateEncoder._encode_hand(player._hand)
+        return np.concatenate([hand_enc] + slots)
