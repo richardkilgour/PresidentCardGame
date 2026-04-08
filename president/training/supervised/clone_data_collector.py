@@ -49,8 +49,9 @@ class CloneDataCollector(CardGameListener):
         # current_melds[seat] = last Meld played by that seat this hand, or None
         self._current_melds: list[Optional[Meld]] = [None, None, None, None]
         # snapshot taken when notify_player_turn fires for the target
-        self._pending_hand:  Optional[list] = None
-        self._pending_melds: Optional[list] = None
+        self._pending_hand:                    Optional[list] = None
+        self._pending_melds:                   Optional[list] = None
+        self._pending_play_history_snapshot:   Optional[list] = None
         # output
         self.episode_records: list[EpisodeRecord] = []
         self._current_episode: EpisodeRecord = EpisodeRecord()
@@ -96,6 +97,7 @@ class CloneDataCollector(CardGameListener):
             self._current_melds[(s - 3) % 4],   # meld_left
             self._current_melds[s],              # meld_self
         ]
+        self._pending_play_history_snapshot = list(self.memory._memory)
 
     def notify_play(self, player, meld: Meld) -> None:
         """Update table state; record if this is the target's action."""
@@ -123,10 +125,12 @@ class CloneDataCollector(CardGameListener):
             hand=self._pending_hand,
             melds=self._pending_melds,
             action=action,
+            play_history_snapshot=self._pending_play_history_snapshot or [],
         )
         self._current_episode.decision_points.append(dp)
-        self._pending_hand  = None
-        self._pending_melds = None
+        self._pending_hand                  = None
+        self._pending_melds                 = None
+        self._pending_play_history_snapshot = None
 
     # ------------------------------------------------------------------ #
     # Output                                                                #

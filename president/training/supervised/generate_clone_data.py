@@ -357,16 +357,9 @@ def build_episode_set(
 
     X, Y = [], []
     for dp in collector.flat_decision_points():
-        p_right = _EncodePlayer([])
-        p_opp   = _EncodePlayer([])
-        p_left  = _EncodePlayer([])
-        p_self  = _EncodePlayer(dp.hand, opponents=[p_right, p_opp, p_left])
+        p_self = _EncodePlayer(dp.hand)
         ph = PlayHistory()
-        for p, meld in zip([p_right, p_opp, p_left, p_self], dp.melds):
-            if meld is not None and meld.cards:
-                ph._memory.append(
-                    GameEvent(player=p, event_type=EventType.MELD, meld=meld, remaining_cards=0)
-                )
+        ph._memory = list(dp.play_history_snapshot)
         x = model_cls.encode_state(ph, p_self)
         y = encode_action(dp.action)
         X.append(x)
