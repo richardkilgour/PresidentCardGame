@@ -14,7 +14,7 @@ Used for:
   - Analysis:            filter by opponent, starting rank, outcome etc.
 
 File format: one JSON record per trajectory, appended to a per-policy
-.jsonl file. Human readable and appendable without loading the full file.
+.jsonl file. Human-readable and appendable without loading the full file.
 """
 from __future__ import annotations
 

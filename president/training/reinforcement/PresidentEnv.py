@@ -6,7 +6,7 @@ Gymnasium environment for training an RL agent to play President.
 The game runs on a background thread. The agent communicates with it
 via threading.Event handshakes — no busy-waiting.
 
-Observation: 108-bit binary vector (54 hand + 54 target)
+Observation: binary vector, size determined by model_cls.INPUT_SIZE
 Action:       integer 0–54  (0–53 = meld index, 54 = pass)
 Reward:       sparse, at episode end only
               {President: +2, Vice: +1, Citizen: -1, Scumbag: -2}
@@ -22,11 +22,10 @@ from gymnasium import spaces
 from president.core.GameMaster import GameMaster, IllegalPlayPolicy
 from president.core.Meld import Meld
 from president.core.PlayerRegistry import PlayerRegistry
-from president.models.single_meld_mlp import SingleMeldMLP, encode_state
+from president.models.single_meld_mlp import SingleMeldMLP
 from president.players.PlayerSplitter import PlayerSplitter
 
 ACTION_BITS = 55   # 0-53 melds, 54 = pass
-OBS_BITS    = SingleMeldMLP.INPUT_SIZE
 
 RANK_REWARDS = {0: 2.0, 1: 1.0, 2: -1.0, 3: -2.0}
 
@@ -39,11 +38,12 @@ class PresidentEnv(gym.Env):
 
     metadata = {"render_modes": []}
 
-    def __init__(self, opponent_type=PlayerSplitter):
+    def __init__(self, model_cls=SingleMeldMLP, opponent_type=PlayerSplitter):
         super().__init__()
+        self._model_cls        = model_cls
         self.opponent_type     = opponent_type
         self.observation_space = spaces.Box(
-            low=0, high=1, shape=(OBS_BITS,), dtype=np.float32
+            low=0, high=1, shape=(model_cls.INPUT_SIZE,), dtype=np.float32
         )
         self.action_space = spaces.Discrete(ACTION_BITS)
 
@@ -68,7 +68,7 @@ class PresidentEnv(gym.Env):
 
         self._done       = False
         self._final_rank = None
-        self._agent      = _AgentProxy("Agent")
+        self._agent      = _AgentProxy("Agent", self._model_cls)
 
         gm = GameMaster(
             registry=self._registry,
@@ -113,10 +113,7 @@ class PresidentEnv(gym.Env):
         return mask
 
     def _get_observation(self) -> np.ndarray:
-        return encode_state(
-            self._agent._hand_snapshot,
-            self._agent._target_snapshot,
-        ).astype(np.float32)
+        return self._agent._obs_snapshot
 
     def _get_reward(self) -> float:
         if not self._done:
@@ -178,22 +175,23 @@ class _AgentProxy(PlayerSplitter):
     sees a consistent view regardless of subsequent game thread updates.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, model_cls):
         super().__init__(name)
-        self._action_needed   = threading.Event()
-        self._action_ready    = threading.Event()
-        self._chosen_meld     = Meld()
-        self._aborted         = False
-        self._done_flag       = False
-        self._state_lock      = threading.Lock()
-        self._hand_snapshot   = []
-        self._target_snapshot = None
+        self._model_cls     = model_cls
+        self._action_needed = threading.Event()
+        self._action_ready  = threading.Event()
+        self._chosen_meld   = Meld()
+        self._aborted       = False
+        self._done_flag     = False
+        self._state_lock    = threading.Lock()
+        self._hand_snapshot = []
+        self._obs_snapshot  = np.zeros(model_cls.INPUT_SIZE, dtype=np.float32)
 
     def play(self) -> Meld:
         """Called by the game thread — snapshot state then block until action arrives."""
         with self._state_lock:
-            self._hand_snapshot   = list(self._hand)
-            self._target_snapshot = self.target_meld
+            self._hand_snapshot = list(self._hand)
+            self._obs_snapshot  = self._model_cls.encode_state(self.memory, self).astype(np.float32)
 
         self._action_needed.set()
         if not self._action_ready.wait(timeout=30):

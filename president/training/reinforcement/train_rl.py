@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Reinforcement learning training for the splitter agent.
+Reinforcement learning training for a network agent.
 
 Usage:
     python train_rl.py <experiment_name> [--clone <clone_experiment_name>]
@@ -24,6 +24,7 @@ Writes to:
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import sys
 from pathlib import Path
@@ -64,6 +65,53 @@ def load_rl_config(exp_dir: Path) -> dict:
     for key, value in DEFAULT_RL_CONFIG.items():
         rl_cfg.setdefault(key, value)
     return rl_cfg
+
+
+# ─────────────────────────────────────────────
+# Model class
+# ─────────────────────────────────────────────
+
+def load_model_cls(cfg: dict):
+    """Dynamically import the model class specified in config.json."""
+    model_cfg = cfg.get("model")
+    if model_cfg is None or "class" not in model_cfg:
+        sys.exit(
+            "config.json must contain a 'model.class' entry "
+            "(e.g. president.models.single_meld_mlp.SingleMeldMLP)"
+        )
+    dotted = model_cfg["class"]
+    module_path, class_name = dotted.rsplit(".", 1)
+    module = importlib.import_module(module_path)
+    return getattr(module, class_name)
+
+
+# ─────────────────────────────────────────────
+# Export
+# ─────────────────────────────────────────────
+
+def export_pt(model: MaskablePPO, exp_dir: Path, net_arch: list) -> Path:
+    """
+    Export the trained PPO policy weights to a .pt state-dict usable by PlayerNetwork.
+    Maps: mlp_extractor.policy_net → model.net (hidden layers)
+          action_net               → model.net (output layer)
+    """
+    policy_state   = model.policy.state_dict()
+    exported_state = {}
+
+    for i in range(len(net_arch)):
+        src = f"mlp_extractor.policy_net.{i * 2}"
+        dst = f"net.{i * 2}"
+        exported_state[f"{dst}.weight"] = policy_state[f"{src}.weight"]
+        exported_state[f"{dst}.bias"]   = policy_state[f"{src}.bias"]
+
+    last_idx = len(net_arch) * 2
+    exported_state[f"net.{last_idx}.weight"] = policy_state["action_net.weight"]
+    exported_state[f"net.{last_idx}.bias"]   = policy_state["action_net.bias"]
+
+    out_path = exp_dir / f"{exp_dir.name}.pt"
+    torch.save(exported_state, out_path)
+    print(f"Exported .pt weights → {out_path}")
+    return out_path
 
 
 # ─────────────────────────────────────────────
@@ -134,7 +182,7 @@ def mask_fn(env):
 # ─────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="RL training for the splitter agent.")
+    parser = argparse.ArgumentParser(description="RL training for a network agent.")
     parser.add_argument("experiment", help="RL experiment name under training/experiments/")
     parser.add_argument("--clone", default=None,
                         help="Supervised clone experiment to warm-start from. "
@@ -145,8 +193,13 @@ def main():
     if not exp_dir.is_dir():
         sys.exit(f"Experiment directory not found: {exp_dir}")
 
-    rl_cfg = load_rl_config(exp_dir)
+    with open(exp_dir / "config.json") as f:
+        full_cfg = json.load(f)
+
+    rl_cfg    = load_rl_config(exp_dir)
+    model_cls = load_model_cls(full_cfg)
     print(f"Experiment : {args.experiment}")
+    print(f"Model class: {full_cfg['model']['class']}")
     print(f"RL config  : {json.dumps(rl_cfg, indent=2)}\n")
 
     # Resolve clone experiment
@@ -159,8 +212,8 @@ def main():
     log_dir.mkdir(exist_ok=True)
     checkpoint_dir.mkdir(exist_ok=True)
 
-    env      = ActionMasker(PresidentEnv(), mask_fn)
-    eval_env = ActionMasker(PresidentEnv(), mask_fn)
+    env      = ActionMasker(PresidentEnv(model_cls=model_cls), mask_fn)
+    eval_env = ActionMasker(PresidentEnv(model_cls=model_cls), mask_fn)
 
     # ── Load or create model ──────────────────
     if best_model_path.exists():
@@ -219,7 +272,10 @@ def main():
 
     final_path = exp_dir / "rl_agent.zip"
     model.save(final_path)
-    print(f"\nTraining complete. Model saved to {final_path}")
+    print(f"\nTraining complete. Final model saved to {final_path}")
+
+    best = MaskablePPO.load(best_model_path, env=env) if best_model_path.exists() else model
+    export_pt(best, exp_dir, rl_cfg["net_arch"])
 
 
 if __name__ == "__main__":
