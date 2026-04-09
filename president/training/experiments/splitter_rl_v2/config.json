@@ -1,0 +1,18 @@
+{
+    "model": {
+        "class": "president.models.multi_meld_mlp.MultiMeldMLP",
+        "architecture": { "hidden_sizes": [256, 256], "activation": "relu", "dropout": 0.0 }
+    },
+    "rl": {
+        "clone":           "splitter_clone_v2",
+        "total_timesteps": 5000000,
+        "eval_freq":       10000,
+        "n_eval_episodes": 200,
+        "checkpoint_freq": 50000
+    },
+    "opponents": [
+        {"class": "president.players.PlayerHolder.PlayerHolder", "name": "Holder_1"},
+        {"class": "president.players.PlayerHolder.PlayerHolder", "name": "Holder_2"},
+        {"class": "president.players.PlayerHolder.PlayerHolder", "name": "Holder_3"}
+    ]
+}
