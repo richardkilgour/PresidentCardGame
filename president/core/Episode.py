@@ -27,7 +27,7 @@ from president.core.PlayValidator import PlayValidator
 from president.core.PlayerManager import PlayerManager
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.WARNING)
 
 
 class State(Enum):
