@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -38,6 +39,7 @@ from stable_baselines3.common.callbacks import (
     EvalCallback,
 )
 
+from president.core.PlayerRegistry import PlayerEntry
 from president.training.reinforcement.PresidentEnv import PresidentEnv
 
 EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
@@ -47,7 +49,6 @@ DEFAULT_RL_CONFIG = {
     "eval_freq":       10_000,
     "n_eval_episodes": 200,
     "checkpoint_freq": 50_000,
-    "net_arch":        [256, 256],
 }
 
 
@@ -65,6 +66,22 @@ def load_rl_config(exp_dir: Path) -> dict:
     for key, value in DEFAULT_RL_CONFIG.items():
         rl_cfg.setdefault(key, value)
     return rl_cfg
+
+
+def load_opponents(cfg: dict) -> list[PlayerEntry] | None:
+    """Load opponent entries from config.json. Returns None to fall back to config.yaml."""
+    opponent_cfgs = cfg.get("opponents")
+    if not opponent_cfgs:
+        return None
+    entries = []
+    for opp in opponent_cfgs:
+        dotted = opp["class"]
+        module_path, class_name = dotted.rsplit(".", 1)
+        module = importlib.import_module(module_path)
+        player_cls = getattr(module, class_name)
+        kwargs = {k: v for k, v in opp.items() if k not in ("class", "name")}
+        entries.append(PlayerEntry(name=opp["name"], player_type=player_cls, kwargs=kwargs))
+    return entries
 
 
 # ─────────────────────────────────────────────
@@ -146,7 +163,7 @@ def warm_start(model: MaskablePPO, clone_exp_dir: Path) -> None:
     if len(clone_arch) != len(rl_layers):
         sys.exit(
             f"Architecture mismatch: clone has {len(clone_arch)} hidden layers, "
-            f"RL policy has {len(rl_layers)}. Adjust net_arch in the RL config."
+            f"RL policy has {len(rl_layers)}. Adjust model.architecture.hidden_sizes in config.json."
         )
 
     supervised   = torch.load(checkpoint, weights_only=True, map_location="cpu")
@@ -182,6 +199,8 @@ def mask_fn(env):
 # ─────────────────────────────────────────────
 
 def main():
+    logging.getLogger("president").setLevel(logging.WARNING)
+
     parser = argparse.ArgumentParser(description="RL training for a network agent.")
     parser.add_argument("experiment", help="RL experiment name under training/experiments/")
     parser.add_argument("--clone", default=None,
@@ -198,8 +217,12 @@ def main():
 
     rl_cfg    = load_rl_config(exp_dir)
     model_cls = load_model_cls(full_cfg)
+    net_arch  = full_cfg["model"]["architecture"]["hidden_sizes"]
+    opponents = load_opponents(full_cfg)
     print(f"Experiment : {args.experiment}")
     print(f"Model class: {full_cfg['model']['class']}")
+    print(f"Net arch   : {net_arch}")
+    print(f"Opponents  : {[e.name for e in opponents] if opponents else 'from config.yaml'}")
     print(f"RL config  : {json.dumps(rl_cfg, indent=2)}\n")
 
     # Resolve clone experiment
@@ -212,8 +235,8 @@ def main():
     log_dir.mkdir(exist_ok=True)
     checkpoint_dir.mkdir(exist_ok=True)
 
-    env      = ActionMasker(PresidentEnv(model_cls=model_cls), mask_fn)
-    eval_env = ActionMasker(PresidentEnv(model_cls=model_cls), mask_fn)
+    env      = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents), mask_fn)
+    eval_env = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents), mask_fn)
 
     # ── Load or create model ──────────────────
     if best_model_path.exists():
@@ -240,7 +263,7 @@ def main():
                 env,
                 verbose=1,
                 tensorboard_log=str(log_dir),
-                policy_kwargs=dict(net_arch=rl_cfg["net_arch"]),
+                policy_kwargs=dict(net_arch=net_arch),
             )
             if clone_exp_dir is not None:
                 warm_start(model, clone_exp_dir)
@@ -275,7 +298,7 @@ def main():
     print(f"\nTraining complete. Final model saved to {final_path}")
 
     best = MaskablePPO.load(best_model_path, env=env) if best_model_path.exists() else model
-    export_pt(best, exp_dir, rl_cfg["net_arch"])
+    export_pt(best, exp_dir, net_arch)
 
 
 if __name__ == "__main__":

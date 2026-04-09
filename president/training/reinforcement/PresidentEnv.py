@@ -6,7 +6,7 @@ Gymnasium environment for training an RL agent to play President.
 The game runs on a background thread. The agent communicates with it
 via threading.Event handshakes — no busy-waiting.
 
-Observation: binary vector, size determined by model_cls.INPUT_SIZE
+Observation: binary vector, size and encoding determined by the model's encode_state
 Action:       integer 0–54  (0–53 = meld index, 54 = pass)
 Reward:       sparse, at episode end only
               {President: +2, Vice: +1, Citizen: -1, Scumbag: -2}
@@ -15,40 +15,61 @@ from __future__ import annotations
 
 import logging
 import threading
+from pathlib import Path
+
 import numpy as np
+import yaml
 import gymnasium as gym
 from gymnasium import spaces
 
 from president.core.GameMaster import GameMaster, IllegalPlayPolicy
 from president.core.Meld import Meld
-from president.core.PlayerRegistry import PlayerRegistry
-from president.models.single_meld_mlp import SingleMeldMLP
+from president.core.PlayerRegistry import PlayerEntry, PlayerRegistry
 from president.players.PlayerSplitter import PlayerSplitter
 
 ACTION_BITS = 55   # 0-53 melds, 54 = pass
 
 RANK_REWARDS = {0: 2.0, 1: 1.0, 2: -1.0, 3: -2.0}
 
+CONFIG_PATH = (Path(__file__).resolve().parent.parent.parent / "config" / "config.yaml").resolve()
+
+
+def _load_opponents_from_config() -> list[PlayerEntry]:
+    """
+    Load the 3 opponent entries from config.yaml.
+    The RL agent occupies the first seat; the remaining 3 config players
+    are used as opponents.
+    """
+    with open(CONFIG_PATH) as f:
+        cfg = yaml.safe_load(f)
+    registry = PlayerRegistry.from_config(cfg)
+    entries = registry.all_entries()
+    if len(entries) < 3:
+        raise ValueError(
+            f"config.yaml must define at least 3 non-console players "
+            f"(found {len(entries)})"
+        )
+    return entries[-3:]
+
 
 class PresidentEnv(gym.Env):
     """
     Single-agent Gymnasium environment for President.
-    The agent occupies seat 0. Seats 1-3 are fixed opponents.
+    The RL agent occupies seat 0. Seats 1-3 are filled by opponents
+    loaded from config.yaml (or passed in explicitly).
     """
 
     metadata = {"render_modes": []}
 
-    def __init__(self, model_cls=SingleMeldMLP, opponent_type=PlayerSplitter):
+    def __init__(self, encode_fn, obs_size: int,
+                 opponents: list[PlayerEntry] | None = None):
         super().__init__()
-        self._model_cls        = model_cls
-        self.opponent_type     = opponent_type
+        self._encode_fn  = encode_fn
+        self._opponents  = opponents if opponents is not None else _load_opponents_from_config()
         self.observation_space = spaces.Box(
-            low=0, high=1, shape=(model_cls.INPUT_SIZE,), dtype=np.float32
+            low=0, high=1, shape=(obs_size,), dtype=np.float32
         )
         self.action_space = spaces.Discrete(ACTION_BITS)
-
-        self._registry = PlayerRegistry()
-        self._registry.register(opponent_type, name="Opponent")
 
         self._agent       = None
         self._game_thread = None
@@ -68,15 +89,12 @@ class PresidentEnv(gym.Env):
 
         self._done       = False
         self._final_rank = None
-        self._agent      = _AgentProxy("Agent", self._model_cls)
+        self._agent      = _AgentProxy("Agent", self._encode_fn, obs_size=self.observation_space.shape[0])
 
-        gm = GameMaster(
-            registry=self._registry,
-            policy=IllegalPlayPolicy.PENALISE,
-        )
+        gm = GameMaster(policy=IllegalPlayPolicy.PENALISE)
         gm.add_player(self._agent)
-        for i in range(1, 4):
-            gm.make_player("Opponent", f"Opponent_{i}")
+        for entry in self._opponents:
+            gm.add_player(entry.player_type(entry.name, **entry.kwargs))
         gm.start(number_of_rounds=1)
 
         self._game_thread = threading.Thread(
@@ -175,9 +193,9 @@ class _AgentProxy(PlayerSplitter):
     sees a consistent view regardless of subsequent game thread updates.
     """
 
-    def __init__(self, name: str, model_cls):
+    def __init__(self, name: str, encode_fn, obs_size: int):
         super().__init__(name)
-        self._model_cls     = model_cls
+        self._encode_fn     = encode_fn
         self._action_needed = threading.Event()
         self._action_ready  = threading.Event()
         self._chosen_meld   = Meld()
@@ -185,13 +203,13 @@ class _AgentProxy(PlayerSplitter):
         self._done_flag     = False
         self._state_lock    = threading.Lock()
         self._hand_snapshot = []
-        self._obs_snapshot  = np.zeros(model_cls.INPUT_SIZE, dtype=np.float32)
+        self._obs_snapshot  = np.zeros(obs_size, dtype=np.float32)
 
     def play(self) -> Meld:
         """Called by the game thread — snapshot state then block until action arrives."""
         with self._state_lock:
             self._hand_snapshot = list(self._hand)
-            self._obs_snapshot  = self._model_cls.encode_state(self.memory, self).astype(np.float32)
+            self._obs_snapshot  = self._encode_fn(self.memory, self).astype(np.float32)
 
         self._action_needed.set()
         if not self._action_ready.wait(timeout=30):
