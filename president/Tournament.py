@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import importlib
 import itertools
 import logging
 from dataclasses import dataclass, field
@@ -97,10 +98,18 @@ class Tournament:
         players = []
         for key in ['player1', 'player2', 'player3', 'player4']:
             p = self.config[key]
-            players.append(self.registry.create(p['type'], p['name']))
+            type_name = p['type']
+            module = importlib.import_module(f'president.players.Player{type_name}')
+            player_cls = getattr(module, f'Player{type_name}')
+            kwargs = {k: v for k, v in p.items() if k not in ('name', 'type', 'type_', 'console')}
+            players.append(player_cls(p['name'], **kwargs))
+
+        def _policy_label(p) -> str:
+            model = getattr(p, 'model_name', None)
+            return f"{p.__class__.__name__}[{model}]" if model else p.__class__.__name__
 
         results = [
-            PlayerResult(name=p.name, policy=p.__class__.__name__)
+            PlayerResult(name=p.name, policy=_policy_label(p))
             for p in players
         ]
 

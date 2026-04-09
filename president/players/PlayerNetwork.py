@@ -34,6 +34,7 @@ class PlayerNetwork(AbstractPlayer):
 
     def __init__(self, name: str, model: str):
         super().__init__(name)
+        self.model_name = model
         exp_dir = (EXPERIMENTS_DIR / model).resolve()
         if not exp_dir.is_dir():
             raise FileNotFoundError(f"Experiment directory not found: {exp_dir}")
