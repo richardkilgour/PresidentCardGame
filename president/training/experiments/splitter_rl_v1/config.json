@@ -5,7 +5,6 @@
     },
     "rl": {
         "clone":           "splitter_clone_v1",
-        "net_arch":        [256, 256],
         "total_timesteps": 5000000,
         "eval_freq":       10000,
         "n_eval_episodes": 200,
