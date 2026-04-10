@@ -38,6 +38,7 @@ from stable_baselines3.common.callbacks import (
     CheckpointCallback,
     EvalCallback,
 )
+from stable_baselines3.common.callbacks import BaseCallback
 
 from president.core.PlayerRegistry import PlayerEntry
 from president.training.reinforcement.PresidentEnv import PresidentEnv
@@ -68,13 +69,9 @@ def load_rl_config(exp_dir: Path) -> dict:
     return rl_cfg
 
 
-def load_opponents(cfg: dict) -> list[PlayerEntry] | None:
-    """Load opponent entries from config.json. Returns None to fall back to config.yaml."""
-    opponent_cfgs = cfg.get("opponents")
-    if not opponent_cfgs:
-        return None
+def _parse_player_entries(cfgs: list[dict]) -> list[PlayerEntry]:
     entries = []
-    for opp in opponent_cfgs:
+    for opp in cfgs:
         dotted = opp["class"]
         module_path, class_name = dotted.rsplit(".", 1)
         module = importlib.import_module(module_path)
@@ -82,6 +79,38 @@ def load_opponents(cfg: dict) -> list[PlayerEntry] | None:
         kwargs = {k: v for k, v in opp.items() if k not in ("class", "name")}
         entries.append(PlayerEntry(name=opp["name"], player_type=player_cls, kwargs=kwargs))
     return entries
+
+
+def load_opponents(cfg: dict) -> list[PlayerEntry] | None:
+    """Load opponent entries from config.json. Returns None to fall back to config.yaml."""
+    opponent_cfgs = cfg.get("opponents")
+    return _parse_player_entries(opponent_cfgs) if opponent_cfgs else None
+
+
+def load_opponent_pool(cfg: dict) -> list[PlayerEntry] | None:
+    """Load opponent pool from config.json. Returns None if not specified."""
+    pool_cfgs = cfg.get("opponent_pool")
+    return _parse_player_entries(pool_cfgs) if pool_cfgs else None
+
+
+# ─────────────────────────────────────────────
+# Callbacks
+# ─────────────────────────────────────────────
+
+class ExportingEvalCallback(EvalCallback):
+    """EvalCallback that also exports a .pt file whenever a new best model is found."""
+
+    def __init__(self, *args, exp_dir: Path, net_arch: list, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._exp_dir   = exp_dir
+        self._net_arch  = net_arch
+
+    def _on_event(self) -> bool:
+        prev_best = self.best_mean_reward
+        result = super()._on_event()
+        if self.best_mean_reward > prev_best:
+            export_pt(self.model, self._exp_dir, self._net_arch)
+        return result
 
 
 # ─────────────────────────────────────────────
@@ -215,15 +244,17 @@ def main():
     with open(exp_dir / "config.json") as f:
         full_cfg = json.load(f)
 
-    rl_cfg    = load_rl_config(exp_dir)
-    model_cls = load_model_cls(full_cfg)
-    net_arch  = full_cfg["model"]["architecture"]["hidden_sizes"]
-    opponents = load_opponents(full_cfg)
-    print(f"Experiment : {args.experiment}")
-    print(f"Model class: {full_cfg['model']['class']}")
-    print(f"Net arch   : {net_arch}")
-    print(f"Opponents  : {[e.name for e in opponents] if opponents else 'from config.yaml'}")
-    print(f"RL config  : {json.dumps(rl_cfg, indent=2)}\n")
+    rl_cfg        = load_rl_config(exp_dir)
+    model_cls     = load_model_cls(full_cfg)
+    net_arch      = full_cfg["model"]["architecture"]["hidden_sizes"]
+    opponents     = load_opponents(full_cfg)
+    opponent_pool = load_opponent_pool(full_cfg)
+    print(f"Experiment    : {args.experiment}")
+    print(f"Model class   : {full_cfg['model']['class']}")
+    print(f"Net arch      : {net_arch}")
+    print(f"Opponents     : {[e.name for e in opponents] if opponents else 'from config.yaml'}")
+    print(f"Opponent pool : {[e.name for e in opponent_pool] if opponent_pool else 'none'}")
+    print(f"RL config     : {json.dumps(rl_cfg, indent=2)}\n")
 
     # Resolve clone experiment
     clone_name    = args.clone or rl_cfg.get("clone")
@@ -235,8 +266,8 @@ def main():
     log_dir.mkdir(exist_ok=True)
     checkpoint_dir.mkdir(exist_ok=True)
 
-    env      = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents), mask_fn)
-    eval_env = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents), mask_fn)
+    env      = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents, opponent_pool=opponent_pool), mask_fn)
+    eval_env = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents, opponent_pool=opponent_pool), mask_fn)
 
     # ── Load or create model ──────────────────
     if best_model_path.exists():
@@ -273,13 +304,15 @@ def main():
     model.verbose = 1
 
     # ── Callbacks ─────────────────────────────
-    eval_callback = EvalCallback(
+    eval_callback = ExportingEvalCallback(
         eval_env,
         best_model_save_path=str(exp_dir),
         log_path=str(log_dir),
         eval_freq=rl_cfg["eval_freq"],
         n_eval_episodes=rl_cfg["n_eval_episodes"],
         deterministic=True,
+        exp_dir=exp_dir,
+        net_arch=net_arch,
     )
     checkpoint_callback = CheckpointCallback(
         save_freq=rl_cfg["checkpoint_freq"],
