@@ -14,6 +14,7 @@ Reward:       sparse, at episode end only
 from __future__ import annotations
 
 import logging
+import random
 import threading
 from pathlib import Path
 
@@ -25,11 +26,15 @@ from gymnasium import spaces
 from president.core.GameMaster import GameMaster, IllegalPlayPolicy
 from president.core.Meld import Meld
 from president.core.PlayerRegistry import PlayerEntry, PlayerRegistry
-from president.players.PlayerSplitter import PlayerSplitter
+from president.core.AbstractPlayer import AbstractPlayer
 
-ACTION_BITS = 55   # 0-53 melds, 54 = pass
+ACTION_BITS    = 55   # 0-53 melds, 54 = pass
+EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
 
-RANK_REWARDS = {0: 2.0, 1: 1.0, 2: -1.0, 3: -2.0}
+RANK_REWARDS = {0: 2.0, 1: 1.0, 2: -1.5, 3: -2.5}
+
+PLAY_REWARD     = 0.05   # reward for playing cards (not passing)
+HAND_WIN_REWARD = 0.10   # reward for winning a hand
 
 CONFIG_PATH = (Path(__file__).resolve().parent.parent.parent / "config" / "config.yaml").resolve()
 
@@ -62,10 +67,14 @@ class PresidentEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, encode_fn, obs_size: int,
-                 opponents: list[PlayerEntry] | None = None):
+                 opponents: list[PlayerEntry] | None = None,
+                 opponent_pool: list[PlayerEntry] | None = None):
         super().__init__()
-        self._encode_fn  = encode_fn
-        self._opponents  = opponents if opponents is not None else _load_opponents_from_config()
+        self._encode_fn      = encode_fn
+        self._opponent_pool  = opponent_pool
+        self._opponents      = opponents if opponents is not None else _load_opponents_from_config()
+        self._available_pool: list[PlayerEntry] | None = None
+        self._reset_count    = 0
         self.observation_space = spaces.Box(
             low=0, high=1, shape=(obs_size,), dtype=np.float32
         )
@@ -93,7 +102,7 @@ class PresidentEnv(gym.Env):
 
         gm = GameMaster(policy=IllegalPlayPolicy.PENALISE)
         gm.add_player(self._agent)
-        for entry in self._opponents:
+        for entry in self._sample_opponents():
             gm.add_player(entry.player_type(entry.name, **entry.kwargs))
         gm.start(number_of_rounds=1)
 
@@ -115,8 +124,13 @@ class PresidentEnv(gym.Env):
         if self._done and self._final_rank is None:
             self._final_rank = 3
 
-        obs        = self._get_observation()
-        reward     = self._get_reward()
+        obs    = self._get_observation()
+        reward = self._get_reward()
+
+        if action != 54:
+            reward += PLAY_REWARD
+        reward += self._agent.consume_hands_won() * HAND_WIN_REWARD
+
         terminated = self._done
         truncated  = False
         info       = {"final_rank": self._final_rank} if self._done else {}
@@ -141,6 +155,39 @@ class PresidentEnv(gym.Env):
     # ─────────────────────────────────────────────
     # Internal helpers
     # ─────────────────────────────────────────────
+
+    def _sample_opponents(self) -> list[PlayerEntry]:
+        """Return 3 opponents: randomly sampled from pool if one is configured,
+        otherwise the fixed opponent list. Pool availability is refreshed every
+        500 resets to pick up new .pt files (e.g. splitter_rl_v2 self-play)."""
+        if self._opponent_pool is None:
+            return self._opponents
+
+        self._reset_count += 1
+        if self._available_pool is None or self._reset_count % 500 == 0:
+            available = []
+            for entry in self._opponent_pool:
+                if self._pool_entry_available(entry):
+                    available.append(entry)
+                else:
+                    logging.debug(f"Pool entry '{entry.name}' unavailable — skipping.")
+            if len(available) < 3:
+                raise RuntimeError(
+                    f"Opponent pool has fewer than 3 available entries: "
+                    f"{[e.name for e in available]}"
+                )
+            self._available_pool = available
+
+        return random.choices(self._available_pool, k=3)
+
+    @staticmethod
+    def _pool_entry_available(entry: PlayerEntry) -> bool:
+        """Check if a pool entry is usable without instantiating it.
+        Network players require their .pt weights file to exist."""
+        model = entry.kwargs.get('model')
+        if model is None:
+            return True
+        return (EXPERIMENTS_DIR / model / f"{model}.pt").exists()
 
     def _run_game(self, gm: GameMaster):
         try:
@@ -185,7 +232,7 @@ class PresidentEnv(gym.Env):
         return value * 4 + count - 1
 
 
-class _AgentProxy(PlayerSplitter):
+class _AgentProxy(AbstractPlayer):
     """
     Player that blocks the game thread at each decision point
     until the environment delivers an action via submit_action().
@@ -204,6 +251,7 @@ class _AgentProxy(PlayerSplitter):
         self._state_lock    = threading.Lock()
         self._hand_snapshot = []
         self._obs_snapshot  = np.zeros(obs_size, dtype=np.float32)
+        self._hands_won     = 0
 
     def play(self) -> Meld:
         """Called by the game thread — snapshot state then block until action arrives."""
@@ -227,7 +275,15 @@ class _AgentProxy(PlayerSplitter):
 
     def notify_hand_won(self, winner):
         with self._state_lock:
+            if winner is self:
+                self._hands_won += 1
             super().notify_hand_won(winner)
+
+    def consume_hands_won(self) -> int:
+        with self._state_lock:
+            count = self._hands_won
+            self._hands_won = 0
+        return count
 
     def submit_action(self, meld: Meld):
         """Called by the environment thread to deliver an action."""
