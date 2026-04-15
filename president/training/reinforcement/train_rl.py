@@ -39,6 +39,7 @@ from stable_baselines3.common.callbacks import (
     EvalCallback,
 )
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 
 from president.core.PlayerRegistry import PlayerEntry
 from president.training.reinforcement.PresidentEnv import PresidentEnv
@@ -50,6 +51,7 @@ DEFAULT_RL_CONFIG = {
     "eval_freq":       10_000,
     "n_eval_episodes": 200,
     "checkpoint_freq": 50_000,
+    "n_envs":          1,
 }
 
 
@@ -223,6 +225,40 @@ def mask_fn(env):
     return env.action_masks()
 
 
+def load_or_create_model(env, best_model_path, log_dir, checkpoint_dir, net_arch, clone_exp_dir):
+    # ── Load or create model ──────────────────
+    if best_model_path.exists():
+        print(f"Resuming from {best_model_path}")
+        model = MaskablePPO.load(
+            best_model_path,
+            env=env,
+            tensorboard_log=str(log_dir),
+        )
+    else:
+        checkpoints = sorted(checkpoint_dir.glob("rl_agent_*_steps.zip"))
+        if checkpoints:
+            latest = checkpoints[-1]
+            print(f"Resuming from checkpoint {latest}")
+            model = MaskablePPO.load(
+                latest,
+                env=env,
+                tensorboard_log=str(log_dir),
+            )
+        else:
+            print("No previous RL model found - creating new model.")
+            model = MaskablePPO(
+                "MlpPolicy",
+                env,
+                verbose=1,
+                tensorboard_log=str(log_dir),
+                policy_kwargs=dict(net_arch=net_arch),
+            )
+            if clone_exp_dir is not None:
+                warm_start(model, clone_exp_dir)
+            else:
+                print("No clone specified — training from scratch.")
+    return model
+
 # ─────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────
@@ -266,40 +302,38 @@ def main():
     log_dir.mkdir(exist_ok=True)
     checkpoint_dir.mkdir(exist_ok=True)
 
-    env      = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents, opponent_pool=opponent_pool), mask_fn)
-    eval_env = ActionMasker(PresidentEnv(encode_fn=model_cls.encode_state, obs_size=model_cls.INPUT_SIZE, opponents=opponents, opponent_pool=opponent_pool), mask_fn)
+    n_envs = rl_cfg["n_envs"]
+    debug  = (n_envs == 1)
 
-    # ── Load or create model ──────────────────
-    if best_model_path.exists():
-        print(f"Resuming from {best_model_path}")
-        model = MaskablePPO.load(
-            best_model_path,
-            env=env,
-            tensorboard_log=str(log_dir),
+    def make_env():
+        return ActionMasker(
+            PresidentEnv(
+                encode_fn=model_cls.encode_state,
+                obs_size=model_cls.INPUT_SIZE,
+                opponents=opponents,
+                opponent_pool=opponent_pool,
+                debug=debug,
+            ),
+            mask_fn,
         )
+
+    if n_envs == 1:
+        env = make_env()
     else:
-        checkpoints = sorted(checkpoint_dir.glob("rl_agent_*_steps.zip"))
-        if checkpoints:
-            latest = checkpoints[-1]
-            print(f"Resuming from checkpoint {latest}")
-            model = MaskablePPO.load(
-                latest,
-                env=env,
-                tensorboard_log=str(log_dir),
-            )
-        else:
-            print("No previous RL model found - creating new model.")
-            model = MaskablePPO(
-                "MlpPolicy",
-                env,
-                verbose=1,
-                tensorboard_log=str(log_dir),
-                policy_kwargs=dict(net_arch=net_arch),
-            )
-            if clone_exp_dir is not None:
-                warm_start(model, clone_exp_dir)
-            else:
-                print("No clone specified — training from scratch.")
+        env = SubprocVecEnv([make_env for _ in range(n_envs)])
+
+    eval_env = ActionMasker(
+        PresidentEnv(
+            encode_fn=model_cls.encode_state,
+            obs_size=model_cls.INPUT_SIZE,
+            opponents=opponents,
+            opponent_pool=opponent_pool,
+            debug=debug,
+        ),
+        mask_fn,
+    )
+
+    model = load_or_create_model(env, best_model_path, log_dir, checkpoint_dir, net_arch, clone_exp_dir)
 
     model.verbose = 1
 
