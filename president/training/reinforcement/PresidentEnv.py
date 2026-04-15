@@ -3,8 +3,11 @@
 """
 Gymnasium environment for training an RL agent to play President.
 
-The game runs on a background thread. The agent communicates with it
-via threading.Event handshakes — no busy-waiting.
+The game runs synchronously on the main thread.  The agent's play()
+returns the '␆' sentinel to pause the game loop, giving control back
+to the environment so it can return an observation.  On the next
+step() call the delivered action is played and the game advances to
+the agent's next decision point (or episode end).
 
 Observation: binary vector, size and encoding determined by the model's encode_state
 Action:       integer 0–54  (0–53 = meld index, 54 = pass)
@@ -15,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import random
-import threading
 from pathlib import Path
 
 import numpy as np
@@ -68,20 +70,23 @@ class PresidentEnv(gym.Env):
 
     def __init__(self, encode_fn, obs_size: int,
                  opponents: list[PlayerEntry] | None = None,
-                 opponent_pool: list[PlayerEntry] | None = None):
+                 opponent_pool: list[PlayerEntry] | None = None,
+                 debug: bool = False):
         super().__init__()
         self._encode_fn      = encode_fn
         self._opponent_pool  = opponent_pool
         self._opponents      = opponents if opponents is not None else _load_opponents_from_config()
         self._available_pool: list[PlayerEntry] | None = None
         self._reset_count    = 0
+        self._debug          = debug
         self.observation_space = spaces.Box(
             low=0, high=1, shape=(obs_size,), dtype=np.float32
         )
         self.action_space = spaces.Discrete(ACTION_BITS)
 
-        self._agent       = None
-        self._game_thread = None
+        self._agent      = None
+        self._gm         = None
+        self._gm_done    = False
         self._done        = False
         self._final_rank  = None
 
@@ -92,25 +97,18 @@ class PresidentEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        if self._game_thread and self._game_thread.is_alive():
-            self._agent.abort()
-            self._game_thread.join()
-
         self._done       = False
         self._final_rank = None
         self._agent      = _AgentProxy("Agent", self._encode_fn, obs_size=self.observation_space.shape[0])
 
-        gm = GameMaster(policy=IllegalPlayPolicy.PENALISE)
-        gm.add_player(self._agent)
+        self._gm = GameMaster(policy=IllegalPlayPolicy.PENALISE)
+        self._gm.add_player(self._agent)
         for entry in self._sample_opponents():
-            gm.add_player(entry.player_type(entry.name, **entry.kwargs))
-        gm.start(number_of_rounds=1)
+            self._gm.add_player(entry.player_type(entry.name, **entry.kwargs))
+        self._gm.start(number_of_rounds=1)
+        self._gm_done = False
 
-        self._game_thread = threading.Thread(
-            target=self._run_game, args=(gm,), daemon=True
-        )
-        self._game_thread.start()
-        self._agent.wait_for_turn()
+        self._advance_game()
 
         return self._get_observation(), {}
 
@@ -119,7 +117,7 @@ class PresidentEnv(gym.Env):
 
         meld = self._action_to_meld(action)
         self._agent.submit_action(meld)
-        self._agent.wait_for_turn()
+        self._advance_game()
 
         if self._done and self._final_rank is None:
             self._final_rank = 3
@@ -155,6 +153,17 @@ class PresidentEnv(gym.Env):
     # ─────────────────────────────────────────────
     # Internal helpers
     # ─────────────────────────────────────────────
+    def _advance_game(self):
+        """Step the game forward until the agent needs an action or the episode ends."""
+        while not self._gm_done:
+            self._gm_done = self._gm.step()
+            if self._agent._awaiting_action:
+                # early return to get the agent response
+                return
+        self._final_rank = self._get_agent_rank(self._gm)
+        # Game finished normally
+        self._done = True
+        return
 
     def _sample_opponents(self) -> list[PlayerEntry]:
         """Return 3 opponents: randomly sampled from pool if one is configured,
@@ -178,7 +187,7 @@ class PresidentEnv(gym.Env):
                 )
             self._available_pool = available
 
-        return random.choices(self._available_pool, k=3)
+        return random.sample(self._available_pool, k=3)
 
     @staticmethod
     def _pool_entry_available(entry: PlayerEntry) -> bool:
@@ -188,19 +197,6 @@ class PresidentEnv(gym.Env):
         if model is None:
             return True
         return (EXPERIMENTS_DIR / model / f"{model}.pt").exists()
-
-    def _run_game(self, gm: GameMaster):
-        try:
-            done = False
-            while not done:
-                done = gm.step()
-            self._final_rank = self._get_agent_rank(gm)
-        except Exception as e:
-            logging.error(f"Game thread error: {e}", exc_info=True)
-            self._final_rank = 3
-        finally:
-            self._done = True
-            self._agent.signal_done()
 
     def _get_agent_rank(self, gm: GameMaster) -> int | None:
         ranks = gm.episode.ranks
@@ -234,77 +230,51 @@ class PresidentEnv(gym.Env):
 
 class _AgentProxy(AbstractPlayer):
     """
-    Player that blocks the game thread at each decision point
-    until the environment delivers an action via submit_action().
-    State is snapshotted at decision time so the main thread always
-    sees a consistent view regardless of subsequent game thread updates.
+    Player whose play() cooperates with the synchronous game loop.
+
+    On each decision point play() snapshots state and returns the '␆'
+    sentinel, which causes player_turn() to return without advancing.
+    The env records the observation and hands control back to the caller.
+
+    On the *next* gm.step() call (after the env delivers an action via
+    submit_action), play() is called again and returns the real meld.
     """
 
     def __init__(self, name: str, encode_fn, obs_size: int):
         super().__init__(name)
         self._encode_fn     = encode_fn
-        self._action_needed = threading.Event()
-        self._action_ready  = threading.Event()
-        self._chosen_meld   = Meld()
-        self._aborted       = False
-        self._done_flag     = False
-        self._state_lock    = threading.Lock()
         self._hand_snapshot = []
         self._obs_snapshot  = np.zeros(obs_size, dtype=np.float32)
         self._hands_won     = 0
+        self._chosen_meld   = Meld()
+        self._awaiting_action = False
+        self._has_action      = False
 
     def play(self) -> Meld:
-        """Called by the game thread — snapshot state then block until action arrives."""
-        with self._state_lock:
-            self._hand_snapshot = list(self._hand)
-            self._obs_snapshot  = self._encode_fn(self.memory, self).astype(np.float32)
+        """Called by the game engine each time it is this player's turn."""
+        if self._has_action:
+            # Second call — deliver the action chosen by the env
+            self._has_action = False
+            self._awaiting_action = False
+            return self._chosen_meld
 
-        self._action_needed.set()
-        if not self._action_ready.wait(timeout=30):
-            raise RuntimeError(
-                "Deadlock: play() timed out waiting for action after 30s"
-            )
-        self._action_ready.clear()
-        if self._aborted:
-            return Meld()
-        return self._chosen_meld
-
-    def notify_play(self, player, meld):
-        with self._state_lock:
-            super().notify_play(player, meld)
+        # First call — snapshot state, then yield control back to the env
+        self._hand_snapshot = list(self._hand)
+        self._obs_snapshot  = self._encode_fn(self.memory, self).astype(np.float32)
+        self._awaiting_action = True
+        return '␆'
 
     def notify_hand_won(self, winner):
-        with self._state_lock:
-            if winner is self:
-                self._hands_won += 1
-            super().notify_hand_won(winner)
+        if winner is self:
+            self._hands_won += 1
+        super().notify_hand_won(winner)
 
     def consume_hands_won(self) -> int:
-        with self._state_lock:
-            count = self._hands_won
-            self._hands_won = 0
+        count = self._hands_won
+        self._hands_won = 0
         return count
 
     def submit_action(self, meld: Meld):
-        """Called by the environment thread to deliver an action."""
+        """Called by the environment to deliver the chosen action."""
         self._chosen_meld = meld
-        self._action_ready.set()
-
-    def wait_for_turn(self):
-        """Called by the environment — polls until play() is called or episode ends."""
-        while not self._action_needed.wait(timeout=1.0):
-            if self._aborted or self._done_flag:
-                return
-        self._action_needed.clear()
-
-    def signal_done(self):
-        """Called by the game thread when the episode ends."""
-        self._done_flag = True
-        self._action_needed.set()
-
-    def abort(self):
-        """Unblock both events so threads can exit cleanly."""
-        self._aborted   = True
-        self._done_flag = True
-        self._action_ready.set()
-        self._action_needed.set()
+        self._has_action = True
