@@ -137,6 +137,11 @@ class Episode:
     def set_player_finished(self, player: AbstractPlayer) -> None:
         """Assign a rank to a player who has played out and notify listeners."""
         ranking = len(self.ranks)
+        if player in self.ranks:
+            raise AssertionError(
+                f"Rank integrity failed for {player.name} "
+                f" already in {[str(c) for c in self.ranks]}"
+            )
         self.ranks.append(player)
         logger.info(f"{player.name} played out and is ranked {player.ranking_names[ranking]}")
         player.set_position(ranking)
