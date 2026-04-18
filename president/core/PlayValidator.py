@@ -6,6 +6,7 @@ accepted by Episode.
 
 Catches:
   - Wrong return type (not a Meld)
+  - If you lead a round, you may not pass
   - Cards not in the player's hand
   - Cards of mixed values in the meld
   - Meld does not beat the current target
@@ -27,14 +28,22 @@ class PlayValidator:
             current_target: The current highest meld, or None if no meld yet.
         """
         PlayValidator._check_type(player, action)
-
-        # Pass is always valid — no further checks needed
-        if not action.cards:
-            return
-
+        PlayValidator._check_must_play(player, action, current_target)
         PlayValidator._check_cards_in_hand(player, action)
         PlayValidator._check_consistent_value(player, action)
         PlayValidator._check_beats_target(player, action, current_target)
+
+    @staticmethod
+    def _check_must_play(player, action, current_target):
+        if not action.cards:
+            # Passing is only valid when there is a target meld to beat.
+            # When current_target is None the player leads and must play a card.
+            if current_target is None:
+                raise IllegalPlayError(
+                    player, action,
+                    "Must lead with a card — passing is not allowed when you have won the round"
+                )
+            return
 
     @staticmethod
     def _check_type(player, action) -> None:
