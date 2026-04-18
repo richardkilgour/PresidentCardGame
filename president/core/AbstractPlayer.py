@@ -7,6 +7,8 @@ import numpy as np
 from president.core.Meld import Meld
 from president.core.CardGameListener import CardGameListener
 from president.core.PlayingCard import PlayingCard
+from president.core.IllegalPlayError import IllegalPlayError
+from president.core.PlayValidator import PlayValidator
 
 
 class AbstractPlayer(CardGameListener):
@@ -69,35 +71,32 @@ class AbstractPlayer(CardGameListener):
         """
         pass
 
+    def _generate_candidates(self):
+        """All singles, pairs, triples, quads from hand, plus pass."""
+        candidates = []
+        for card in self._hand:
+            if candidates and card == candidates[-1].cards[0]:
+                candidates.append(Meld(card, candidates[-1]))
+            else:
+                candidates.append(Meld(card))
+        candidates.append(Meld())
+        return candidates
+
     def possible_plays(self):
         """
-        Make a list of possible melds that may be played given the target minimum meld
-        Will always return the pass option (in last place)
+        Returns all valid melds that may be played given the current target meld,
+        validated through PlayValidator. Pass is included only when not leading.
         Example return value: [[3], [3, 3], [4], ..., []]
         """
-        # A list of the melds possible to play
+        candidates = self._generate_candidates()
+
         possible_melds = []
-
-        if not self.target_meld:
-            # If no minimum, all melds are playable
-            for card in self._hand:
-                # Check to see if this can make a pair
-                if len(possible_melds) > 0 and card == possible_melds[-1].cards[0]:
-                    possible_melds.append(Meld(card, possible_melds[-1]))
-                else:
-                    possible_melds.append(Meld(card))
-        else:
-            current_meld = None
-            for card in self._hand:
-                if current_meld and (card.get_value() == current_meld.cards[0].get_value()):
-                    current_meld = Meld(card, current_meld)
-                else:
-                    current_meld = Meld(card)
-                if current_meld > self.target_meld:
-                    possible_melds.append(current_meld)
-
-        # The option for Pass
-        possible_melds.append(Meld())
+        for meld in candidates:
+            try:
+                PlayValidator.validate(self, meld, self.target_meld)
+                possible_melds.append(meld)
+            except IllegalPlayError as e:
+                logging.warning("possible_plays generated invalid candidate: %s", e)
 
         card_string = f"{self.name} has:"
         for s in self._hand:
