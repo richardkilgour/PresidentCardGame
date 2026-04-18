@@ -79,6 +79,8 @@ class PlayValidator:
 
     @staticmethod
     def _check_beats_target(player, action, current_target) -> None:
+        if not action.cards:
+            return  # pass is validated by _check_must_play
         if current_target and action <= current_target:
             raise IllegalPlayError(
                 player, action,
