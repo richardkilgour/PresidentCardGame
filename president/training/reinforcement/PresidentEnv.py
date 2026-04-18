@@ -260,6 +260,10 @@ class _AgentProxy(AbstractPlayer):
             # Second call — deliver the action chosen by the env
             self._has_action = False
             self._awaiting_action = False
+            assert self._chosen_meld in self.possible_plays(), (
+                f"Agent submitted invalid meld {self._chosen_meld} "
+                f"(target={self.target_meld}); mask was not respected"
+            )
             return self._chosen_meld
 
         # First call — snapshot state, then yield control back to the env
