@@ -29,6 +29,7 @@ from president.core.GameMaster import GameMaster, IllegalPlayPolicy
 from president.core.Meld import Meld
 from president.core.PlayerRegistry import PlayerEntry, PlayerRegistry
 from president.core.AbstractPlayer import AbstractPlayer
+from president.core.PlayValidator import PlayValidator
 
 ACTION_BITS    = 55   # 0-53 melds, 54 = pass
 EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
@@ -137,7 +138,10 @@ class PresidentEnv(gym.Env):
 
     def action_masks(self) -> np.ndarray:
         mask = np.zeros(ACTION_BITS, dtype=bool)
-        legal = self._agent.possible_plays()
+        # Use episode's authoritative target rather than player's local tracking,
+        # which can lag during HAND_WON→ROUND_STARTING transitions.
+        current_target = self._gm.episode.target_meld() if self._gm.episode else None
+        legal = PlayValidator.possible_plays(self._agent._hand, current_target)
         for meld in legal:
             mask[self._meld_to_action(meld)] = True
         return mask

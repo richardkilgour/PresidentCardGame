@@ -86,3 +86,37 @@ class PlayValidator:
                 player, action,
                 f"{action} does not beat current target {current_target}"
             )
+
+    # ─────────────────────────────────────────────
+    # Hand-level helpers (no player context needed)
+    # ─────────────────────────────────────────────
+
+    @staticmethod
+    def possible_plays(hand: list, target) -> list:
+        """Return all legal melds for the given hand and target.
+
+        Args:
+            hand:   The player's current hand (list of PlayingCard).
+            target: The current highest meld, or None if leading.
+        """
+        candidates = PlayValidator._generate_candidates(hand)
+        return [m for m in candidates if PlayValidator._is_legal(m, target)]
+
+    @staticmethod
+    def _generate_candidates(hand: list) -> list:
+        """All singles, pairs, triples, quads from hand, plus pass."""
+        candidates = []
+        for card in hand:
+            if candidates and card == candidates[-1].cards[0]:
+                candidates.append(Meld(card, candidates[-1]))
+            else:
+                candidates.append(Meld(card))
+        candidates.append(Meld())
+        return candidates
+
+    @staticmethod
+    def _is_legal(meld, target) -> bool:
+        """True if meld is legal given the current target (None = leading)."""
+        if not meld.cards:
+            return target is not None  # pass only when there is something to beat
+        return not (target and meld <= target)
