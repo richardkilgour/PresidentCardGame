@@ -136,6 +136,8 @@ class Episode:
 
     def set_player_finished(self, player: AbstractPlayer) -> None:
         """Assign a rank to a player who has played out and notify listeners."""
+        assert player.report_remaining_cards() == 0, \
+            f"set_player_finished called on {player.name} who still has {player.report_remaining_cards()} cards"
         ranking = len(self.ranks)
         if player in self.ranks:
             raise AssertionError(
@@ -143,11 +145,51 @@ class Episode:
                 f" already in {[str(c) for c in self.ranks]}"
             )
         self.ranks.append(player)
+        if player in self.active_players:
+            self.active_players.remove(player)
         logger.info(f"{player.name} played out and is ranked {player.ranking_names[ranking]}")
         player.set_position(ranking)
         self.notify_listeners("notify_played_out", player, ranking)
         player_names = ' '.join(p.name if p else '' for p in self.ranks)
         logger.info(f"Positions: {player_names}")
+
+    def _round_winner(self) -> AbstractPlayer | None:
+        """Return the player who played the target meld this round, or None if no meld was played."""
+        target = self.target_meld()
+        if target is None:
+            return None
+        for i, meld in enumerate(self.current_melds):
+            if meld is target:
+                return self.player_manager.players[i]
+        return None
+
+    def _next_leader(self, winner: AbstractPlayer | None) -> AbstractPlayer:
+        """Return the next player clockwise from winner who still has cards.
+
+        If winner has cards, returns winner (they lead as normal).
+        If winner played out, steps clockwise through player_manager.players
+        until a player with cards is found.
+        If winner is None (no meld was played this round), returns the first
+        player with cards in clockwise order.
+        """
+        players = self.player_manager.players
+        if winner is None:
+            # No meld was played this round (leader was illegally force-passed).
+            # player_manager.players[0] is the intended leader (set by move_to_front);
+            # skip them and advance clockwise to the next player with cards.
+            n = len(players)
+            for offset in range(1, n + 1):
+                candidate = players[offset % n]
+                if candidate.report_remaining_cards() > 0:
+                    return candidate
+            return players[0]  # fallback; not reachable while any player has cards
+        idx = players.index(winner)
+        n = len(players)
+        for offset in range(n):
+            candidate = players[(idx + offset) % n]
+            if candidate.report_remaining_cards() > 0:
+                return candidate
+        return winner  # fallback; not reachable while any player still has cards
 
     def player_turn(self) -> None:
         """Execute a single turn for the current active player.
@@ -161,7 +203,9 @@ class Episode:
         logger.info(f"Players who have not passed = {' '.join(x.name for x in self.active_players)}")
 
         if len(self.active_players) == 1:
-            self.set_player_finished(self.active_players[0])
+            # Only the scumbag remains. They keep their cards — finalization
+            # (rank assignment, card collection) happens in post_episode_checks.
+            self.active_players.clear()
             return
 
         current_target = self.target_meld()
@@ -190,7 +234,10 @@ class Episode:
             self.current_melds[index] = action
             if player.report_remaining_cards() == 0:
                 self.set_player_finished(player)
-            self.active_players.append(self.active_players.pop(0))
+                # Player removed from active_players by set_player_finished;
+                # next player is already at the front — no rotation needed.
+            else:
+                self.active_players.append(self.active_players.pop(0))
 
     # -------------------------------------------------------------------------
     # Post-episode cleanup
@@ -199,6 +246,17 @@ class Episode:
     def post_episode_checks(self) -> None:
         """Finalise the episode: verify integrity, collect scumbag cards, restore deck."""
         n = self.player_manager.player_count
+        # Assign last place to the scumbag if they haven't played out.
+        # Their remaining cards are intentional — HandIntegrityChecker accounts for them.
+        unranked = [p for p in self.player_manager.players if p not in self.ranks]
+        if unranked:
+            assert len(unranked) == 1, f"Expected exactly 1 unranked player, got {len(unranked)}"
+            scumbag = unranked[0]
+            ranking = len(self.ranks)
+            self.ranks.append(scumbag)
+            logger.info(f"{scumbag.name} is ranked {scumbag.ranking_names[ranking]}")
+            scumbag.set_position(ranking)
+            self.notify_listeners("notify_played_out", scumbag, ranking)
         assert len(self.ranks) == n, \
             f"Expected {n} ranked players, got {len(self.ranks)}."
         HandIntegrityChecker.verify(self.player_manager, self.ranks)
@@ -254,18 +312,22 @@ class Episode:
 
         elif self.state == State.PLAYING:
             self.player_turn()
-            if len(self.active_players) == 1:
+            if len(self.active_players) <= 1:
                 self.state = State.HAND_WON
 
         elif self.state == State.HAND_WON:
-            if len(self.ranks) == self.player_manager.player_count:
+            unranked = self.player_manager.player_count - len(self.ranks)
+            if unranked <= 1:
+                # Either all players ranked, or only the scumbag (with cards) remains.
+                # post_episode_checks finalises the scumbag if needed.
                 self.post_episode_checks()
                 self.state = State.FINISHED
             else:
-                assert len(self.active_players) == 1, \
-                    "Expected one active player in HAND_WON state."
-                self.notify_listeners("notify_hand_won", self.active_players[0])
-                self.move_to_front(self.active_players[0])
+                assert len(self.active_players) <= 1, \
+                    "Expected at most one active player in HAND_WON state."
+                next_leader = self._next_leader(self._round_winner())
+                self.notify_listeners("notify_hand_won", next_leader)
+                self.move_to_front(next_leader)
                 self.state = State.ROUND_STARTING
 
         return self.ranks
