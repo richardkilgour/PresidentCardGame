@@ -3,6 +3,8 @@
 """
 Dummy player that just waits for a call to play, and plays whatever was buffered
 """
+import logging
+
 from president.core.AbstractPlayer import AbstractPlayer
 from president.core.Meld import Meld
 
@@ -13,6 +15,8 @@ class AsyncPlayer(AbstractPlayer):
         self.card_to_play = '␆'
 
     def add_play(self, play: Meld):
+        if self.card_to_play != '␆':
+            logging.warning(f'{self.name}: buffered play {self.card_to_play} dropped, replaced by {play}')
         self.card_to_play = play
 
     def play(self):
