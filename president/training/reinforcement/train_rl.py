@@ -36,9 +36,9 @@ from sb3_contrib.common.wrappers import ActionMasker
 from stable_baselines3.common.callbacks import (
     CallbackList,
     CheckpointCallback,
-    EvalCallback,
 )
 from stable_baselines3.common.callbacks import BaseCallback
+from sb3_contrib.common.maskable.callbacks import MaskableEvalCallback
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 
 from president.core.PlayerRegistry import PlayerEntry
@@ -99,7 +99,7 @@ def load_opponent_pool(cfg: dict) -> list[PlayerEntry] | None:
 # Callbacks
 # ─────────────────────────────────────────────
 
-class ExportingEvalCallback(EvalCallback):
+class ExportingEvalCallback(MaskableEvalCallback):
     """EvalCallback that also exports a .pt file whenever a new best model is found."""
 
     def __init__(self, *args, exp_dir: Path, net_arch: list, **kwargs):
