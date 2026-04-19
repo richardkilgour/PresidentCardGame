@@ -28,8 +28,8 @@ from gymnasium import spaces
 from president.core.GameMaster import GameMaster, IllegalPlayPolicy
 from president.core.Meld import Meld
 from president.core.PlayerRegistry import PlayerEntry, PlayerRegistry
-from president.core.AbstractPlayer import AbstractPlayer
 from president.core.PlayValidator import PlayValidator
+from president.players.AgentProxy import AgentProxy
 
 ACTION_BITS    = 55   # 0-53 melds, 54 = pass
 EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
@@ -100,7 +100,7 @@ class PresidentEnv(gym.Env):
 
         self._done       = False
         self._final_rank = None
-        self._agent      = _AgentProxy("Agent", self._encode_fn, obs_size=self.observation_space.shape[0])
+        self._agent      = AgentProxy("Agent", self._encode_fn, obs_size=self.observation_space.shape[0])
 
         self._gm = GameMaster(policy=IllegalPlayPolicy.PENALISE)
         self._gm.add_player(self._agent)
@@ -230,59 +230,3 @@ class PresidentEnv(gym.Env):
         value = meld.cards[0].get_value()
         count = len(meld.cards)
         return value * 4 + count - 1
-
-
-class _AgentProxy(AbstractPlayer):
-    """
-    Player whose play() cooperates with the synchronous game loop.
-
-    On each decision point play() snapshots state and returns the '␆'
-    sentinel, which causes player_turn() to return without advancing.
-    The env records the observation and hands control back to the caller.
-
-    On the *next* gm.step() call (after the env delivers an action via
-    submit_action), play() is called again and returns the real meld.
-    """
-
-    def __init__(self, name: str, encode_fn, obs_size: int):
-        super().__init__(name)
-        self._encode_fn     = encode_fn
-        self._hand_snapshot = []
-        self._obs_snapshot  = np.zeros(obs_size, dtype=np.float32)
-        self._hands_won     = 0
-        self._chosen_meld   = Meld()
-        self._awaiting_action = False
-        self._has_action      = False
-
-    def play(self) -> Meld:
-        """Called by the game engine each time it is this player's turn."""
-        if self._has_action:
-            # Second call — deliver the action chosen by the env
-            self._has_action = False
-            self._awaiting_action = False
-            assert self._chosen_meld in self.possible_plays(), (
-                f"Agent submitted invalid meld {self._chosen_meld} "
-                f"(target={self.target_meld}); mask was not respected"
-            )
-            return self._chosen_meld
-
-        # First call — snapshot state, then yield control back to the env
-        self._hand_snapshot = list(self._hand)
-        self._obs_snapshot  = self._encode_fn(self.memory, self).astype(np.float32)
-        self._awaiting_action = True
-        return '␆'
-
-    def notify_hand_won(self, winner):
-        if winner is self:
-            self._hands_won += 1
-        super().notify_hand_won(winner)
-
-    def consume_hands_won(self) -> int:
-        count = self._hands_won
-        self._hands_won = 0
-        return count
-
-    def submit_action(self, meld: Meld):
-        """Called by the environment to deliver the chosen action."""
-        self._chosen_meld = meld
-        self._has_action = True
