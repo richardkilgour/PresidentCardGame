@@ -1,6 +1,5 @@
 player1:
   name: snAkbar
-  type_: Splitter
   type: Splitter
   console: false
 player2:
@@ -17,7 +16,7 @@ player4:
   name: Sara
   type_: Naive
   type: Network
-  model: splitter_clone_v1
+  model: splitter_rl_v2
   console: false
 screen:
   width: 900
