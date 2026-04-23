@@ -8,11 +8,18 @@
         "total_timesteps": 5000000,
         "eval_freq":       10000,
         "n_eval_episodes": 200,
-        "checkpoint_freq": 50000
+        "checkpoint_freq": 50000,
+        "n_envs":          20
     },
     "opponents": [
-        {"class": "president.players.PlayerHolder.PlayerHolder", "name": "Holder_1"},
-        {"class": "president.players.PlayerHolder.PlayerHolder", "name": "Holder_2"},
-        {"class": "president.players.PlayerHolder.PlayerHolder", "name": "Holder_3"}
+        {"class": "president.players.PlayerNaive.PlayerNaive",   "name": "Naive"},
+        {"class": "president.players.PlayerSimple.PlayerSimple", "name": "Simple"},
+        {"class": "president.players.PlayerHolder.PlayerHolder", "name": "Holder"}
+    ],
+    "opponent_pool": [
+        {"class": "president.players.PlayerSplitter.PlayerSplitter", "name": "Splitter"},
+        {"class": "president.players.PlayerNetwork.PlayerNetwork",   "name": "Clone_v1", "model": "splitter_clone_v1"},
+        {"class": "president.players.PlayerNetwork.PlayerNetwork",   "name": "Clone_v2", "model": "splitter_clone_v2"},
+        {"class": "president.players.PlayerNetwork.PlayerNetwork",   "name": "RL_v2",    "model": "splitter_rl_v2"}
     ]
 }
