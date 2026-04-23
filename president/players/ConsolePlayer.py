@@ -6,6 +6,8 @@ ConsolePlayer is a human-controlled player with console input/output.
 The play() function presents possible melds and waits for user input.
 Typing 'q' at any prompt saves a checkpoint and exits cleanly.
 """
+from __future__ import annotations
+
 import logging
 import sys
 
