@@ -1,0 +1,96 @@
+from flask_socketio import join_room
+
+from president.app.game_event_handler import cards_to_list
+from president.app.game_keeper import GamesKeeper
+from president.app.session_manager import user_socket_map
+from president.players.AsyncPlayer import AsyncPlayer
+
+
+def add_human_player(user_id, game_id):
+    player = AsyncPlayer(user_id)
+    for sid in user_socket_map[user_id]:
+        join_room(game_id, sid)
+    GamesKeeper().add_player(game_id, player)
+    print(f"User {user_id} joined game {game_id}")
+
+
+def find_valid_game(user_id, game_id=None):
+    games = GamesKeeper().get_games()
+
+    if not game_id or game_id not in games:
+        game_id = next(
+            (gid for gid, gm in games.items() if user_id in GamesKeeper().get_player_names(gid)),
+            None
+        )
+
+    if not game_id or game_id not in games:
+        return None
+
+    return game_id
+
+
+def get_game_state(game_id):
+    gm = GamesKeeper().get_game(game_id)
+    player_names = GamesKeeper().get_player_names(game_id)
+    player_status = [gm.get_player_status(player) if player else "Absent" for player in gm.players]
+
+    if gm.episode:
+        player_positions = [player.name if player else -1 for player in gm.episode.positions]
+    else:
+        player_positions = [-1] * 4
+
+    player_cards = [player._hand if player else [] for player in gm.players]
+    player_status = [status if isinstance(status, str) else cards_to_list(status.cards) for status in player_status]
+
+    return {
+        "game_id": game_id,
+        "player_names": player_names,
+        "player_status": player_status,
+        "player_positions": player_positions,
+        "player_hands": player_cards,
+        "owner": gm.players[0].name,
+    }
+
+
+def get_state_for_user(user_id, game_id=None):
+    """Return game state from the perspective of the given user."""
+    if not user_id:
+        return None
+
+    game_id = find_valid_game(user_id, game_id)
+    if not game_id:
+        return None
+
+    game_state = get_game_state(game_id)
+
+    if user_id not in game_state["player_names"]:
+        raise KeyError
+
+    player_index = game_state["player_names"].index(user_id)
+
+    player_names = game_state["player_names"][player_index:] + game_state["player_names"][:player_index]
+    player_status = game_state["player_status"][player_index:] + game_state["player_status"][:player_index]
+    player_positions = game_state["player_positions"]
+
+    opponent_cards = []
+    for i in range(1, 4):
+        opponent_index = (i + player_index) % 4
+        opponent_cards.append(len(game_state["player_hands"][opponent_index]))
+
+    player = GamesKeeper().get_game(game_id).players[player_index]
+    playable_indices = [c.cards[-1].get_index() for c in player.possible_plays(player.target_meld)[:-1]]
+
+    playable_cards = []
+    for card in game_state["player_hands"][player_index]:
+        playable = card.get_index() in playable_indices
+        playable_cards.append([card.get_value(), card.suit_str(), playable])
+
+    return {
+        "game_id": game_id,
+        "player_names": player_names,
+        "player_status": player_status,
+        "player_positions": player_positions,
+        "player_hand": playable_cards,
+        "opponent_cards": opponent_cards,
+        "is_owner": (game_state["owner"] == user_id),
+    }
