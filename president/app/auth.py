@@ -1,13 +1,19 @@
 import uuid
 
 import bcrypt
-from flask import flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from president.app.db import GAME_DB, PLAYER_DB, load_data, save_data
-from president.app.extensions import app, socketio
+from president.app.extensions import socketio
 from president.app.session_manager import socket_user_map, user_socket_map
 
+# Blueprint objects are created here, in the module that owns the routes. The 'auth'
+# string is the blueprint's internal name — Flask uses it as a prefix for url_for()
+# lookups, so url_for('auth.home') resolves to this module's home() view. __name__
+# tells Flask where to find templates and static files relative to this module.
+auth_bp = Blueprint('auth', __name__)
 
-@app.route("/", methods=["GET", "POST"])
+
+@auth_bp.route("/", methods=["GET", "POST"])
 def home():
     players = load_data(PLAYER_DB)
     games = load_data(GAME_DB)
@@ -16,7 +22,7 @@ def home():
     if username:
         for game_id, game in games.items():
             if username in game["players"]:
-                return redirect(url_for("playfield", game_id=game_id, player_id=username))
+                return redirect(url_for("game_routes.show_game", game_id=game_id))
 
     if request.method == "POST":
         username = request.form["username"]
@@ -29,34 +35,36 @@ def home():
 
             for game_id, game in games.items():
                 if username in game["players"]:
-                    return redirect(url_for("playfield", game_id=game_id, player_id=username))
+                    return redirect(url_for("game_routes.show_game", game_id=game_id))
 
-            return redirect(url_for("home"))
+            return redirect(url_for("auth.home"))
         return render_template("home.html", games=games, login_error="Invalid credentials")
 
     return render_template("home.html", games=games, username=username)
 
 
-@app.route("/register", methods=["POST"])
+@auth_bp.route("/register", methods=["POST"])
 def register():
-    players = load_data(PLAYER_DB)
-    username = request.form["username"]
-    password = request.form["password"]
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
 
+    players = load_data(PLAYER_DB)
     if username in players:
-        return render_template("home.html", register_error="Username already taken")
+        return jsonify({"success": False, "error": "Username already taken"})
 
     hashed_password = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     players[username] = {"password": hashed_password, "wins": 0, "losses": 0}
     save_data(PLAYER_DB, players)
 
     session["user"] = username
+    session["logged_in"] = True
     session["login_time"] = uuid.uuid4().hex
 
-    return redirect(url_for("home"))
+    return jsonify({"success": True})
 
 
-@app.route('/login', methods=['POST'])
+@auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     username, password = data.get('username'), data.get('password')
@@ -70,7 +78,7 @@ def login():
     return jsonify({"success": False, "error": "Invalid credentials"})
 
 
-@app.route("/logout", methods=['POST'])
+@auth_bp.route("/logout", methods=['POST'])
 def logout(data=None):
     username = session.get("user")
 
@@ -88,10 +96,10 @@ def logout(data=None):
         del user_socket_map[username]
 
     session.clear()
-    return redirect(url_for("home"))
+    return redirect(url_for("auth.home"))
 
 
-@app.route('/get_user_info')
+@auth_bp.route('/get_user_info')
 def get_user_info():
     if 'logged_in' in session and session['logged_in']:
         info = {"logged_in": True, "username": session.get('user')}

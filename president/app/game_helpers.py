@@ -32,15 +32,18 @@ def find_valid_game(user_id, game_id=None):
 def get_game_state(game_id):
     gm = GamesKeeper().get_game(game_id)
     player_names = GamesKeeper().get_player_names(game_id)
-    player_status = [gm.get_player_status(player) if player else "Absent" for player in gm.players]
+    players = gm.player_manager.players
 
     if gm.episode:
-        player_positions = [player.name if player else -1 for player in gm.episode.positions]
+        player_positions = [player.name if player else -1 for player in gm.positions]
+        raw_status = [gm.episode.current_melds[i] if player else "Absent"
+                      for i, player in enumerate(players)]
     else:
         player_positions = [-1] * 4
+        raw_status = ["Waiting" if player else "Absent" for player in players]
 
-    player_cards = [player._hand if player else [] for player in gm.players]
-    player_status = [status if isinstance(status, str) else cards_to_list(status.cards) for status in player_status]
+    player_cards = [player._hand if player else [] for player in players]
+    player_status = [s if isinstance(s, str) else cards_to_list(s.cards) for s in raw_status]
 
     return {
         "game_id": game_id,
@@ -48,7 +51,7 @@ def get_game_state(game_id):
         "player_status": player_status,
         "player_positions": player_positions,
         "player_hands": player_cards,
-        "owner": gm.players[0].name,
+        "owner": players[0].name,
     }
 
 
@@ -77,7 +80,7 @@ def get_state_for_user(user_id, game_id=None):
         opponent_index = (i + player_index) % 4
         opponent_cards.append(len(game_state["player_hands"][opponent_index]))
 
-    player = GamesKeeper().get_game(game_id).players[player_index]
+    player = GamesKeeper().get_game(game_id).player_manager.players[player_index]
     playable_indices = [c.cards[-1].get_index() for c in player.possible_plays(player.target_meld)[:-1]]
 
     playable_cards = []

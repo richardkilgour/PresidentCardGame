@@ -127,7 +127,7 @@ def handle_play_card(data):
             value, suit = card.split('_')
             meld = Meld(PlayingCard(int(value) * 4 + int(suit)), meld)
 
-    for p in game.players:
+    for p in game.player_manager.players:
         if p.name == user_id:
             p.add_play(meld)
     game.episode.step()
