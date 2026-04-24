@@ -82,14 +82,19 @@
             </div>
         </div>
 
-        <div class="left_over">Left Over</div>
+        <div class="left_over" id="stats-panel" style="overflow-y:auto; padding:8px; font-size:0.85em;"></div>
 
         <!-- Bottom: Current Player -->
         <div class="playfield_bottom" id="playfield_bottom">
             <h1 id="player_id"></h1>
             <div class="player_you">
-                <div class="hand_play_area">
+                <div class="hand_play_area" style="position: relative;">
                     <div id="player-hand"></div>
+                    <div id="compulsory-pass-overlay"
+                         onclick="playCards('PASSED')"
+                         style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.5); z-index:10; cursor:pointer; align-items:center; justify-content:center; border-radius:8px;">
+                        <span style="color:white; font-size:2em; font-weight:bold; text-shadow:0 2px 4px rgba(0,0,0,0.8);">Pass</span>
+                    </div>
                 </div>
                 <button onclick="playCards('PASSED')">Pass</button>
             </div>

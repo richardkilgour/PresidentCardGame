@@ -27,7 +27,7 @@ class GameEventHandler(CardGameListener):
     def notify_game_stated(self):
         """Notify all players that the game has started."""
         print(f"notify_game_started for game {self.game_id}")
-        self.socketio.emit('notify_game_stated', {
+        self.socketio.emit('notify_game_started', {
             'game_id': self.game_id
         }, room=self.game_id)
 
@@ -73,12 +73,13 @@ class GameEventHandler(CardGameListener):
             "game_id": self.game_id
         }, room=self.game_id)
 
-    def notify_cards_swapped(self, player_good, player_bad, num_cards):
+    def notify_cards_swapped(self, player_good, player_bad, num_cards, cards_to_good=None, cards_to_bad=None):
         """Notify all players that cards have been swapped between players."""
         print(f"notify_cards_swapped: {num_cards} cards from {player_bad} to {player_good} in game {self.game_id}")
         self.socketio.emit('notify_cards_swapped', {
             "player_good": player_good.name,
             "player_bad": player_bad.name,
-            "num_cards": num_cards,
+            "cards_to_good": cards_to_list(cards_to_good or []),
+            "cards_to_bad": cards_to_list(cards_to_bad or []),
             "game_id": self.game_id
         }, room=self.game_id)

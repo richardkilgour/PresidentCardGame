@@ -18,20 +18,22 @@ from president.core.Meld import Meld
 class PlayValidator:
 
     @staticmethod
-    def validate(player, action, current_target) -> None:
+    def validate(player, action, current_target, must_include_index=None) -> None:
         """
         Validate a play. Raises IllegalPlayError if invalid.
 
         Args:
-            player:         The player who made the play.
-            action:         The value returned by player.play().
-            current_target: The current highest meld, or None if no meld yet.
+            player:              The player who made the play.
+            action:              The value returned by player.play().
+            current_target:      The current highest meld, or None if no meld yet.
+            must_include_index:  Card index that must appear in the meld, or None.
         """
         PlayValidator._check_type(player, action)
         PlayValidator._check_must_play(player, action, current_target)
         PlayValidator._check_cards_in_hand(player, action)
         PlayValidator._check_consistent_value(player, action)
         PlayValidator._check_beats_target(player, action, current_target)
+        PlayValidator._check_must_include(player, action, must_include_index)
 
     @staticmethod
     def _check_must_play(player, action, current_target):
@@ -78,6 +80,16 @@ class PlayValidator:
             )
 
     @staticmethod
+    def _check_must_include(player, action, must_include_index) -> None:
+        if must_include_index is None or not action.cards:
+            return
+        if must_include_index not in [c.get_index() for c in action.cards]:
+            raise IllegalPlayError(
+                player, action,
+                f"Opening play must include the card at index {must_include_index}"
+            )
+
+    @staticmethod
     def _check_beats_target(player, action, current_target) -> None:
         if not action.cards:
             return  # pass is validated by _check_must_play
@@ -92,15 +104,20 @@ class PlayValidator:
     # ─────────────────────────────────────────────
 
     @staticmethod
-    def possible_plays(hand: list, target) -> list:
+    def possible_plays(hand: list, target, must_include_index=None) -> list:
         """Return all legal melds for the given hand and target.
 
         Args:
-            hand:   The player's current hand (list of PlayingCard).
-            target: The current highest meld, or None if leading.
+            hand:                The player's current hand (list of PlayingCard).
+            target:              The current highest meld, or None if leading.
+            must_include_index:  Card index that must appear in the meld, or None.
         """
         candidates = PlayValidator._generate_candidates(hand)
-        return [m for m in candidates if PlayValidator._is_legal(m, target)]
+        plays = [m for m in candidates if PlayValidator._is_legal(m, target)]
+        if must_include_index is not None:
+            plays = [m for m in plays
+                     if m.cards and must_include_index in [c.get_index() for c in m.cards]]
+        return plays
 
     @staticmethod
     def _generate_candidates(hand: list) -> list:

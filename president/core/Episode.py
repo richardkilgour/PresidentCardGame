@@ -58,6 +58,9 @@ class Episode:
         self.deck = deck
         self.listener_list = listener_list
         self.card_handler = card_handler
+        # On the very first episode the leader must open with the 3♠ (index 0).
+        # Cleared once the opening play is accepted.
+        self.open_card_index: int | None = 0 if not starting_ranks else None
 
     def notify_listeners(self, notify_func_name: str, *args) -> None:
         for p in self.listener_list:
@@ -79,15 +82,17 @@ class Episode:
     def swap_cards(self) -> None:
         """Swap cards between players based on their previous episode rankings."""
         n = len(self.starting_ranks)
-        self.card_handler.swap_for_new_episode(self.starting_ranks)
-        # Notify listeners for each symmetric swap pair: rank 0 swaps with rank n-1,
-        # rank 1 swaps with rank n-2, etc. Only notify for the upper half to avoid
-        # duplicate notifications.
+        result = self.card_handler.swap_for_new_episode(self.starting_ranks)
+        # result is ((best_2, worst_2), (best_1, worst_1)) for a 4-player game,
+        # where best_N came from the low-ranked player and worst_N from the high-ranked.
+        swap_details = list(result) if result else []
         for i in range(n // 2):
             j = n - 1 - i
             num_cards = (n // 2) - i
+            cards_to_good, cards_to_bad = swap_details[i] if i < len(swap_details) else ([], [])
             self.notify_listeners("notify_cards_swapped",
-                                  self.starting_ranks[i], self.starting_ranks[j], num_cards)
+                                  self.starting_ranks[i], self.starting_ranks[j], num_cards,
+                                  cards_to_good, cards_to_bad)
 
     def move_to_front(self, front_player: AbstractPlayer) -> None:
         """Rotate the players deque until the specified player is at the front."""
@@ -216,22 +221,30 @@ class Episode:
             self.active_players.remove(player)
             return
 
+        if current_target is None:
+            valid_plays = PlayValidator.possible_plays(player._hand, None, self.open_card_index)
+            assert valid_plays, (
+                f"{player.name} must lead but has no valid plays "
+                f"(hand: {player._hand}, open_card_index: {self.open_card_index})"
+            )
+
         self.notify_listeners("notify_player_turn", player)
 
         action = player.play()
         if action == '␆':  # no-op, async player not ready yet
             return
 
-        PlayValidator.validate(player, action, current_target)
+        PlayValidator.validate(player, action, current_target, self.open_card_index)
+        self.open_card_index = None
 
+        index = self.player_manager.players.index(player)
+        self.current_melds[index] = action
         if not action.cards:
             self.notify_listeners("notify_pass", player)
             self.active_players.remove(player)
         else:
             self.notify_listeners("notify_play", player, action)
             self.card_handler.play_meld(player, action)
-            index = self.player_manager.players.index(player)
-            self.current_melds[index] = action
             if player.report_remaining_cards() == 0:
                 self.set_player_finished(player)
                 # Player removed from active_players by set_player_finished;
@@ -326,8 +339,9 @@ class Episode:
                 assert len(self.active_players) <= 1, \
                     "Expected at most one active player in HAND_WON state."
                 next_leader = self._next_leader(self._round_winner())
-                self.notify_listeners("notify_hand_won", next_leader)
                 self.move_to_front(next_leader)
+                self.current_melds = ['␆'] * self.player_manager.player_count
+                self.notify_listeners("notify_hand_won", next_leader)
                 self.state = State.ROUND_STARTING
 
         return self.ranks

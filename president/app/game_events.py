@@ -8,9 +8,6 @@ from president.app.game_helpers import add_human_player, find_valid_game, get_st
 from president.app.game_keeper import GamesKeeper
 from president.app.game_wrapper import GameWrapper
 from president.app.session_manager import emit_to_user
-from president.core.Episode import State
-from president.core.Meld import Meld
-from president.core.PlayingCard import PlayingCard
 from president.players.PlayerHolder import PlayerHolder
 from president.players.PlayerSimple import PlayerSimple
 from president.players.PlayerSplitter import PlayerSplitter
@@ -89,7 +86,7 @@ def start_game(data=None):
         return {'error': 'Game not found'}
 
     game = GamesKeeper().get_game(game_id)
-    if not game.episode or game.episode.state == State.INITIALISED:
+    if game.can_start():
         game.start()
 
 
@@ -114,20 +111,6 @@ def handle_play_card(data):
         return {'error': 'Game not found'}
 
     game = GamesKeeper().get_game(game_id)
-    if not game.episode:
-        return {'error': 'Game not started'}
-    if not game.episode.active_players:
-        return {'error': 'Round not started'}
-    if game.episode.active_players[0].name != user_id:
-        return {'error': 'Not your turn'}
-
-    meld = Meld()
-    if data['cards'] != 'PASSED':
-        for card in data['cards']:
-            value, suit = card.split('_')
-            meld = Meld(PlayingCard(int(value) * 4 + int(suit)), meld)
-
-    for p in game.player_manager.players:
-        if p.name == user_id:
-            p.add_play(meld)
-    game.episode.step()
+    error = game.play(user_id, data['cards'])
+    if error:
+        return {'error': error}

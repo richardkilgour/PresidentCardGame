@@ -45,7 +45,7 @@ class CardGameListener:
     def notify_player_turn(self, player):
         pass
 
-    def notify_cards_swapped(self, player_good, player_bad, num_cards):
+    def notify_cards_swapped(self, player_good, player_bad, num_cards, cards_to_good=None, cards_to_bad=None):
         # Notify that one player swapped cards with another.
         # player_good got good card(s) from player_bad and vice versa.
         # PlayHistory infers starting positions (President/VP/Citizen/Scumbag) from these calls.

@@ -27,10 +27,16 @@ class AbstractPlayer(CardGameListener):
         self.target_meld = None
         self.position_count = [0, 0, 0, 0]
         self.last_played = None
+        self.consecutive_president = 0
+        self.max_consecutive_president = 0
 
     def set_position(self, pos):
-        # Remember the new position for statistical porpoises
         self.position_count[pos] += 1
+        if pos == 0:
+            self.consecutive_president += 1
+            self.max_consecutive_president = max(self.max_consecutive_president, self.consecutive_president)
+        else:
+            self.consecutive_president = 0
 
     def get_score(self):
         return 2 * self.position_count[0] + \
@@ -49,6 +55,7 @@ class AbstractPlayer(CardGameListener):
     def notify_hand_start(self):
         super().notify_hand_start()
         self._starting_hand = list(self._hand)
+        self.target_meld = None
 
     def notify_hand_won(self, winner):
         # Someone just won the hand
@@ -70,17 +77,18 @@ class AbstractPlayer(CardGameListener):
         """
         pass
 
-    def possible_plays(self, target=None):
+    def possible_plays(self, target=None, must_include_index=None):
         """
         Returns all valid melds that may be played given the current target meld.
         Pass is included only when not leading.
 
         Args:
-            target: The meld to beat. Defaults to self.target_meld if not provided.
+            target:              The meld to beat. Defaults to self.target_meld if not provided.
+            must_include_index:  Card index that must appear in the meld, or None.
         """
         if target is None:
             target = self.target_meld
-        possible_melds = PlayValidator.possible_plays(self._hand, target)
+        possible_melds = PlayValidator.possible_plays(self._hand, target, must_include_index)
 
         card_string = f"{self.name} has:"
         for s in self._hand:
