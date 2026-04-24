@@ -237,6 +237,12 @@ const CardGame = {
     setPlayedCard: function(playerId, cardIds) {
         const arenaDivId = this.findArena(playerId);
         const arenaDiv = document.getElementById(arenaDivId);
+
+        // Skip re-render (and re-animation) if the same cards are already showing
+        const cardKey = JSON.stringify(cardIds);
+        if (arenaDiv.dataset.cardKey === cardKey) return;
+        arenaDiv.dataset.cardKey = cardKey;
+
         arenaDiv.innerHTML = '';
 
         if (!cardIds || cardIds.length === 0) {
@@ -245,11 +251,6 @@ const CardGame = {
             arenaDiv.appendChild(passedElement);
             return;
         }
-
-        // Skip re-render (and re-animation) if the same cards are already showing
-        const cardKey = JSON.stringify(cardIds);
-        if (arenaDiv.dataset.cardKey === cardKey) return;
-        arenaDiv.dataset.cardKey = cardKey;
 
         const isMyArena = arenaDivId === 'arena_bottom';
         // Consume saved rects only for this play, then clear
