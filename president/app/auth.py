@@ -1,28 +1,32 @@
 import uuid
 
 import bcrypt
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
-from president.app.db import GAME_DB, PLAYER_DB, load_data, save_data
+from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from president.app.db import PLAYER_DB, load_data, save_data
 from president.app.extensions import socketio
+from president.app.game_keeper import GamesKeeper
 from president.app.session_manager import socket_user_map, user_socket_map
 
-# Blueprint objects are created here, in the module that owns the routes. The 'auth'
-# string is the blueprint's internal name — Flask uses it as a prefix for url_for()
-# lookups, so url_for('auth.home') resolves to this module's home() view. __name__
-# tells Flask where to find templates and static files relative to this module.
 auth_bp = Blueprint('auth', __name__)
+
+
+def _active_game_for(username: str) -> str | None:
+    """Return the game_id the user should be redirected to, or None."""
+    game_ids = GamesKeeper().find_player(username)
+    if game_ids:
+        return game_ids[0]
+    return GamesKeeper().find_reserved_game(username)
 
 
 @auth_bp.route("/", methods=["GET", "POST"])
 def home():
     players = load_data(PLAYER_DB)
-    games = load_data(GAME_DB)
     username = session.get("user")
 
     if username:
-        for game_id, game in games.items():
-            if username in game["players"]:
-                return redirect(url_for("game_routes.show_game", game_id=game_id))
+        active_game = _active_game_for(username)
+        if active_game:
+            return redirect(url_for("game_routes.show_game", game_id=active_game))
 
     if request.method == "POST":
         username = request.form["username"]
@@ -33,14 +37,14 @@ def home():
             session["logged_in"] = True
             session["login_time"] = uuid.uuid4().hex
 
-            for game_id, game in games.items():
-                if username in game["players"]:
-                    return redirect(url_for("game_routes.show_game", game_id=game_id))
+            active_game = _active_game_for(username)
+            if active_game:
+                return redirect(url_for("game_routes.show_game", game_id=active_game))
 
             return redirect(url_for("auth.home"))
-        return render_template("home.html", games=games, login_error="Invalid credentials")
+        return render_template("home.html", login_error="Invalid credentials")
 
-    return render_template("home.html", games=games, username=username)
+    return render_template("home.html", username=username)
 
 
 @auth_bp.route("/register", methods=["POST"])

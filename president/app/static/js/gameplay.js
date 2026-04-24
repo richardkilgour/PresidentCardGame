@@ -51,7 +51,6 @@ const CardGame = {
             const rankSymbols = ["👑", "🥈", "🥉", "💩"];
 
             if (data.pos == 0) {
-                // Clear existing ranks from all player elements
                 document.querySelectorAll("[data-rank]").forEach(el => {
                     el.removeAttribute("data-rank");
                 });
@@ -81,21 +80,95 @@ const CardGame = {
         });
         this.socket.on('notify_player_turn', (data) => this.highlightCurrentPlayerTurn(data));
         this.socket.on('card_played', (data) => {
-            // Just request the new state - setPlayedCard will be called by the game state receiver
             this.socket.emit("request_game_state");
+        });
+
+        // Disconnection / replacement events
+        this.socket.on('player_disconnected', (data) => this.handlePlayerDisconnected(data.username));
+        this.socket.on('replace_available', (data) => this.showReplaceButton(data.username));
+        this.socket.on('player_replaced', (data) => {
+            this.clearDisconnectedState(data.username);
+            this.socket.emit("request_game_state");
+        });
+        this.socket.on('player_quit', (data) => {
+            this.clearDisconnectedState(data.username);
+            this.socket.emit("request_game_state");
+        });
+        this.socket.on('quit_confirmed', () => {
+            window.location.href = '/';
         });
     },
 
+    // -------------------------------------------------------------------------
+    // Disconnect / replace UI
+    // -------------------------------------------------------------------------
+
+    _playerPanels: function() {
+        return [
+            { nameId: 'player_id',       playfieldId: 'playfield_bottom' },
+            { nameId: 'opponent-1-name', playfieldId: 'playfield_left'   },
+            { nameId: 'opponent-2-name', playfieldId: 'playfield_center' },
+            { nameId: 'opponent-3-name', playfieldId: 'playfield_right'  },
+        ];
+    },
+
+    handlePlayerDisconnected: function(username) {
+        for (const { nameId, playfieldId } of this._playerPanels()) {
+            const nameEl = document.getElementById(nameId);
+            if (nameEl && nameEl.textContent.trim() === username) {
+                const pf = document.getElementById(playfieldId);
+                if (pf) pf.style.opacity = '0.4';
+                break;
+            }
+        }
+    },
+
+    showReplaceButton: function(username) {
+        const existing = document.getElementById('replace-btn');
+        if (existing) existing.remove();
+
+        const btn = document.createElement('button');
+        btn.id = 'replace-btn';
+        btn.dataset.username = username;
+        btn.textContent = `Replace ${username} with AI`;
+        btn.style.cssText = [
+            'position:fixed', 'bottom:24px', 'left:50%',
+            'transform:translateX(-50%)', 'padding:10px 24px',
+            'font-size:1em', 'z-index:200', 'background:#c44',
+            'color:#fff', 'border:none', 'border-radius:6px', 'cursor:pointer',
+        ].join(';');
+        btn.addEventListener('click', () => {
+            this.socket.emit('replace_with_ai', { username });
+            btn.remove();
+        });
+        document.body.appendChild(btn);
+    },
+
+    clearDisconnectedState: function(username) {
+        const btn = document.getElementById('replace-btn');
+        if (btn && btn.dataset.username === username) btn.remove();
+
+        for (const { nameId, playfieldId } of this._playerPanels()) {
+            const nameEl = document.getElementById(nameId);
+            if (nameEl && nameEl.textContent.trim() === username) {
+                const pf = document.getElementById(playfieldId);
+                if (pf) pf.style.opacity = '';
+                break;
+            }
+        }
+    },
+
+    // -------------------------------------------------------------------------
+    // Game controls
+    // -------------------------------------------------------------------------
 
     enableStartButton: function() {
         console.log("Enable start button");
         let startGameButton = document.getElementById("start_game_button");
         startGameButton.disabled = false;
 
-        // Add class to trigger animation
         startGameButton.classList.add("fill");
 
-        // Auto-click after 5 seconds — store so disableStartButton can cancel it
         this.startButtonTimeout = setTimeout(() => {
             startGameButton.click();
         }, 5000);
@@ -106,10 +179,8 @@ const CardGame = {
         let startGameButton = document.getElementById("start_game_button");
         startGameButton.disabled = true;
 
-        // Remove the animation class if it was added
         startGameButton.classList.remove("fill");
 
-        // Clear any pending auto-click timeout
         if (this.startButtonTimeout) {
             clearTimeout(this.startButtonTimeout);
             this.startButtonTimeout = null;
@@ -120,24 +191,19 @@ const CardGame = {
     handleGameState: function(data) {
         console.log("Received full game state:", data);
 
-        // Count how many opponents have joined (ignoring null slots)
         let playerCount = data.player_names.filter(opponent => opponent !== null).length;
 
-
-        // Enable "Start Game" button if 3 opponents have joined
         let startGameButton = document.getElementById("start_game_button");
         if (playerCount >= 4 && startGameButton.disabled) {
             this.enableStartButton();
         }
 
-        // Update opponent slots dynamically
         this.playerNames = data.player_names;
         for (var i = 0; i < 3; i += 1) {
             this.updateOpponentSlot(i + 1, data.player_names[i+1], data.opponent_cards[i],
                                   data.is_owner, data.player_names);
         }
 
-        // Update player's hand
         this.updatePlayerHand(data.player_hand);
         this.updateStats(data.stats);
         const mustPass = data.is_my_turn
@@ -145,7 +211,6 @@ const CardGame = {
             && !data.player_hand.some(c => c[2]);
         const overlay = document.getElementById('compulsory-pass-overlay');
         overlay.style.display = mustPass ? 'flex' : 'none';
-        // Update player's name
         document.getElementById("player_id").innerHTML = data.player_names[0]
 
         const position_names = [
@@ -157,7 +222,6 @@ const CardGame = {
 
         for (var i = 0; i < 4; i += 1) {
             if (typeof data.player_status[i] === "string") {
-                // The element for Absent players can't be found, so skip them
                 if (data.player_status[i] !== "Absent") {
                     let position_index = data.player_positions.indexOf(data.player_names[i])
                     if (position_index >= 0) {
@@ -168,7 +232,6 @@ const CardGame = {
                 }
             }
             else {
-                // Some cards have been played
                 this.setPlayedCard(data.player_names[i], data.player_status[i]);
             }
         }
@@ -176,7 +239,7 @@ const CardGame = {
 
     updatePlayerHand: function(cards) {
         const handContainer = document.getElementById("player-hand");
-        handContainer.innerHTML = ""; // Clear previous cards
+        handContainer.innerHTML = "";
         cards.forEach((card, i) => {
             let index = i - Math.floor(cards.length / 2);
             handContainer.appendChild(this.cardRenderer.renderCard(card[0], card[1], index, true, card[2]));
@@ -205,13 +268,11 @@ const CardGame = {
     },
 
     findArena: function(playerId) {
-        // Get the names from the HTML elements
         const opponent1Name = document.getElementById('opponent-1-name').textContent.trim();
         const opponent2Name = document.getElementById('opponent-2-name').textContent.trim();
         const opponent3Name = document.getElementById('opponent-3-name').textContent.trim();
         const playerName = document.getElementById('player_id').textContent.trim();
 
-        // Determine the corresponding arena div based on the player name
         if (playerId === opponent1Name) {
             return 'arena_left';
         } else if (playerId === opponent2Name) {
@@ -238,7 +299,6 @@ const CardGame = {
         const arenaDivId = this.findArena(playerId);
         const arenaDiv = document.getElementById(arenaDivId);
 
-        // Skip re-render (and re-animation) if the same cards are already showing
         const cardKey = JSON.stringify(cardIds);
         if (arenaDiv.dataset.cardKey === cardKey) return;
         arenaDiv.dataset.cardKey = cardKey;
@@ -253,11 +313,9 @@ const CardGame = {
         }
 
         const isMyArena = arenaDivId === 'arena_bottom';
-        // Consume saved rects only for this play, then clear
         const srcRects = isMyArena ? this.lastPlayedRects : null;
         if (isMyArena) this.lastPlayedRects = null;
 
-        // Average source position across all played cards (handles pairs/triples cleanly)
         let srcX = null, srcY = null;
         if (srcRects) {
             const valid = srcRects.filter(Boolean);
@@ -275,7 +333,6 @@ const CardGame = {
             const rotation = 7 * index;
 
             if (isMyArena) {
-                // FLIP technique: measure destination, animate from hand position
                 const dest = cardElement.getBoundingClientRect();
                 const dx = srcX != null ? srcX - (dest.left + dest.width  / 2) : 0;
                 const dy = srcY != null ? srcY - (dest.top  + dest.height / 2) : 180;
@@ -284,7 +341,6 @@ const CardGame = {
                     { transform: `rotate(${rotation}deg)`,                    opacity: '1'    }
                 ], { duration: 420, easing: 'cubic-bezier(0.2, 0, 0.1, 1)' });
             } else {
-                // Opponent card: flip from edge-on (face-down) to face-up
                 const inner = cardElement.querySelector('.card_small');
                 if (inner) {
                     inner.animate([
@@ -299,9 +355,7 @@ const CardGame = {
     showSwapModal: function({ iGave, iReceived, otherName }) {
         const renderCards = (cards) => {
             const wrap = document.createElement('div');
-            // card_hit_area uses position:absolute, so the container must be
-            // position:relative with explicit dimensions to anchor them correctly.
-            const cardWidth = 11; // em — left = (index+6)em, so 1 card needs ~11em
+            const cardWidth = 11;
             wrap.style.cssText = `position:relative; height:150px; width:${cards.length * 2 + cardWidth}em; margin:0 auto;`;
             cards.forEach(([value, suit], i) => {
                 const index = i - Math.floor(cards.length / 2);
@@ -381,7 +435,6 @@ const CardGame = {
 
     playCards: function(cards) {
         console.log("playCards: " + cards);
-        // Capture hand positions before the card leaves the DOM so we can animate from there
         this.lastPlayedRects = Array.isArray(cards)
             ? cards.map(id => { const el = document.getElementById(id); return el ? el.getBoundingClientRect() : null; })
             : null;
@@ -398,7 +451,6 @@ const CardGame = {
 
         if (!Array.isArray(existingPlayers)) existingPlayers = [];
 
-        // Collect names selected in the other visible dropdowns
         const otherSelected = [];
         for (let i = 1; i <= 3; i++) {
             if (i === slotIndex) continue;
@@ -418,7 +470,6 @@ const CardGame = {
             aiDropdown.appendChild(option);
         });
 
-        // Restore previous selection if still available
         if (savedValue && [...aiDropdown.options].some(o => o.value === savedValue)) {
             aiDropdown.value = savedValue;
         }
@@ -431,25 +482,21 @@ const CardGame = {
 
         if (playerName) {
             nameElement.textContent = playerName;
-            handElement.innerHTML = ""; // Clear existing cards
+            handElement.innerHTML = "";
 
-            // Add cards if player has joined
             for (let i = 0; i < cardCount; i++) {
                 let index = i - Math.floor(cardCount / 2);
                 handElement.appendChild(this.cardRenderer.renderCard(-1, "", index, false, false));
             }
 
-            // Hide AI selection (owner cannot add AI to an occupied slot)
             if (aiSelectElement) {
                 aiSelectElement.style.display = "none";
             }
         } else {
-            // Player has not joined
             nameElement.textContent = "Waiting for player to join...";
-            handElement.innerHTML = ""; // No cards shown
+            handElement.innerHTML = "";
             console.log("isOwner = " + isOwner);
             console.log("aiSelectElement = " + aiSelectElement);
-            // Show AI selection if the game owner is viewing
             if (isOwner && aiSelectElement) {
                 aiSelectElement.style.display = "block";
                 this.populateAIDropdown(index, existingPlayers);
@@ -471,10 +518,7 @@ const CardGame = {
         const aiDropdown = document.getElementById(`ai-opponent-${opponentIndex}`);
         const aiName = aiDropdown.value;
 
-        // Find the full entry in AI_OPPONENTS array
         const aiEntry = this.aiOpponents.find(entry => entry.startsWith(aiName));
-
-        // Extract difficulty from the parentheses (e.g., "Easy", "Medium", "Hard")
         const aiDifficulty = aiEntry.match(/\((.*?)\)/)[1];
 
         console.log(`Adding AI Player: ${aiName}, Difficulty: ${aiDifficulty}`);
@@ -485,7 +529,6 @@ const CardGame = {
     logOut: function() {
         console.log("Requesting logout");
         this.socket.emit('logout');
-        // Also make HTTP request to ensure session is cleared
         fetch('/logout', {method: 'POST'})
             .then(() => window.location.href = '/');
     },
@@ -495,7 +538,9 @@ const CardGame = {
     },
 
     leaveGame: function() {
-        this.socket.emit('leave_game');
+        if (confirm('Quit this game? You will be replaced by an AI player and cannot rejoin.')) {
+            this.socket.emit('quit_game');
+        }
     },
 
     readyToStart: function() {
@@ -508,7 +553,6 @@ const CardGame = {
 document.addEventListener("DOMContentLoaded", function() {
     CardGame.init();
 
-    // Expose functions needed by HTML event handlers
     window.playCards = (cards) => CardGame.playCards(cards);
     window.logOut = () => CardGame.logOut();
     window.leaveGame = () => CardGame.leaveGame();

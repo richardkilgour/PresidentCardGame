@@ -241,6 +241,31 @@ class GameMaster:
             self._force_pass(error.player)
             return False
 
+    def swap_player(self, old_player: AbstractPlayer,
+                    new_player: AbstractPlayer) -> int:
+        """
+        Replace one player with another mid-game, transferring hand and stats
+        and updating all internal references (player_manager, episode, listeners).
+
+        Returns:
+            The seat index of the replaced player.
+        """
+        seat = self.player_manager.players.index(old_player)
+        new_player._hand = old_player._hand[:]
+        new_player.position_count = old_player.position_count[:]
+        self.player_manager.players[seat] = new_player
+
+        if self.episode and old_player in self.episode.active_players:
+            i = self.episode.active_players.index(old_player)
+            self.episode.active_players[i] = new_player
+
+        if old_player in self.listener_list:
+            i = self.listener_list.index(old_player)
+            self.listener_list[i] = new_player
+
+        self.notify_listeners("notify_player_joined", new_player, seat)
+        return seat
+
     def _disqualify_player(self, player: AbstractPlayer) -> None:
         """
         Replace a disqualified player with the fallback type from the registry.

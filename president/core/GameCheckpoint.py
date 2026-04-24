@@ -168,13 +168,26 @@ class GameCheckpoint:
         Restore game state from a checkpoint file.
 
         Args:
-            path:         Path to the checkpoint JSON file.
-            game_master:  A freshly initialised GameMaster to restore into.
-            player_registry:     PlayerRegistry used to reconstruct player objects.
+            path:            Path to the checkpoint JSON file.
+            game_master:     A freshly initialised GameMaster to restore into.
+            player_registry: PlayerRegistry used to reconstruct player objects.
         """
         path = Path(path)
         state = json.loads(path.read_text())
+        GameCheckpoint.restore_from_dict(state, game_master, player_registry)
+        logging.info(f"Checkpoint restored from {path}")
 
+    @staticmethod
+    def restore_from_dict(state: dict, game_master: "GameMaster",
+                          player_registry: "PlayerRegistry") -> None:
+        """
+        Restore game state from an already-parsed dict.
+
+        Args:
+            state:           Checkpoint dict (as produced by _serialise).
+            game_master:     A freshly initialised GameMaster to restore into.
+            player_registry: PlayerRegistry used to reconstruct player objects.
+        """
         GameCheckpoint._check_version(state)
 
         gm = game_master
@@ -231,7 +244,7 @@ class GameCheckpoint:
                     f"Discard checksum mismatch: expected {expected}, got {actual}"
                 )
 
-        logging.info(f"Checkpoint restored from {path}")
+        logging.info("Checkpoint restored from dict")
 
     @staticmethod
     def _check_version(state: dict) -> None:

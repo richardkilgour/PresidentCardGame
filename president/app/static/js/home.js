@@ -165,6 +165,11 @@ class GameListController {
       console.log("Joined game: " + data.game_id);
       window.location.href = "/game/" + data.game_id;
     });
+
+    // Server tells us we have an active game to return to (reconnect after drop)
+    this.socketService.on('rejoin_game', (data) => {
+      window.location.href = "/game/" + data.game_id;
+    });
   }
 
   setupNewGameButton() {

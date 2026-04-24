@@ -2,7 +2,7 @@ import bcrypt
 from flask import request, session
 from flask_socketio import join_room
 
-from president.app.db import GAME_DB, PLAYER_DB, load_data
+from president.app.db import PLAYER_DB, load_data
 from president.app.extensions import socketio
 from president.app.game_keeper import GamesKeeper
 from president.app.session_manager import socket_user_map, user_socket_map
@@ -22,9 +22,22 @@ def handle_connect(data=None):
         socketio.emit('connection_status', {'status': 'connected', 'username': username})
         print(f"User {username} connected with socket ID: {sid}")
 
-        for game_id in GamesKeeper().find_player(username):
-            for s in user_socket_map[username]:
-                join_room(game_id, s)
+        # If this user has a reserved slot, restore them and send them back to the game.
+        reserved_game_id = GamesKeeper().find_reserved_game(username)
+        if reserved_game_id:
+            from president.app.game_persistence import save_game
+            game = GamesKeeper().get_game(reserved_game_id)
+            game.restore_human_player(username)
+            game.clear_disconnect(username)
+            join_room(reserved_game_id, sid)
+            socketio.emit('rejoin_game', {'game_id': reserved_game_id}, to=sid)
+            save_game(reserved_game_id)
+        else:
+            # Re-join game rooms and cancel any pending disconnect timeout.
+            for game_id in GamesKeeper().find_player(username):
+                join_room(game_id, sid)
+                game = GamesKeeper().get_game(game_id)
+                game.clear_disconnect(username)
     else:
         socketio.emit('connection_status', {'status': 'anonymous'})
         print(f"Anonymous socket connection: {sid}")
@@ -40,11 +53,28 @@ def handle_disconnect(data=None):
             user_socket_map[username].discard(sid)
             if not user_socket_map[username]:
                 del user_socket_map[username]
+                _handle_player_fully_disconnected(username)
 
         del socket_user_map[sid]
         print(f"User {username} disconnected socket {sid}")
     else:
         print(f"Anonymous socket disconnected: {sid}")
+
+
+def _handle_player_fully_disconnected(username: str) -> None:
+    """Called when the last socket for a user closes."""
+    from president.app.game_persistence import save_game
+
+    for game_id in GamesKeeper().find_player(username):
+        game = GamesKeeper().get_game(game_id)
+        save_game(game_id)
+
+        other_humans_connected = any(
+            p.name != username and p.name in user_socket_map
+            for _, p in game.human_players()
+        )
+        game.record_disconnect(username, other_humans_connected)
+        socketio.emit('player_disconnected', {'username': username}, room=game_id)
 
 
 @socketio.on('authenticate')
@@ -67,11 +97,12 @@ def handle_socket_authentication(data):
         socketio.emit('auth_response', {'success': True, 'username': username})
         print(f"Socket authentication successful for {username}")
 
-        games = load_data(GAME_DB)
-        for game_id, game in games.items():
-            if username in game["players"]:
-                socketio.emit('active_game', {'game_id': game_id})
-                break
+        # Redirect to active game if one exists
+        game_ids = GamesKeeper().find_player(username)
+        reserved_game = GamesKeeper().find_reserved_game(username)
+        active_game = (game_ids[0] if game_ids else None) or reserved_game
+        if active_game:
+            socketio.emit('active_game', {'game_id': active_game})
     else:
         socketio.emit('auth_response', {'success': False, 'error': 'Invalid credentials'})
         print(f"Socket authentication failed for {username}")

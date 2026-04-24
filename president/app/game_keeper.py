@@ -43,3 +43,10 @@ class GamesKeeper:
         if game_id in self._games:
             return [player.name if player else None for player in self._games[game_id].player_manager.players]
         return []
+
+    def find_reserved_game(self, user_id: str) -> str | None:
+        """Return the game_id where this user has a reserved (AI-held) slot."""
+        for gid, game in self._games.items():
+            if user_id in game.reserved_slots.values():
+                return gid
+        return None
