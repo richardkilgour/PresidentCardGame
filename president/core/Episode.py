@@ -208,10 +208,13 @@ class Episode:
         logger.info(f"Players who have not passed = {' '.join(x.name for x in self.active_players)}")
 
         if len(self.active_players) == 1:
-            # Only the scumbag remains. They keep their cards — finalization
-            # (rank assignment, card collection) happens in post_episode_checks.
-            self.active_players.clear()
-            return
+            round_winner = self._round_winner()
+            if round_winner is None or round_winner == self.active_players[0]:
+                # Either no card has been played (scumbag case), or the last remaining
+                # player already holds the highest meld — everyone else passed/finished.
+                self.active_players.clear()
+                return
+            # A now-finished player holds the target meld; remaining player still needs a turn.
 
         current_target = self.target_meld()
         logger.info(f'Currently played highest card = {current_target}')
