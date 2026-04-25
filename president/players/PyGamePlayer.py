@@ -50,11 +50,8 @@ class PyGamePlayer(PlayerSimple):
 
     def get_meld(self, card):
         """Return a meld if the card can be turned into a valid meld, otherwise None"""
-        # Last option is Pass, so ignore it
-        selection = self.possible_plays()[:-1]
-        for s in selection:
-            # Logic for multiple selections relies on highest card not being on lower combos
-            if card.same_card(s.cards[-1]):
+        for s in self.possible_plays():
+            if s.cards and card.same_card(s.cards[-1]):
                 return s
 
 
