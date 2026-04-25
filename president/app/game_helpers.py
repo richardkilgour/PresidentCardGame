@@ -3,6 +3,7 @@ from flask_socketio import join_room
 from president.app.game_event_handler import cards_to_list
 from president.app.game_keeper import GamesKeeper
 from president.app.session_manager import user_socket_map
+from president.core.Episode import State as EpisodeState
 from president.players.AsyncPlayer import AsyncPlayer
 
 
@@ -46,7 +47,10 @@ def get_game_state(game_id):
     players = gm.player_manager.players
 
     if gm.episode:
-        player_positions = [player.name if player else -1 for player in gm.positions]
+        player_positions = [
+            player.name if player in gm.episode.ranks else -1
+            for player in players
+        ]
         raw_status = [gm.episode.current_melds[i] if player else "Absent"
                       for i, player in enumerate(players)]
     else:
@@ -124,6 +128,7 @@ def get_state_for_user(user_id, game_id=None):
 
     is_my_turn = (
         game.episode is not None and
+        game.episode.state == EpisodeState.PLAYING and
         bool(game.episode.active_players) and
         game.episode.active_players[0].name == user_id
     )

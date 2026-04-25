@@ -16,11 +16,13 @@ const CardGame = {
         const startGameButton = document.getElementById("start_game_button");
         startGameButton.addEventListener("click", () => this.socket.emit("start_game"));
         startGameButton.disabled = true;
-        this.socket.emit("request_game_state");
     },
 
     setupSocketEvents: function() {
-        this.socket.on('connect', () => console.log('WebSocket connection established'));
+        this.socket.on('connect', () => {
+            console.log('WebSocket connection established');
+            this.socket.emit('request_game_state');
+        });
         this.socket.on("current_game_state", (data) => this.handleGameState(data));
         this.socket.on('notify_player_joined', () => this.socket.emit("request_game_state"));
         this.socket.on('notify_game_started', () => {
@@ -51,7 +53,11 @@ const CardGame = {
             const rankSymbols = ["👑", "🥈", "🥉", "💩"];
 
             if (data.pos == 0) {
+                document.querySelectorAll("[data-ex-rank]").forEach(el => {
+                    el.removeAttribute("data-ex-rank");
+                });
                 document.querySelectorAll("[data-rank]").forEach(el => {
+                    el.setAttribute("data-ex-rank", el.getAttribute("data-rank"));
                     el.removeAttribute("data-rank");
                 });
             }

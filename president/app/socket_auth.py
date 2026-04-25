@@ -33,11 +33,13 @@ def handle_connect(data=None):
             socketio.emit('rejoin_game', {'game_id': reserved_game_id}, to=sid)
             save_game(reserved_game_id)
         else:
-            # Re-join game rooms and cancel any pending disconnect timeout.
+            # Re-join game rooms, cancel any pending disconnect timeout, and
+            # tell the client to navigate back (mirrors the reserved-slot path).
             for game_id in GamesKeeper().find_player(username):
                 join_room(game_id, sid)
                 game = GamesKeeper().get_game(game_id)
                 game.clear_disconnect(username)
+                socketio.emit('rejoin_game', {'game_id': game_id}, to=sid)
     else:
         socketio.emit('connection_status', {'status': 'anonymous'})
         print(f"Anonymous socket connection: {sid}")
