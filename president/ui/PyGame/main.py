@@ -52,13 +52,9 @@ while players[0] != p0:
         break
     players.append(players.pop(0))
 
-human_player = None
 for i, p in enumerate(players):
     player_class = PLAYER_TYPES[p['type']]
     gm.make_player(player_class, p['name'])
-    if p['type'] == 'PyGamePlayer':
-        human_player = gm.player_manager.players[-1]
-        assert i == 0
     if i == 0:
         ui_sprites_list.add(PlayerNameLabel(p['name'], width // 2, height - 60))
     elif i == 1:
@@ -68,47 +64,42 @@ for i, p in enumerate(players):
     elif i == 3:
         ui_sprites_list.add(PlayerNameLabel(p['name'], width - 60, height // 3))
 
+human_player = gm.get_human_player()
+
 clock = pygame.time.Clock()
 running = True
 
 pass_button = PassButton(width // 2, height // 2)
 ui_sprites_list.add(pass_button)
-last_mouse_pos = None
 
 stat_box = StatBox(0, height - 150)
 ui_sprites_list.add(stat_box)
 
 while running:
-
-    mouse_is_over = False
+    mouse_pos = pygame.mouse.get_pos()
+    mouse_is_over_card = False
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
-        if event.type == KEYDOWN:
+        elif event.type == KEYDOWN:
             gm.keypress(event.key)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if pass_button.rect.collidepoint(event.pos) and human_player:
+                human_player.send_card_click('PASS')
+            else:
+                for s in card_sprites_list:
+                    if s.rect.collidepoint(event.pos):
+                        gm.notify_click(s.card)
+                        break
 
-        for s in ui_sprites_list:
-            if s == pass_button:
-                if s.rect.collidepoint(pygame.mouse.get_pos()):
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        if human_player:
-                            human_player.send_card_click('PASS')
-                    else:
-                        s.highlight(True)
-                else:
-                    s.highlight(False)
-
-        for s in card_sprites_list:
-            if s.rect.collidepoint(pygame.mouse.get_pos()):
-                last_mouse_pos = pygame.mouse.get_pos()
-                gm.notify_mouseover(s)
-                mouse_is_over = True
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    gm.notify_click(s.card)
-
-    if not mouse_is_over and last_mouse_pos != pygame.mouse.get_pos():
+    pass_button.highlight(pass_button.rect.collidepoint(mouse_pos))
+    for s in card_sprites_list:
+        if s.rect.collidepoint(mouse_pos):
+            gm.notify_mouseover(s)
+            mouse_is_over_card = True
+            break
+    if not mouse_is_over_card:
         gm.notify_mouseover(None)
 
     card_sprites_list, other_sprite_list = gm.play()

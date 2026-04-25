@@ -68,9 +68,7 @@ class PyGamePlayer(PlayerSimple):
         if self.next_action is None:
             return '␆'
         if self.next_action == 'PASS':
-            # Reset the last action
             self.next_action = None
-            # Return null meld ('pass')
             return Meld()
 
         m = self.get_meld(self.next_action)

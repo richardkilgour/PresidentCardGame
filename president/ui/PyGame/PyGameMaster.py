@@ -12,6 +12,7 @@ from president.core.CardHandler import CardHandler
 from president.core.Episode import Episode, State
 from president.core.GameMaster import GameMaster
 from president.core.IllegalPlayError import IllegalPlayError
+from president.core.Meld import Meld
 from president.ui.PyGame.PyGameCard import PyGameCard
 from president.ui.PyGame.GuiElements import PlayerNameLabel
 from president.players.PyGamePlayer import PyGamePlayer
@@ -108,7 +109,7 @@ class PyGameMaster(GameMaster):
             player = self.player_manager.players[player_index]
             player_meld = self.episode.current_melds[player_index]
 
-            if player_meld is None:
+            if player_meld is None or (isinstance(player_meld, Meld) and not player_meld.cards):
                 self.player_status_labels[i].set_text(f'{player.name} PASSED')
                 self.set_label_pos(self.player_status_labels[i], i)
                 visible_others.add(self.player_status_labels[i])
