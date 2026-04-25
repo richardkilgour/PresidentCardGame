@@ -147,6 +147,7 @@ class GameCheckpoint:
                 "active_players": active,
                 "current_melds": current_melds,
                 "discard_count": discard_count,
+                "open_card_index": episode.open_card_index,
             }
 
         return {
@@ -234,6 +235,8 @@ class GameCheckpoint:
                     for card_index in meld_data:
                         meld = Meld(PlayingCard(card_index), meld)
                     episode.current_melds[i] = meld
+            if "open_card_index" in episode_data:
+                episode.open_card_index = episode_data["open_card_index"]
             gm.episode = episode
 
             # Verify discard checksum
