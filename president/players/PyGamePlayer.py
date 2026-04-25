@@ -1,6 +1,6 @@
-from president.cards.Meld import Meld
-from president.player.AbstractPlayer import AbstractPlayer
-from president.player.PlayerSimple import PlayerSimple
+from president.core.AbstractPlayer import AbstractPlayer
+from president.core.Meld import Meld
+from president.players.PlayerSimple import PlayerSimple
 
 
 class PyGamePlayer(PlayerSimple):

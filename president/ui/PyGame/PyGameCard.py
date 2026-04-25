@@ -4,8 +4,9 @@ Make a card which is a PyGame Sprite
 TODO: move dynamic stuff elsewhere?
 """
 import pygame
-from president.cards.PlayingCard import PlayingCard
 from pygame.sprite import Sprite
+
+from president.core.PlayingCard import PlayingCard
 
 ALPHA_CHANNEL = 255
 colour_key = (1,1,1)

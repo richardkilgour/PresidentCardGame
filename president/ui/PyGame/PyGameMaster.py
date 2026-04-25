@@ -11,12 +11,13 @@ import pygame
 from president.core.CardHandler import CardHandler
 from president.core.Episode import Episode, State
 from president.core.GameMaster import GameMaster
-from president.ui.PyGame import PyGameCard, PlayerNameLabel
-from president.ui.PyGame.PyGamePlayer import PyGamePlayer
+from president.ui.PyGame.PyGameCard import PyGameCard
+from president.ui.PyGame.GuiElements import PlayerNameLabel
+from president.players.PyGamePlayer import PyGamePlayer
 
 
 def player_is_human(player):
-    return isinstance(player, PyGamePlayer.PyGamePlayer)
+    return isinstance(player, PyGamePlayer)
 
 def find_pos(pos, dist, angle):
     """Get a pos, a length and an angle, return the relative position"""
@@ -29,7 +30,7 @@ class PyGameMaster(GameMaster):
 
         # Sprites should be persistent, so init them here
         self.pycards = pygame.sprite.Group()
-        for i in range(0, self.deck_size):
+        for i in range(0, self.deck.size()):
             self.pycards.add(PyGameCard(i))
 
         self.episode = None
@@ -42,8 +43,10 @@ class PyGameMaster(GameMaster):
         self.mouse_over = None
 
     def make_player(self, player_type, name=None):
-        super().make_player(player_type, name)
+        player = player_type(name)
+        self.add_player(player)
         self.player_status_labels.append(PlayerNameLabel(name))
+        return player
 
     def get_pycard(self, c) -> PyGameCard:
         for pc in self.pycards:
@@ -69,7 +72,7 @@ class PyGameMaster(GameMaster):
         # check for any action, and display the current play field
         if not self.episode:
             # Create a new episode
-            self.episode = Episode(self.players, self.positions, self.deck, self.listener_list,
+            self.episode = Episode(self.player_manager, self.positions, self.deck, self.listener_list,
                                    CardHandler(self.deck))
 
         self.positions = self.episode.step()
@@ -96,7 +99,7 @@ class PyGameMaster(GameMaster):
 
         # Find the human current_player (if any)
         human_player_index = 0
-        for i, player in enumerate(self.players):
+        for i, player in enumerate(self.player_manager.players):
             if player_is_human(player):
                 human_player_index = i
                 break
@@ -115,7 +118,7 @@ class PyGameMaster(GameMaster):
             # Current player is offset by the 'human' index
             # TODO: move human to first place? (locally)
             player_index = (human_player_index + i) % 4
-            player = self.players[player_index]
+            player = self.player_manager.players[player_index]
 
             if self.episode:
                 player_meld = self.episode.current_melds[player_index]
@@ -193,7 +196,7 @@ class PyGameMaster(GameMaster):
                 human.send_card_click(card)
 
     def get_human_player(self) -> PyGamePlayer:
-        for p in self.players:
+        for p in self.player_manager.players:
             if player_is_human(p):
                 return p
 

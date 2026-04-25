@@ -1,0 +1,29 @@
+{
+    "dbf28e7c-b224-49ee-8fd0-df65b198804b": {
+        "checkpoint": {
+            "version": 1,
+            "round_number": 0,
+            "positions": [],
+            "players": [
+                {
+                    "seat": 0,
+                    "name": "Badger",
+                    "type": "AsyncPlayer",
+                    "hand": [],
+                    "position_count": [
+                        0,
+                        0,
+                        0,
+                        0
+                    ]
+                },
+                null,
+                null,
+                null
+            ],
+            "episode": null
+        },
+        "reserved_slots": {},
+        "saved_at": "2026-04-24T21:17:51.115334+00:00"
+    }
+}
