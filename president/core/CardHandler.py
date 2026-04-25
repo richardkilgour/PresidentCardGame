@@ -91,7 +91,7 @@ class CardHandler:
         """
         for card in meld.cards:
             for i, h in enumerate(player._hand):
-                if h.get_index() == card.get_index():
+                if h.same_card(card):
                     self.discard_pile.append(player._hand.pop(i))
                     break
         logging.debug(f'{player.name} is left with {player}')

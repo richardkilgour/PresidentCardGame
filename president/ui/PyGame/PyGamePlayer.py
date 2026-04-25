@@ -54,7 +54,7 @@ class PyGamePlayer(PlayerSimple):
         selection = self.possible_plays()[:-1]
         for s in selection:
             # Logic for multiple selections relies on highest card not being on lower combos
-            if card.get_index() == s.cards[-1].get_index():
+            if card.same_card(s.cards[-1]):
                 return s
 
 

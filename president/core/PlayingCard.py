@@ -27,6 +27,16 @@ class PlayingCard:
             # I don't know how to compare to other
             return NotImplemented
 
+    def __hash__(self):
+        return self._value
+
+    def same_card(self, other):
+        """Exact match: same rank AND suit."""
+        try:
+            return self._index == other.get_index()
+        except AttributeError:
+            return NotImplemented
+
     def __le__(self, other):
         try:
             return self._value <= other.get_value()

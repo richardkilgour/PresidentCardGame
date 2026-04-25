@@ -47,7 +47,7 @@ class PyGameMaster(GameMaster):
 
     def get_pycard(self, c) -> PyGameCard:
         for pc in self.pycards:
-            if pc.card.get_index() == c.get_index():
+            if pc.card.same_card(c):
                 return pc
 
     def set_label_pos(self, label, index):
@@ -186,7 +186,7 @@ class PyGameMaster(GameMaster):
     def notify_click(self, card):
         """Forward a clicked card to the human player (if any) to decide which to play"""
         # Ignore it if it's not the currently selcted card
-        if self.mouse_over and self.mouse_over.cards[-1] == card:
+        if self.mouse_over and self.mouse_over.cards[-1].same_card(card):
             human = self.get_human_player()
             if human:
                 # Let the player decide which to take if multiple clicks
@@ -208,6 +208,6 @@ class PyGameMaster(GameMaster):
                 return
             # Check if it's a valid play, and even then only if it's the best one
             meld = human.get_meld(pycard.card)
-            if meld and meld.cards[-1] == pycard.card:
+            if meld and meld.cards[-1].same_card(pycard.card):
                 self.mouse_over = meld
 

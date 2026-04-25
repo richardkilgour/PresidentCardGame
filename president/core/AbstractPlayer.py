@@ -124,7 +124,7 @@ class AbstractPlayer(CardGameListener):
     def surrender_cards(self, cards, receiver):
         for c in cards:
             for i, h in enumerate(self._hand):
-                if h.get_index() == c.get_index():
+                if h.same_card(c):
                     self._hand.pop(i)
                     break
         receiver.award_cards(cards, self)
