@@ -175,17 +175,14 @@ class PyGameMaster(GameMaster):
             if player_is_human(p):
                 return p
 
-    def notify_mouseover(self, pycard):
-        """Enact mouseover behaviour if """
-        if not pycard:
-            self.mouse_over = None
-        else:
-            human = self.get_human_player()
-            if not human:
-                # No human player
-                return
-            # Check if it's a valid play, and even then only if it's the best one
+    def notify_mouseover(self, pycards: list):
+        self.mouse_over = None
+        human = self.get_human_player()
+        if not human or not pycards:
+            return
+        for pycard in pycards:
             meld = human.get_meld(pycard.card)
             if meld and meld.cards[-1].same_card(pycard.card):
-                self.mouse_over = meld
+                if self.mouse_over is None or meld.cards[0].get_value() > self.mouse_over.cards[0].get_value():
+                    self.mouse_over = meld
 

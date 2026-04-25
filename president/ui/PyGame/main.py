@@ -38,6 +38,7 @@ size = width, height = config['screen']['width'], config['screen']['height']
 
 pygame.init()
 screen = pygame.display.set_mode(size)
+debug_font = pygame.font.SysFont('Arial', 16)
 
 card_sprites_list = pygame.sprite.Group()
 ui_sprites_list = pygame.sprite.Group()
@@ -77,7 +78,6 @@ ui_sprites_list.add(stat_box)
 
 while running:
     mouse_pos = pygame.mouse.get_pos()
-    mouse_is_over_card = False
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -93,16 +93,12 @@ while running:
                         gm.notify_click(s.card)
                         break
 
-    pass_button.highlight(pass_button.rect.collidepoint(mouse_pos))
-    for s in card_sprites_list:
-        if s.rect.collidepoint(mouse_pos):
-            gm.notify_mouseover(s)
-            mouse_is_over_card = True
-            break
-    if not mouse_is_over_card:
-        gm.notify_mouseover(None)
-
     card_sprites_list, other_sprite_list = gm.play()
+
+    # Hover detection uses current frame's rects (set by gm.play() above)
+    pass_button.highlight(pass_button.rect.collidepoint(mouse_pos))
+    under_mouse = [s for s in card_sprites_list if s.rect.collidepoint(mouse_pos)]
+    gm.notify_mouseover(under_mouse)
 
     for position, player in enumerate(gm.positions):
         for tag in ui_sprites_list.sprites():
@@ -114,5 +110,15 @@ while running:
     card_sprites_list.draw(screen)
     other_sprite_list.draw(screen)
     ui_sprites_list.draw(screen)
+
+    # Debug overlay
+    debug_lines = [
+        f'Mouse: {mouse_pos}',
+        f'Hit: {[(s.card, s.rect) for s in under_mouse]}' if under_mouse else 'Hit: none',
+        f'Highlighted: {gm.mouse_over}' if gm.mouse_over else 'Highlighted: none',
+    ]
+    for i, line in enumerate(debug_lines):
+        screen.blit(debug_font.render(line, True, pygame.Color('red')), (5, height - 90 + i * 20))
+
     pygame.display.flip()
     pygame.time.wait(1)
