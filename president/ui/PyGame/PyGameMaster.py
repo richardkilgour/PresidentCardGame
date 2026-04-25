@@ -11,6 +11,7 @@ import pygame
 from president.core.CardHandler import CardHandler
 from president.core.Episode import Episode, State
 from president.core.GameMaster import GameMaster
+from president.core.IllegalPlayError import IllegalPlayError
 from president.ui.PyGame.PyGameCard import PyGameCard
 from president.ui.PyGame.GuiElements import PlayerNameLabel
 from president.players.PyGamePlayer import PyGamePlayer
@@ -33,10 +34,8 @@ class PyGameMaster(GameMaster):
         for i in range(0, self.deck.size()):
             self.pycards.add(PyGameCard(i))
 
-        self.episode = None
         self.current_player = None
         self.active_players = None
-        self.positions = []
         self.width = width
         self.height = height
         self.player_status_labels = []
@@ -69,35 +68,29 @@ class PyGameMaster(GameMaster):
             label.rect.y = self.height // 3
 
     def play(self, number_of_rounds=100, preset_hands=None):
-        # check for any action, and display the current play field
         if not self.episode:
-            # Create a new episode
-            self.episode = Episode(self.player_manager, self.positions, self.deck, self.listener_list,
-                                   CardHandler(self.deck))
+            self.reset()
 
-        self.positions = self.episode.step()
-        if self.episode.state == State.INITIALISED:
-            # Do an episode - We need 4 players and a deck of cards.
-            pass
-        elif self.episode.state == State.DEALING:
-            for c in self.pycards:
-                c.set_card_params(faceup=False)
-        elif self.episode.state == State.SWAPPING:
-            pass
-        elif self.episode.state == State.ROUND_STARTING:
-            pass
-        elif self.episode.state == State.PLAYING:
-            # Play until the round is won (only one player remaining)
-            pass
-        elif self.episode.state == State.HAND_WON:
-            pass
-        elif self.episode.state == State.FINISHED:
-            # Set highlight state of all cards to False
+        try:
+            self.positions = self.episode.step()
+        except IllegalPlayError:
+            human = self.get_human_player()
+            if human:
+                human.next_action = None
+
+        visible_cards = pygame.sprite.Group()
+        visible_others = pygame.sprite.Group()
+
+        if self.episode.state == State.FINISHED:
             for c in self.pycards:
                 c.set_card_params(highlighted=False)
-            self.episode = None
+            self.on_round_completed()
+            return visible_cards, visible_others
 
-        # Find the human current_player (if any)
+        if self.episode.state == State.DEALING:
+            for c in self.pycards:
+                c.set_card_params(faceup=False)
+
         human_player_index = 0
         for i, player in enumerate(self.player_manager.players):
             if player_is_human(player):
@@ -110,34 +103,20 @@ class PyGameMaster(GameMaster):
             for c in self.mouse_over.cards:
                 self.get_pycard(c).set_card_params(highlighted=True)
 
-        visible_cards = pygame.sprite.Group()
-        visible_others = pygame.sprite.Group()
-
-        # i = 0 is human (or computer), then clockwise
         for i in range(0, 4):
-            # Current player is offset by the 'human' index
-            # TODO: move human to first place? (locally)
             player_index = (human_player_index + i) % 4
             player = self.player_manager.players[player_index]
+            player_meld = self.episode.current_melds[player_index]
 
-            if self.episode:
-                player_meld = self.episode.current_melds[player_index]
-            else:
-                player_meld = None
-
-            # Render played cards or labels
             if player_meld is None:
-                # TODO: Put a label saying "Passed"
                 self.player_status_labels[i].set_text(f'{player.name} PASSED')
                 self.set_label_pos(self.player_status_labels[i], i)
                 visible_others.add(self.player_status_labels[i])
             elif player_meld == '␆':
-                # TODO: Put a label saying "Waiting"
                 self.player_status_labels[i].set_text(f'{player.name} WAITING')
                 self.set_label_pos(self.player_status_labels[i], i)
                 visible_others.add(self.player_status_labels[i])
             else:
-                # draw the played cards
                 for j, card in enumerate(player_meld.cards):
                     pycard = self.pycards.sprites()[card.get_index()]
                     visible_cards.add(pycard)
@@ -154,29 +133,24 @@ class PyGameMaster(GameMaster):
                     pycard.rect.x = pos[0]
                     pycard.rect.y = pos[1]
 
-            # Render unplaced cards
             mid_card_index = len(player._hand) / 2.
             for j, card in enumerate(player._hand):
-                # index to the pycard
-                # It will draw itself, but needs some parameters
                 pycard = self.pycards.sprites()[card.get_index()]
                 pycard.set_card_params(faceup=i == 0)
                 visible_cards.add(pycard)
                 card_spread = 6
                 card_angle = i * 90 + (j - mid_card_index) * card_spread
-                # TODO: more elegant pos and angle to make a nice arc
-                pos = (0,0)
+                pos = (0, 0)
                 if i == 0:
                     pos = (self.width // 2, self.height)
                 elif i == 1:
                     pos = (-50, self.height // 3)
                 elif i == 2:
-                    pos = (self.width // 2, -pycard.height-20)
+                    pos = (self.width // 2, -pycard.height - 20)
                 elif i == 3:
                     pos = (self.width, self.height // 3)
                 pos = find_pos(pos, 1.5 * pycard.height, card_angle)
-                pycard.set_card_params(newAngle = -card_angle)
-                # TODO: place by mid-point so hack above can be removed
+                pycard.set_card_params(newAngle=-card_angle)
                 pycard.rect.x = pos[0]
                 pycard.rect.y = pos[1]
 
