@@ -90,8 +90,10 @@ class CardHandler:
             meld: The meld being played.
         """
         for card in meld.cards:
-            player._hand.remove(card)
-            self.discard_pile.append(card)
+            for i, h in enumerate(player._hand):
+                if h.get_index() == card.get_index():
+                    self.discard_pile.append(player._hand.pop(i))
+                    break
         logging.debug(f'{player.name} is left with {player}')
 
     # -------------------------------------------------------------------------
