@@ -11,6 +11,8 @@ Catches:
   - Cards of mixed values in the meld
   - Meld does not beat the current target
 """
+from collections import Counter
+
 from president.core.IllegalPlayError import IllegalPlayError
 from president.core.Meld import Meld
 
@@ -57,9 +59,10 @@ class PlayValidator:
 
     @staticmethod
     def _check_cards_in_hand(player, action) -> None:
-        hand_indices = player.get_hand_indices()
+        available = Counter(player.get_hand_indices())
         for card in action.cards:
-            if card.get_index() not in hand_indices:
+            available[card.get_index()] -= 1
+            if available[card.get_index()] < 0:
                 raise IllegalPlayError(
                     player, action,
                     f"Card {card} is not in {player.name}'s hand"
