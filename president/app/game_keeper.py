@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class GamesKeeper:
     _instance = None
     _games = {}
