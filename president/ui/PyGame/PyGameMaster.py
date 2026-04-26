@@ -183,6 +183,9 @@ class PyGameMaster(GameMaster):
         for pycard in pycards:
             meld = human.get_meld(pycard.card)
             if meld and meld.cards[-1].same_card(pycard.card):
-                if self.mouse_over is None or meld.cards[0].get_value() > self.mouse_over.cards[0].get_value():
+                if self.mouse_over is None \
+                        or meld.cards[0].get_value() > self.mouse_over.cards[0].get_value() \
+                        or (meld.cards[0].get_value() == self.mouse_over.cards[0].get_value()
+                                and len(meld.cards) > len(self.mouse_over.cards)):
                     self.mouse_over = meld
 
