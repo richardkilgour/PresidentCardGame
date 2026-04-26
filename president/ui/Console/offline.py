@@ -16,10 +16,10 @@ import yaml
 from president.core.GameMaster import GameMaster
 from president.core.GameRecord import GameRecord
 from president.core.PlayerRegistry import PlayerRegistry
-from president.players.ConsolePlayer import ConsolePlayer
+from president.players.PlayerConsole import PlayerConsole
 
-_CONFIG_PATH = Path(__file__).parents[3] / 'config' / 'config.yaml'
-_LOG_PATH    = Path(__file__).parents[3] / 'test.log'
+_CONFIG_PATH = Path(__file__).parents[2] / 'config' / 'config.yaml'
+_LOG_PATH    = Path(__file__).parents[2] / 'test.log'
 
 
 def run_offline(args) -> None:
@@ -42,7 +42,7 @@ def run_offline(args) -> None:
         for key in ['player1', 'player2', 'player3', 'player4']:
             p = config[key]
             if p.get('console', False):
-                gm.add_player(ConsolePlayer(p['name']))
+                gm.add_player(PlayerConsole(p['name']))
             else:
                 gm.make_player(p['type'], p['name'])
         gm.start(number_of_rounds=1000)
@@ -51,7 +51,7 @@ def run_offline(args) -> None:
     gm.set_record(record)
 
     for player in gm.player_manager.players:
-        if isinstance(player, ConsolePlayer):
+        if isinstance(player, PlayerConsole):
             player.set_record(record)
 
     done = False

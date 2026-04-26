@@ -3,7 +3,7 @@
 """
 Console rendering for online game state.
 
-Translates server state dicts into ConsolePlayer display calls and handles the
+Translates server state dicts into PlayerConsole display calls and handles the
 interactive turn loop (show table → read input → send play).
 
 Nothing in this module knows about sessions, lobbies, or reconnection — it only
@@ -15,11 +15,11 @@ import sys
 
 from president.core.Meld import Meld
 from president.core.PlayingCard import PlayingCard
-from president.players.ConsolePlayer import ConsolePlayer
+from president.ui.Console.offline import ConsolePlayer
 
 
 class PlayerProxy:
-    """Minimal player-like object used to fill ConsolePlayer.players for display."""
+    """Minimal player-like object used to fill PlayerConsole.players for display."""
 
     def __init__(self, name: str, card_count: int):
         self.name = name
@@ -39,7 +39,7 @@ def meld_from_server(meld_cards: list) -> Meld:
 
 
 def status_from_server(raw) -> Meld | None | str:
-    """Convert a server player_status value into the form ConsolePlayer expects."""
+    """Convert a server player_status value into the form PlayerConsole expects."""
     if raw in ('Waiting', '␆'):
         return None
     if raw == 'Passed':
@@ -50,7 +50,7 @@ def status_from_server(raw) -> Meld | None | str:
 
 
 def console_for_state(state: dict) -> ConsolePlayer:
-    """Build a display-ready ConsolePlayer from a server game-state dict."""
+    """Build a display-ready PlayerConsole from a server game-state dict."""
     console = ConsolePlayer(state['player_names'][0])
 
     console._hand = [
