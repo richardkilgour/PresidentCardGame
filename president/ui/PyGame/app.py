@@ -18,7 +18,7 @@ from president.players.PlayerNaive import PlayerNaive
 from president.players.PlayerSimple import PlayerSimple
 from president.players.PlayerHolder import PlayerHolder
 from president.players.PlayerSplitter import PlayerSplitter
-from president.players.ConsolePlayer import ConsolePlayer
+from president.players.PlayerConsole import PlayerConsole
 
 # ---------------------------------------------------------------------------
 # Config
@@ -41,7 +41,7 @@ PLAYER_TYPES = {
     'PlayerSimple':   PlayerSimple,
     'PlayerHolder':   PlayerHolder,
     'PlayerSplitter': PlayerSplitter,
-    'ConsolePlayer':  ConsolePlayer,
+    'PlayerConsole':  PlayerConsole,
 }
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-ConsolePlayer is a human-controlled player with console input/output.
+PlayerConsole is a human-controlled player with console input/output.
 
 The play() function presents possible melds and waits for user input.
 Typing 'q' at any prompt saves a checkpoint and exits cleanly.
@@ -16,7 +16,7 @@ from president.core.GameRecord import GameRecord
 from president.core.Meld import Meld
 
 
-class ConsolePlayer(AbstractPlayer):
+class PlayerConsole(AbstractPlayer):
 
     def __init__(self, name):
         super().__init__(name)
@@ -109,7 +109,7 @@ class ConsolePlayer(AbstractPlayer):
     # Play
     # -------------------------------------------------------------------------
 
-    def play(self) -> Meld:
+    def play(self, valid_plays) -> Meld:
         """
         Present possible melds and prompt the user to select one.
         Returns a Meld, or '␆' as a no-op if input is not ready.
@@ -117,7 +117,7 @@ class ConsolePlayer(AbstractPlayer):
         """
         self._show_table()
 
-        options = self.possible_plays()
+        options = valid_plays
 
         print("Select a play:")
         for i, meld in enumerate(options):
