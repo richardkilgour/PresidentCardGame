@@ -23,11 +23,18 @@ def step_games(sc):
         for username, info in list(game_wrapper.disconnect_info.items()):
             if not info['notified'] and (now - info['time']) >= info['timeout']:
                 info['notified'] = True
-                socketio.emit(
-                    'replace_available',
-                    {'username': username, 'game_id': game_id},
-                    room=game_id,
-                )
+                if username.endswith(' (unregistered)'):
+                    # Anonymous player — auto-replace so the game continues,
+                    # but keep slot reserved so they can rejoin
+                    game_wrapper.replace_human_with_ai(username, reserved=True)
+                    game_wrapper.clear_disconnect(username)
+                    socketio.emit('player_replaced', {'username': username}, room=game_id)
+                else:
+                    socketio.emit(
+                        'replace_available',
+                        {'username': username, 'game_id': game_id},
+                        room=game_id,
+                    )
 
     # Clean up games that have run their full course (no humans asked to end them)
     for game_id in finished_games:

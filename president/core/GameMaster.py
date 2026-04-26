@@ -20,6 +20,7 @@ from president.core.CardHandler import CardHandler
 from president.core.DeckManager import DeckManager
 from president.core.Episode import Episode, State
 from president.core.GameCheckpoint import GameCheckpoint
+from president.core.GameRecord import GameRecord
 from president.core.IllegalPlayError import IllegalPlayError
 from president.core.PlayerManager import PlayerManager
 from president.core.PlayerRegistry import PlayerRegistry
@@ -59,10 +60,10 @@ class GameMaster:
         self.registry = registry or PlayerRegistry()
         self.policy = policy
         self.fallback_player_name = fallback_player_name
-        self._checkpoint: GameCheckpoint | None = None
+        self._record: GameRecord | None = None
 
-    def set_checkpoint(self, checkpoint: GameCheckpoint) -> None:
-        self._checkpoint = checkpoint
+    def set_record(self, record: GameRecord) -> None:
+        self._record = record
 
     # -------------------------------------------------------------------------
     # Listener management
@@ -198,9 +199,9 @@ class GameMaster:
             return self._handle_illegal_play(e)
         except Exception as e:
             logger.error(f"Unexpected error during step: {e}", exc_info=True)
-            if self._checkpoint:
-                self._checkpoint.save_on_error(
-                    GameCheckpoint.stamped_path("crash")
+            if self._record:
+                self._record.save_on_error(
+                    GameRecord.stamped_path("crash")
                 )
             raise
 
@@ -222,16 +223,16 @@ class GameMaster:
         )
 
         if self.policy == IllegalPlayPolicy.TERMINATE:
-            if self._checkpoint:
-                self._checkpoint.save_on_error(
-                    GameCheckpoint.stamped_path("illegal_play")
+            if self._record:
+                self._record.save_on_error(
+                    GameRecord.stamped_path("illegal_play")
                 )
             raise error
 
         elif self.policy == IllegalPlayPolicy.DISQUALIFY:
-            if self._checkpoint:
-                self._checkpoint.save_on_error(
-                    GameCheckpoint.stamped_path("illegal_play")
+            if self._record:
+                self._record.save_on_error(
+                    GameRecord.stamped_path("illegal_play")
                 )
             self._disqualify_player(error.player)
             return False

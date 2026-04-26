@@ -119,12 +119,20 @@ def get_state_for_user(user_id, game_id=None):
     game = GamesKeeper().get_game(game_id)
     player = game.player_manager.players[player_index]
     open_card_index = game.open_card_index
-    playable_indices = [c.cards[-1].get_index() for c in player.possible_plays(player.target_meld, open_card_index) if c.cards]
+    options = player.possible_plays(player.target_meld, open_card_index)
+    playable_indices = {c.cards[-1].get_index() for c in options if c.cards}
 
     playable_cards = []
     for card in game_state["player_hands"][player_index]:
         playable = card.get_index() in playable_indices
         playable_cards.append([card.get_value(), card.suit_str(), playable])
+
+    # Full meld options for non-browser clients (console / PyGame)
+    possible_melds = [
+        [[c.get_value(), c.suit_str()] for c in meld.cards]
+        for meld in options if meld.cards
+    ]
+    can_pass = any(not meld.cards for meld in options)
 
     is_my_turn = (
         game.episode is not None and
@@ -142,5 +150,7 @@ def get_state_for_user(user_id, game_id=None):
         "opponent_cards": opponent_cards,
         "is_owner": (game_state["owner"] == user_id),
         "is_my_turn": is_my_turn,
+        "possible_melds": possible_melds,
+        "can_pass": can_pass,
         "stats": game_state["stats"],
     }

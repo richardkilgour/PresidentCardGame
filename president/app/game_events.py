@@ -160,12 +160,13 @@ def add_ai_player(data):
     ai_name = data["aiName"]
     ai_difficulty = data["aiDifficulty"]
 
+    tagged_name = f"{ai_name} (AI)"
     if ai_difficulty == "Easy":
-        new_ai = PlayerSimple(ai_name)
+        new_ai = PlayerSimple(tagged_name)
     elif ai_difficulty == "Medium":
-        new_ai = PlayerHolder(ai_name)
+        new_ai = PlayerHolder(tagged_name)
     else:
-        new_ai = PlayerSplitter(ai_name)
+        new_ai = PlayerSplitter(tagged_name)
 
     GamesKeeper().add_player(game_id, new_ai, opponent_index)
     send_game_state()

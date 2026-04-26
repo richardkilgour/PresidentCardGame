@@ -2,6 +2,7 @@ import time
 
 from president.core.Episode import State
 from president.core.GameMaster import GameMaster
+from president.core.GameRecord import GameRecord
 from president.core.Meld import Meld
 from president.core.PlayingCard import PlayingCard
 from president.players.AsyncPlayer import AsyncPlayer
@@ -21,6 +22,17 @@ class GameWrapper(GameMaster):
         self.reserved_slots: dict[int, str] = {}
         # username → {"time": float, "timeout": 10|20, "notified": bool}
         self.disconnect_info: dict[str, dict] = {}
+        record = GameRecord(self, game_id=str(game_id))
+        self.set_record(record)
+        self.add_listener(record)
+
+    def replace_record(self, record: GameRecord) -> None:
+        """Swap in a restored GameRecord, removing the placeholder created at init."""
+        if self._record is not None and self._record in self.listener_list:
+            self.listener_list.remove(self._record)
+        self.set_record(record)
+        if record not in self.listener_list:
+            self.listener_list.append(record)
 
     def on_round_completed(self):
         result = super().on_round_completed()

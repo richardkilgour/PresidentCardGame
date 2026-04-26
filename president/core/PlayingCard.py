@@ -54,7 +54,7 @@ class PlayingCard:
         return card_str
 
     def isRed(self):
-        return self._suit == 1 or self._suit == 2
+        return self._suit == 2 or self._suit == 3
 
     def get_index(self):
         return self._index

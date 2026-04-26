@@ -112,3 +112,23 @@ def get_user_info():
     else:
         info = {"logged_in": False}
     return jsonify(info)
+
+
+@auth_bp.route('/api/anonymous_login', methods=['POST'])
+def anonymous_login():
+    """Create a temporary session for clients that don't have registered credentials."""
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        name = f"Guest_{uuid.uuid4().hex[:6]}"
+    display_name = f"{name} (unregistered)"
+    session['user'] = display_name
+    session['logged_in'] = True
+    return jsonify({'success': True, 'username': display_name})
+
+
+@auth_bp.route('/api/games', methods=['GET'])
+def api_games():
+    """HTTP endpoint returning the current game list (mirrors the SocketIO refresh_games event)."""
+    from president.app.game_keeper import GamesKeeper
+    return jsonify({'games': GamesKeeper().game_list()})

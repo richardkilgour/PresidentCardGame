@@ -12,7 +12,7 @@ import logging
 import sys
 
 from president.core.AbstractPlayer import AbstractPlayer
-from president.core.GameCheckpoint import GameCheckpoint
+from president.core.GameRecord import GameRecord
 from president.core.Meld import Meld
 
 
@@ -20,14 +20,11 @@ class ConsolePlayer(AbstractPlayer):
 
     def __init__(self, name):
         super().__init__(name)
-        self._checkpoint: GameCheckpoint | None = None
+        self._record: GameRecord | None = None
 
-    def set_checkpoint(self, checkpoint: GameCheckpoint) -> None:
-        """
-        Attach a GameCheckpoint so the player can save and quit mid-game.
-        Call this after the GameMaster is set up.
-        """
-        self._checkpoint = checkpoint
+    def set_record(self, record: GameRecord) -> None:
+        """Attach the GameRecord so the player can save and quit mid-game."""
+        self._record = record
 
     # -------------------------------------------------------------------------
     # Listener callbacks
@@ -150,11 +147,11 @@ class ConsolePlayer(AbstractPlayer):
         return options[card_index]
 
     def _save_and_quit(self) -> None:
-        """Save a checkpoint and exit cleanly."""
-        if self._checkpoint:
-            path = GameCheckpoint.stamped_path("quit_save")
-            self._checkpoint.save(path)
+        """Save the game record and exit cleanly."""
+        if self._record:
+            path = GameRecord.stamped_path("quit_save")
+            self._record.save(path)
             print(f'\n  Game saved to {path}. Resume with: --restore {path}')
         else:
-            print('\n  No checkpoint configured — progress will be lost.')
+            print('\n  No record configured — progress will be lost.')
         sys.exit(0)

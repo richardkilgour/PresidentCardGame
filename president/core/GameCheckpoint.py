@@ -286,53 +286,57 @@ class GameCheckpoint:
         """
         path = Path(path)
         state = json.loads(path.read_text())
-        lines = []
-
-        lines.append(f"=== Checkpoint v{state.get('version', '?')} ===")
-        lines.append(f"Round:     {state['round_number']}")
-        lines.append(f"Positions: {', '.join(state['positions']) or 'None (first episode)'}")
-
-        lines.append("\n--- Players ---")
-        for p in state["players"]:
-            if p is None:
-                lines.append("  [empty seat]")
-                continue
-            hand = _format_hand(p["hand"])
-            score = (2 * p["position_count"][0] +
-                     p["position_count"][1] -
-                     p["position_count"][2] -
-                     2 * p["position_count"][3])
-            lines.append(
-                f"  Seat {p['seat']}  {p['name']} ({p['type']})\n"
-                f"          Hand: {hand}\n"
-                f"          Positions: {p['position_count']}  Score: {score}"
-            )
-
-        ep = state.get("episode")
-        if ep is None:
-            lines.append("\n--- No active episode ---")
-        else:
-            lines.append(f"\n--- Episode ---")
-            lines.append(f"  State:          {ep['state']}")
-            lines.append(f"  Rankings so far: {', '.join(ep['ranks']) or 'None'}")
-            lines.append(f"  Active players: {', '.join(ep['active_players']) or 'None'}")
-            lines.append(f"  Discard count:  {ep['discard_count']}")
-            lines.append("  Current melds:")
-            for i, meld in enumerate(ep["current_melds"]):
-                meld_str = _format_hand(meld) if meld else "—"
-                lines.append(f"    Seat {i}: {meld_str}")
-
-        if "disconnected_player" in state:
-            lines.append(f"\n⚠  Saved due to disconnect: {state['disconnected_player']}")
-        if "error" in state:
-            lines.append(f"\n⚠  Saved due to crash:\n{state['error']}")
-
-        return "\n".join(lines)
+        return _format_snapshot(state)
 
 
 # -------------------------------------------------------------------------
 # Module-level helpers
 # -------------------------------------------------------------------------
+
+def _format_snapshot(state: dict) -> str:
+    """Render a serialised game state dict as a human-readable string."""
+    lines = []
+    lines.append(f"=== Checkpoint v{state.get('version', '?')} ===")
+    lines.append(f"Round:     {state['round_number']}")
+    lines.append(f"Positions: {', '.join(state['positions']) or 'None (first episode)'}")
+
+    lines.append("\n--- Players ---")
+    for p in state["players"]:
+        if p is None:
+            lines.append("  [empty seat]")
+            continue
+        hand = _format_hand(p["hand"])
+        score = (2 * p["position_count"][0] +
+                 p["position_count"][1] -
+                 p["position_count"][2] -
+                 2 * p["position_count"][3])
+        lines.append(
+            f"  Seat {p['seat']}  {p['name']} ({p['type']})\n"
+            f"          Hand: {hand}\n"
+            f"          Positions: {p['position_count']}  Score: {score}"
+        )
+
+    ep = state.get("episode")
+    if ep is None:
+        lines.append("\n--- No active episode ---")
+    else:
+        lines.append("\n--- Episode ---")
+        lines.append(f"  State:           {ep['state']}")
+        lines.append(f"  Rankings so far: {', '.join(ep['ranks']) or 'None'}")
+        lines.append(f"  Active players:  {', '.join(ep['active_players']) or 'None'}")
+        lines.append(f"  Discard count:   {ep['discard_count']}")
+        lines.append("  Current melds:")
+        for i, meld in enumerate(ep["current_melds"]):
+            meld_str = _format_hand(meld) if meld else "—"
+            lines.append(f"    Seat {i}: {meld_str}")
+
+    if "disconnected_player" in state:
+        lines.append(f"\n⚠  Saved due to disconnect: {state['disconnected_player']}")
+    if "error" in state:
+        lines.append(f"\n⚠  Saved due to crash:\n{state['error']}")
+
+    return "\n".join(lines)
+
 
 def _format_hand(card_indices: list[int] | None) -> str:
     """Format a list of card indices as a readable string."""

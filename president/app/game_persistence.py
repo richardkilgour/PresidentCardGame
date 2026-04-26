@@ -1,14 +1,16 @@
 import logging
-from datetime import datetime, timezone
+from pathlib import Path
 
 from president.app.db import GAME_DB, load_data, save_data
 from president.app.game_keeper import GamesKeeper
-from president.core.GameCheckpoint import GameCheckpoint
+from president.core.GameRecord import GameRecord
 from president.core.PlayerRegistry import PlayerRegistry
 from president.players.AsyncPlayer import AsyncPlayer
 from president.players.PlayerHolder import PlayerHolder
 from president.players.PlayerSimple import PlayerSimple
 from president.players.PlayerSplitter import PlayerSplitter
+
+_ARCHIVE_DIR = Path(__file__).parent / "db" / "archive"
 
 
 def _make_restore_registry() -> PlayerRegistry:
@@ -21,21 +23,25 @@ def _make_restore_registry() -> PlayerRegistry:
 
 
 def save_game(game_id: str) -> None:
-    """Serialise the current game state to games.json."""
+    """Serialise the current game trajectory to games.json."""
     game = GamesKeeper().get_game(game_id)
-    checkpoint = GameCheckpoint(game)
-    state = checkpoint._serialise()
+    data = game._record.serialise()
+    data["reserved_slots"] = {str(k): v for k, v in game.reserved_slots.items()}
     games_data = load_data(GAME_DB)
-    games_data[game_id] = {
-        "checkpoint": state,
-        "reserved_slots": {str(k): v for k, v in game.reserved_slots.items()},
-        "saved_at": datetime.now(timezone.utc).isoformat(),
-    }
+    games_data[game_id] = data
     save_data(GAME_DB, games_data)
 
 
 def delete_game(game_id: str) -> None:
-    """Remove a game from games.json (called when a game ends or is archived)."""
+    """Archive the completed game then remove it from games.json."""
+    game = GamesKeeper().get_game(game_id)
+    if game and game._record:
+        game._record.mark_complete()
+        try:
+            game._record.archive(_ARCHIVE_DIR)
+        except Exception as e:
+            logging.error(f"Failed to archive game {game_id}: {e}")
+
     games_data = load_data(GAME_DB)
     if game_id in games_data:
         del games_data[game_id]
@@ -61,10 +67,21 @@ def load_all_games() -> None:
     for game_id, data in games_data.items():
         try:
             wrapper = GameWrapper(game_id, GameEventHandler(socketio, game_id))
-            GameCheckpoint.restore_from_dict(data["checkpoint"], wrapper, registry)
-            wrapper.reserved_slots = {
+            reserved_slots = {
                 int(k): v for k, v in data.get("reserved_slots", {}).items()
             }
+
+            # Support both old format {"checkpoint": {...}} and new {"trajectory": [...]}
+            if "checkpoint" in data:
+                record = GameRecord.restore_from_dict(
+                    data["checkpoint"], wrapper, registry
+                )
+            else:
+                record_data = {k: v for k, v in data.items() if k != "reserved_slots"}
+                record = GameRecord.restore_from_dict(record_data, wrapper, registry)
+
+            wrapper.replace_record(record)
+            wrapper.reserved_slots = reserved_slots
             GamesKeeper().add_game(game_id, wrapper)
             logging.info(f"Restored game {game_id}")
         except Exception as e:
