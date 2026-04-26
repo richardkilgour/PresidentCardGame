@@ -9,6 +9,11 @@ class PyGamePlayer(PlayerSimple):
         # NextAction can be None (no action) or a list or cards to play (empty list = pass)
         self.next_action = None
         self.highlight_meld = None
+        self._valid_plays = []
+
+    def notify_player_turn(self, player):
+        if player is not self:
+            self._valid_plays = []
 
     def send_keypress(self, key):
         self.next_action = key
@@ -50,18 +55,18 @@ class PyGamePlayer(PlayerSimple):
 
     def get_meld(self, card):
         """Return a meld if the card can be turned into a valid meld, otherwise None"""
-        for s in self.possible_plays():
+        for s in self._valid_plays:
             if s.cards and card.same_card(s.cards[-1]):
                 return s
 
-
-    def play(self):
+    def play(self, valid_plays):
         """
         Process an action set by another thread
         Return a meld (set of cards) if a valid card was clicked
         Return a pass (empty Meld) if the clicked card is an empty set
         Fall through if no action is selected yet (return noop '␆')
         """
+        self._valid_plays = valid_plays
         if self.next_action is None:
             return '␆'
         if self.next_action == 'PASS':

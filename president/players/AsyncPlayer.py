@@ -19,7 +19,7 @@ class AsyncPlayer(AbstractPlayer):
             logging.warning(f'{self.name}: buffered play {self.card_to_play} dropped, replaced by {play}')
         self.card_to_play = play
 
-    def play(self):
+    def play(self, valid_plays):
         card_to_play = self.card_to_play
         self.card_to_play = '␆'
         return card_to_play

@@ -60,7 +60,7 @@ class Episode:
         self.card_handler = card_handler
         # On the very first episode the leader must open with the 3♠ (index 0).
         # Cleared once the opening play is accepted.
-        self.open_card_index: int | None = 0 if not starting_ranks else None
+        self.open_card_index = 0 if not starting_ranks else None
 
     def notify_listeners(self, notify_func_name: str, *args) -> None:
         for p in self.listener_list:
@@ -224,8 +224,8 @@ class Episode:
             self.active_players.remove(player)
             return
 
+        valid_plays = PlayValidator.possible_plays(player._hand, current_target, self.open_card_index)
         if current_target is None:
-            valid_plays = PlayValidator.possible_plays(player._hand, None, self.open_card_index)
             assert valid_plays, (
                 f"{player.name} must lead but has no valid plays "
                 f"(hand: {player._hand}, open_card_index: {self.open_card_index})"
@@ -233,7 +233,7 @@ class Episode:
 
         self.notify_listeners("notify_player_turn", player)
 
-        action = player.play()
+        action = player.play(valid_plays)
         if action == '␆':  # no-op, async player not ready yet
             return
 

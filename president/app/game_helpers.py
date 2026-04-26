@@ -4,6 +4,7 @@ from president.app.game_event_handler import cards_to_list
 from president.app.game_keeper import GamesKeeper
 from president.app.session_manager import user_socket_map
 from president.core.Episode import State as EpisodeState
+from president.core.PlayValidator import PlayValidator
 from president.players.AsyncPlayer import AsyncPlayer
 
 
@@ -119,7 +120,7 @@ def get_state_for_user(user_id, game_id=None):
     game = GamesKeeper().get_game(game_id)
     player = game.player_manager.players[player_index]
     open_card_index = game.open_card_index
-    options = player.possible_plays(player.target_meld, open_card_index)
+    options = PlayValidator.possible_plays(player._hand, player.target_meld, open_card_index)
     playable_indices = {c.cards[-1].get_index() for c in options if c.cards}
 
     playable_cards = []

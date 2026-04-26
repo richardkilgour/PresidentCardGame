@@ -39,9 +39,9 @@ class PlayerRL(AbstractPlayer):
         self._device = _device
         self._model  = MaskablePPO.load(model_path, device=_device)
 
-    def play(self) -> Meld:
+    def play(self, valid_plays) -> Meld:
         obs  = encode_state(self._hand, self.target_meld).astype(np.float32)
-        mask = self._get_action_mask()
+        mask = self._get_action_mask(valid_plays)
 
         with torch.no_grad():
             obs_tensor  = torch.tensor(obs,  dtype=torch.float32).unsqueeze(0).to(self._device)
@@ -52,22 +52,19 @@ class PlayerRL(AbstractPlayer):
             logits[~mask_tensor] = float("-inf")
             action = logits.argmax(dim=1).item()
 
-        meld  = self._action_to_meld(action)
-        legal = self.possible_plays()
-
-        if meld in legal:
+        meld = self._action_to_meld(action)
+        if meld in valid_plays:
             return meld
 
         logging.warning(
             f"{self.name}: RL model predicted illegal meld, falling back. "
             f"Hand: {self._hand}, target: {self.target_meld}"
         )
-        return legal[0]
+        return valid_plays[0]
 
-    def _get_action_mask(self) -> np.ndarray:
-        mask  = np.zeros(ACTION_BITS, dtype=bool)
-        legal = self.possible_plays()
-        for meld in legal:
+    def _get_action_mask(self, valid_plays) -> np.ndarray:
+        mask = np.zeros(ACTION_BITS, dtype=bool)
+        for meld in valid_plays:
             mask[self._meld_to_action(meld)] = True
         return mask
 

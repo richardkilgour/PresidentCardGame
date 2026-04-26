@@ -16,10 +16,8 @@ from president.core.AbstractPlayer import AbstractPlayer
 class PlayerSimple(AbstractPlayer):
     """Plays the lowest possible meld, avoiding splits."""
 
-    def play(self):
-        possible_plays = self.possible_plays()
-
-        for meld in possible_plays:
+    def play(self, valid_plays):
+        for meld in valid_plays:
             if self._is_safe_to_play(meld):
                 return meld
             logging.info(

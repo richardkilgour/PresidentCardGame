@@ -37,15 +37,13 @@ class RLSimple(AbstractPlayer):
             model_file = "RL/best_model.pt"
         self.trained_model = load_model(filepath = model_file)
 
-    def play(self):
+    def play(self, valid_plays):
         """
         Given a list of cards, choose a set to play
         If no minimum, just play the lowest card or lowest set of cards
         Return a list of cards, or None if the desire is to pass
         """
-        super().play()
-        # We know the target meld, and play the lowest option that beats the meld
-        possible_plays = self.possible_plays()
+        possible_plays = valid_plays
 
         # Create an input vector for the model (similar to DataGrabber)
         # Get up to 3 previous plays

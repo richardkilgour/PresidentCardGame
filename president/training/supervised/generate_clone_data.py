@@ -50,6 +50,7 @@ from president.core.AbstractPlayer import AbstractPlayer
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
 from president.core.PlayHistory import PlayHistory, GameEvent, EventType
+from president.core.PlayValidator import PlayValidator
 from president.training.data.StateEncoder import StateEncoder
 
 ACTION_BITS = 55   # 0-53 melds, 54 = pass
@@ -258,7 +259,8 @@ def query_player(
     setup_fn: PlayerSetupFn = simple_player_setup,
 ) -> np.ndarray:
     setup_fn(player, hand, target)
-    return encode_action(player.play())
+    valid_plays = PlayValidator.possible_plays(player._hand, target)
+    return encode_action(player.play(valid_plays))
 
 
 # ─────────────────────────────────────────────

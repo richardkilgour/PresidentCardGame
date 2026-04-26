@@ -10,6 +10,5 @@ from president.core.AbstractPlayer import AbstractPlayer
 class PlayerNaive(AbstractPlayer):
     """Plays the lowest possible meld unconditionally."""
 
-    def play(self):
-        possible_plays = self.possible_plays()
-        return possible_plays[0]
+    def play(self, valid_plays):
+        return valid_plays[0]

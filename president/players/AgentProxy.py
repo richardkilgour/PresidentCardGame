@@ -27,7 +27,7 @@ class AgentProxy(AbstractPlayer):
         self._has_action      = False
         self._snapshot_plays: list = []
 
-    def play(self) -> Meld:
+    def play(self, valid_plays) -> Meld:
         """Called by the game engine each time it is this player's turn."""
         if self._has_action:
             # Second call — deliver the action chosen by the env
@@ -42,7 +42,7 @@ class AgentProxy(AbstractPlayer):
         # First call — snapshot state, then yield control back to the env
         self._hand_snapshot  = list(self._hand)
         self._obs_snapshot   = self._encode_fn(self.memory, self).astype(np.float32)
-        self._snapshot_plays = self.possible_plays()
+        self._snapshot_plays = valid_plays
         self._awaiting_action = True
         return '␆'
 

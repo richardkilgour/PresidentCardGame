@@ -23,8 +23,8 @@ from president.players.PlayerSplitter import PlayerSplitter
 
 class PlayerHolder(PlayerSplitter):
 
-    def play(self):
-        candidate = super().play()
+    def play(self, valid_plays):
+        candidate = super().play(valid_plays)
 
         # No target — defer to PlayerSplitter
         if not self.target_meld:
@@ -50,7 +50,7 @@ class PlayerHolder(PlayerSplitter):
                 f'{self.name}: conserving {candidate} to protect '
                 f'{self._hand[0]} — passing instead'
             )
-            return self.possible_plays()[-1]  # Pass
+            return valid_plays[-1]  # Pass
 
         logging.info(f'{self.name}: playing {candidate} against {self.target_meld}')
         return candidate

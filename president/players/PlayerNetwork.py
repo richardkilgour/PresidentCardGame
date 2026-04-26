@@ -68,7 +68,7 @@ class PlayerNetwork(AbstractPlayer):
         self._device    = _device
         self._model_cls = model_cls
 
-    def play(self) -> Meld:
+    def play(self, valid_plays) -> Meld:
         x = torch.tensor(
             self._model_cls.encode_state(self.memory, self),
             dtype=torch.float32,
@@ -76,7 +76,7 @@ class PlayerNetwork(AbstractPlayer):
         ).unsqueeze(0)
 
         mask = torch.tensor(
-            self._action_mask(), dtype=torch.bool, device=self._device
+            self._action_mask(valid_plays), dtype=torch.bool, device=self._device
         ).unsqueeze(0)
 
         with torch.no_grad():
@@ -86,9 +86,9 @@ class PlayerNetwork(AbstractPlayer):
 
         return self._action_to_meld(pred)
 
-    def _action_mask(self) -> np.ndarray:
+    def _action_mask(self, valid_plays) -> np.ndarray:
         mask = np.zeros(55, dtype=bool)
-        for meld in self.possible_plays():
+        for meld in valid_plays:
             mask[self._meld_to_action(meld)] = True
         return mask
 

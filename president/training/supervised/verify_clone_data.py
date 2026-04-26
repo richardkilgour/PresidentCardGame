@@ -27,6 +27,7 @@ import numpy as np
 
 from president.core.PlayingCard import PlayingCard
 from president.core.Meld import Meld
+from president.core.PlayValidator import PlayValidator
 from president.training.data.StateEncoder import StateEncoder, MELD_BITS, HAND_BITS, JOKER_OFFSET, MAX_REGULAR_VALUE
 
 EXPERIMENTS_DIR = (Path(__file__).resolve().parent.parent / "experiments").resolve()
@@ -113,8 +114,9 @@ def verify_sample(x: np.ndarray, y: np.ndarray, player, encode_action_fn) -> boo
 
     player._hand = sorted(hand, key=lambda c: c.get_index())
     player.target_meld = target
+    valid_plays = PlayValidator.possible_plays(player._hand, target)
 
-    action     = player.play()
+    action     = player.play(valid_plays)
     encoded    = encode_action_fn(action)
     return np.array_equal(encoded, y)
 

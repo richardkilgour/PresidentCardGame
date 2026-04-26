@@ -23,7 +23,6 @@ class AbstractPlayer(CardGameListener):
         self.name = name
         self._hand = []
         self._starting_hand = []
-        # TODO: ask the GM?
         self.target_meld = None
         self.position_count = [0, 0, 0, 0]
         self.last_played = None
@@ -58,7 +57,6 @@ class AbstractPlayer(CardGameListener):
         self.target_meld = None
 
     def notify_hand_won(self, winner):
-        # Someone just won the hand
         super().notify_hand_won(winner)
         self.target_meld = None
 
@@ -77,33 +75,8 @@ class AbstractPlayer(CardGameListener):
         """
         pass
 
-    def possible_plays(self, target=None, must_include_index=None):
-        """
-        Returns all valid melds that may be played given the current target meld.
-        Pass is included only when not leading.
-
-        Args:
-            target:              The meld to beat. Defaults to self.target_meld if not provided.
-            must_include_index:  Card index that must appear in the meld, or None.
-        """
-        if target is None:
-            target = self.target_meld
-        possible_melds = PlayValidator.possible_plays(self._hand, target, must_include_index)
-
-        card_string = f"{self.name} has:"
-        for s in self._hand:
-            card_string += " {},".format(s)
-        logging.info(card_string)
-
-        meld_string = f"Options for {self.name} to play are:"
-        for s in possible_melds:
-            meld_string += " {},".format(s)
-        logging.info(meld_string)
-
-        return possible_melds
-
     @abstractmethod
-    def play(self):
+    def play(self, valid_plays):
         # Must be implemented by children - BLOCKING (Don't expect any redraws)
         pass
 
@@ -209,27 +182,27 @@ def main():
         # Any single meld should result in possible plays inversely proportional to card value
         meld = Meld(PlayingCard(i))
         player.notify_play(None, meld)
-        assert (len(player.possible_plays(meld)) == 14 - i // 4)
+        assert (len(PlayValidator.possible_plays(player._hand, meld)) == 14 - i // 4)
         # Any double plays can't be responded to except by 2, Joker, or pass
         meld = Meld(PlayingCard(i + 1), meld)
         player.notify_play(None, meld)
         if meld.cards[0].get_value() < 12:
-            assert (len(player.possible_plays(meld)) == 3)
+            assert (len(PlayValidator.possible_plays(player._hand, meld)) == 3)
         elif meld.cards[0].get_value() == 12:
             # Double 2: Joker of pass
-            assert (len(player.possible_plays(meld)) == 2)
+            assert (len(PlayValidator.possible_plays(player._hand, meld)) == 2)
         else:
             # Double Joker: only Pass
-            assert (len(player.possible_plays(meld)) == 1)
+            assert (len(PlayValidator.possible_plays(player._hand, meld)) == 1)
 
     # Test case based on some bug
     player = AbstractPlayer('')
     # 3♦ 5♥ 5♠ 6♠ 7♦ 8♦ 9♥ 9♠ J♣ J♦ 2♦ Joker
     for card in ([2, 9, 8, 12, 18, 28, 25, 24, 35, 34, 50, 52]):
         player.card_to_hand(PlayingCard(card))
-    meld =  Meld(PlayingCard(53))
+    meld = Meld(PlayingCard(53))
     player.notify_play(None, meld)
-    print(player.possible_plays(meld))
+    print(PlayValidator.possible_plays(player._hand, meld))
 
 
 if __name__ == '__main__':
