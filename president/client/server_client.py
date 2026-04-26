@@ -42,22 +42,27 @@ class ServerClient:
         self._http = requests.Session()
         self.sio = socketio.Client(logger=False, engineio_logger=False)
 
-        self._ev_games = threading.Event()
-        self._ev_state = threading.Event()
+        self._ev_games   = threading.Event()
+        self._ev_state   = threading.Event()
         self._ev_created = threading.Event()
         self._ev_started = threading.Event()
+        self._ev_quit    = threading.Event()
 
         # Optional callbacks — set before connect() so none are missed
-        self.on_game_state = None      # (state: dict) -> None
-        self.on_player_turn = None     # (player_name: str) -> None
-        self.on_card_played = None     # (player_id: str, cards: list) -> None
-        self.on_hand_won = None        # (winner: str) -> None
-        self.on_game_started = None    # () -> None
-        self.on_hand_started = None    # () -> None
-        self.on_player_joined = None   # (name: str) -> None
-        self.on_player_quit = None     # (name: str) -> None
-        self.on_error = None           # (message: str) -> None
-        self.on_rejoin_game = None     # () -> None
+        self.on_game_state          = None   # (state: dict) -> None
+        self.on_player_turn         = None   # (player_name: str) -> None
+        self.on_card_played         = None   # (player_id: str, cards: list) -> None
+        self.on_hand_won            = None   # (winner: str) -> None
+        self.on_game_started        = None   # () -> None
+        self.on_hand_started        = None   # () -> None
+        self.on_player_joined       = None   # (name: str) -> None
+        self.on_player_quit         = None   # (name: str) -> None
+        self.on_player_disconnected = None   # (username: str) -> None
+        self.on_replace_available   = None   # (username: str) -> None
+        self.on_player_replaced     = None   # (username: str) -> None
+        self.on_quit_confirmed      = None   # () -> None
+        self.on_error               = None   # (message: str) -> None
+        self.on_rejoin_game         = None   # () -> None
 
         self._register_handlers()
 
@@ -118,6 +123,27 @@ class ServerClient:
         def _(data):
             if self.on_player_quit:
                 self.on_player_quit(data.get('username'))
+
+        @sio.on('player_disconnected')
+        def _(data):
+            if self.on_player_disconnected:
+                self.on_player_disconnected(data.get('username', ''))
+
+        @sio.on('replace_available')
+        def _(data):
+            if self.on_replace_available:
+                self.on_replace_available(data.get('username', ''))
+
+        @sio.on('player_replaced')
+        def _(data):
+            if self.on_player_replaced:
+                self.on_player_replaced(data.get('username', ''))
+
+        @sio.on('quit_confirmed')
+        def _(data):
+            self._ev_quit.set()
+            if self.on_quit_confirmed:
+                self.on_quit_confirmed()
 
         @sio.on('game_created')
         def _(data):
@@ -216,6 +242,18 @@ class ServerClient:
         self.sio.emit('start_game', {})
         return self._ev_started.wait(timeout=timeout)
 
+    def quit_game(self, timeout: float = 5.0) -> bool:
+        """Leave the current game. The server replaces us with AI (slot stays reserved).
+        Blocks until quit_confirmed or timeout; returns True on clean confirmation."""
+        self._ev_quit.clear()
+        self.sio.emit('quit_game', {})
+        return self._ev_quit.wait(timeout=timeout)
+
+    def replace_with_ai(self, username: str) -> None:
+        """Replace a disconnected player with an AI. Any player in the game may call this
+        once the server has emitted replace_available for that username."""
+        self.sio.emit('replace_with_ai', {'username': username})
+
     # -------------------------------------------------------------------------
     # Gameplay
     # -------------------------------------------------------------------------
@@ -232,6 +270,14 @@ class ServerClient:
         self.sio.emit('request_game_state', {})
         self._ev_state.wait(timeout=timeout)
         return self.game_state
+
+    def logout(self) -> None:
+        """Destroy the server-side HTTP session."""
+        try:
+            self._http.post(f'{self.server_url}/logout')
+        except Exception:
+            pass
+        self.username = None
 
     # -------------------------------------------------------------------------
     # Session persistence (for reconnect)
