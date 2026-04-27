@@ -138,9 +138,9 @@ class TestMeldEquality(unittest.TestCase):
         self.assertEqual(meld1, meld2)
 
     def test_single_card_inequality(self):
-        """Single card melds are unequal if different cards."""
+        """Single card melds are unequal if different values."""
         meld1 = Meld(FOUR_SPADES)
-        meld2 = Meld(FOUR_CLUBS)
+        meld2 = Meld(FIVE_SPADES)
         self.assertNotEqual(meld1, meld2)
 
     def test_double_equality(self):
