@@ -63,6 +63,20 @@ def console_for_state(state: dict) -> ConsolePlayer:
     console.players = [console] + [
         PlayerProxy(n, c) for n, c in zip(opp_names, opp_counts)
     ]
+    # TODO: player_status is a legacy attribute set here for the online display path.
+    # CardGameListener.get_player_status() now reconstructs status from memory, but
+    # this fake console is built from server JSON with PlayerProxy stubs — those proxies
+    # never appear in memory, so get_player_status() returns None for every player.
+    #
+    # To fix this properly, either:
+    #   (a) Teach get_player_status() to fall back to an _status_override dict
+    #       (keyed by player object), and populate that dict here instead of the raw list.
+    #   (b) Give PlayerConsole._show_table() an optional explicit status map so the
+    #       online display path can pass server-derived values without touching the
+    #       memory-backed attribute.
+    #
+    # Until then, _show_table() in the online path reads from player_status directly
+    # via the fallback branch — see PlayerConsole._show_table().
     console.player_status = [status_from_server(s) for s in state['player_status']]
     return console
 
