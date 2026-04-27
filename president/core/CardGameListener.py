@@ -4,19 +4,23 @@
 A Card Game Listener is aware of all the goings-on in the game, and by default keeps a history of them.
 """
 from president.core.Meld import Meld
-from president.core.PlayHistory import PlayHistory
+from president.core.PlayHistory import PlayHistory, EventType
 
 
 class CardGameListener:
     def __init__(self):
         self.memory = PlayHistory()
-        self.players = [None, None, None, None]
-        self.player_status = ['Absent', 'Absent', 'Absent', 'Absent']
+
+    @property
+    def players(self):
+        return self.memory.players
+
+    @players.setter
+    def players(self, value):
+        self.memory.set_players(value)
 
     def notify_player_joined(self, new_player, position):
-        self.players[position] = new_player
-        self.player_status[position] = 'Waiting'
-        self.memory.set_players(self.players)
+        self.memory.add_player(position, new_player)
 
     def notify_game_stated(self):
         pass
@@ -57,6 +61,23 @@ class CardGameListener:
 
     def notify_episode_end(self, final_ranks: list, starting_ranks: list) -> None:
         pass
+
+    def get_player_status(self, player):
+        """Return this player's current status reconstructed from memory.
+
+        Returns:
+            None          — waiting / absent / about to lead after winning a round
+            Meld          — the meld they played (empty Meld means passed)
+            int           — rank index (0=President … 3=Scumbag) if they finished
+        """
+        event = self.memory.last_event_for(player)
+        if event is None or event.event_type == EventType.ROUND_WON:
+            return None
+        if event.event_type == EventType.MELD:
+            return event.meld
+        if event.event_type == EventType.COMPLETE:
+            return event.meld  # stored as rank index
+        return None
 
     def opponents_clockwise(self, player=None) -> list:
         """

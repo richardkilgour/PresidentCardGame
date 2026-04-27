@@ -38,7 +38,7 @@ class PlayHistory:
     def __init__(self):
         self._memory = []
         self._finished_players = []
-        self._players = []             # Seated order for clockwise validation
+        self._players = [None, None, None, None]  # Positional seats; None = empty
         self._last_play_player = None  # Last player to act (meld or pass)
         self._starting_positions = {}  # player → rank index at episode start (empty = neutral)
         self._final_positions = {}     # player → rank index at episode end
@@ -50,12 +50,20 @@ class PlayHistory:
         # _players is preserved — seating doesn't change between hands
 
     def set_players(self, players):
-        """Record the seated player order (excluding empty seats)."""
-        self._players = [p for p in players if p is not None]
+        """Set the full positional seat list (None for empty seats)."""
+        self._players = list(players)
+
+    def add_player(self, position: int, player) -> None:
+        """Seat a player at the given position."""
+        self._players[position] = player
+
+    @property
+    def players(self):
+        return self._players
 
     def _get_expected_next_player(self):
         """Return the one valid next player: first clockwise from last who hasn't passed or finished."""
-        if not self._players or self._last_play_player is None:
+        if self._last_play_player is None:
             return None
         if self._last_play_player not in self._players:
             return None
@@ -71,7 +79,7 @@ class PlayHistory:
         last_idx = self._players.index(self._last_play_player)
         for i in range(1, n):
             candidate = self._players[(last_idx + i) % n]
-            if candidate not in passed_this_round and candidate not in finished:
+            if candidate is not None and candidate not in passed_this_round and candidate not in finished:
                 return candidate
         return None
 
