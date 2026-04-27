@@ -328,7 +328,7 @@ class Episode:
 
         elif self.state == State.PLAYING:
             self.player_turn()
-            if len(self.active_players) <= 1:
+            if len(self.active_players) == 0:
                 self.state = State.HAND_WON
 
         elif self.state == State.HAND_WON:
