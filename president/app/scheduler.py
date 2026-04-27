@@ -1,8 +1,11 @@
+import os
 import sched
 import threading
 import time
 
 from president.app.game_keeper import GamesKeeper
+
+_INTERVAL = float(os.environ.get('PRESIDENT_SCHEDULER_INTERVAL', '1'))
 
 
 def step_games(sc):
@@ -42,12 +45,12 @@ def step_games(sc):
         delete_game(game_id)
         GamesKeeper().remove_game(game_id)
 
-    sc.enter(1, 1, step_games, (sc,))
+    sc.enter(_INTERVAL, 1, step_games, (sc,))
 
 
 def start_scheduler():
     scheduler = sched.scheduler(time.time, time.sleep)
-    scheduler.enter(1, 1, step_games, (scheduler,))
+    scheduler.enter(_INTERVAL, 1, step_games, (scheduler,))
     thread = threading.Thread(target=scheduler.run, daemon=True)
     thread.start()
     return thread
