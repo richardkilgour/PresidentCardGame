@@ -49,18 +49,14 @@ class PlayerConsole(AbstractPlayer):
         remaining = player.report_remaining_cards() - len(meld)
         if player != self:
             print(f'  {player.name} plays {meld}  ({remaining} cards left)')
-        self._update_status(player, meld)
 
     def notify_pass(self, player):
         super().notify_pass(player)
         if player != self:
             print(f'  {player.name} passes.')
-            self._update_status(player, Meld())
 
     def notify_waiting(self, player):
         super().notify_waiting(player)
-        if player != self:
-            self._update_status(player, None)
 
     def notify_played_out(self, player, pos):
         super().notify_played_out(player, pos)
@@ -69,7 +65,6 @@ class PlayerConsole(AbstractPlayer):
             print(f'\n  ★ You ({player.name}) finished as {rank_name}!')
         else:
             print(f'  {player.name} finished as {rank_name}.')
-            self._update_status(player, rank_name)
 
     def notify_episode_end(self, final_ranks, starting_ranks):
         if input("Save this game to your history? [y/n] ").lower() == 'y':
@@ -79,28 +74,21 @@ class PlayerConsole(AbstractPlayer):
     # Display
     # -------------------------------------------------------------------------
 
-    def _update_status(self, player, status) -> None:
-        """Update the display status for a player if they are in our player list."""
-        if player in self.players:
-            self.player_status[self.players.index(player)] = status
-
     def _show_table(self) -> None:
         """Print the current table state from this player's perspective."""
         print(f'\n{"═" * 40}')
-        for i, player in enumerate(self.players):
-            if player is None:
-                continue
+
+        for player in [self] + self.opponents_clockwise():
             you_str = "  ◄ you" if player == self else ""
-            status = self.player_status[i]
-            if status is None:
-                status_str = "waiting"
+            status = self.get_player_status(player)
+            if isinstance(status, int):
+                status_str = f'finished: {self.ranking_names[status]}'
             elif isinstance(status, Meld):
                 status_str = f'played {status}' if status.cards else 'passed'
-            elif isinstance(status, str):
-                status_str = status
             else:
-                status_str = str(status)
+                status_str = 'waiting'
             print(f'  {player.name:15} {player.report_remaining_cards():2} cards   {status_str}{you_str}')
+
         print(f'{"─" * 40}')
         print(f'  Your hand: {self}')
         print(f'{"═" * 40}\n')
@@ -125,7 +113,7 @@ class PlayerConsole(AbstractPlayer):
             print(f'  [{i}] {meld}{split_str}')
         print("  [q] Save and quit")
 
-        user_input = input("\nYour choice: ").strip().lower()
+        user_input = input("\nYour choice [default 0]: ").strip().lower()
 
         if user_input in ('q', 'quit'):
             self._save_and_quit()
