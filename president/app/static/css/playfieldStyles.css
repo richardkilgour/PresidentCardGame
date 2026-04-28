@@ -1,136 +1,362 @@
-/******************************************************************************
-* Styles for play field.                                                   *
-******************************************************************************/
+/* Ghost Wire — Chrome Deco + Teal
+   Triple Point Design System
+   ============================================================ */
 
-.container {
-    display: grid;
-    grid-template-columns: 20% auto 20%;
+:root {
+  --bg:           #030608;
+  --felt:         #060F18;
+  --rim:          #00FFB8;
+  --panel-bg:     #020507;
+  --text:         #D0EEE6;
+  --muted:        #1E5044;
+  --accent:       #00FFB8;
+  --gold:         #88B8A8;
+  --btn:          #00FFB8;
+  --btn-text:     #020507;
+  --a-glow:       0 0 0 2px #00FFB8,
+                  0 0 20px rgba(0,255,184,0.55),
+                  0 0 40px rgba(0,255,184,0.2);
+  --font-h:       'Syne', sans-serif;
+  --font-b:       'IBM Plex Mono', monospace;
 }
 
-.header_row {
-  grid-column: 1 / 4;
-  grid-row: 1;
-  background-color: #F1C1A1;
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-b);
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
 }
 
-.grid-container {
-    display: grid;
-    grid-template-columns: 20% 15% 30% 15% 20%;
-    grid-template-rows: 30% 15% 15% 40%;
-    width: 100vw;
-    height: 100vh;
-    gap: 5px;
+/* ── Scanlines ──────────────────────────────────────────── */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,0.13) 3px,
+    rgba(0,0,0,0.13) 4px
+  );
 }
 
-.playfield_left { grid-area: 1 / 1 / span 3 / 2; background: lightblue; position: relative; border: none; }
-.playfield_center { grid-area: 1 / 2 / span 1 / span 3; background: lightgreen; position: relative; border: none; }
-.playfield_right { grid-area: 1 / 5 / span 3 / 6; background: lightcoral; position: relative; border: none; }
-.playfield_bottom { grid-area: 4 / 2 / 5 / 5; background: lightgoldenrodyellow; position: relative; border: none; }
-
-.arena_left { grid-area: 2 / 2 / span 2 / 3; background: lightsalmon; }
-.arena_center { grid-area: 2 / 3 / span 1 / 4; background: lightgray; }
-.arena_right { grid-area: 2 / 4 / span 2 / 5; background: lightpink; }
-.arena_bottom { grid-area: 3 / 3 / 4 / 4; background: lightyellow; }
-
-.left_over { grid-area: 4 / 1 / 5 / 2; background: lightcyan; }
-.right_over { grid-area: 4 / 5 / 5 / 6; background: lightseagreen; }
-
-.arena_play_area_0 {
-  position: relative;
-  left: 0%;
+/* ── ∴ Watermark ────────────────────────────────────────── */
+.table-watermark {
+  position: fixed;
   top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-h);
+  font-weight: 800;
+  font-size: 22vw;
+  color: rgba(0,255,184,0.03);
+  pointer-events: none;
+  z-index: 0;
+  user-select: none;
+  line-height: 1;
+}
+
+/* ── Grid ───────────────────────────────────────────────── */
+.grid-container {
+  display: grid;
+  grid-template-columns: 20% 15% 30% 15% 20%;
+  grid-template-rows: 30% 15% 15% 40%;
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* ── Grid areas ─────────────────────────────────────────── */
+.playfield_left   { grid-area: 1 / 1 / span 3 / 2; position: relative; }
+.playfield_center { grid-area: 1 / 2 / span 1 / span 3; position: relative; }
+.playfield_right  { grid-area: 1 / 5 / span 3 / 6; position: relative; }
+.playfield_bottom { grid-area: 4 / 2 / 5 / 5; position: relative; }
+.arena_left       { grid-area: 2 / 2 / span 2 / 3; }
+.arena_center     { grid-area: 2 / 3 / span 1 / 4; }
+.arena_right      { grid-area: 2 / 4 / span 2 / 5; }
+.arena_bottom     { grid-area: 3 / 3 / 4 / 4; }
+.left_over        { grid-area: 4 / 1 / 5 / 2; }
+.right_over       { grid-area: 4 / 5 / 5 / 6; }
+
+/* ── Felt table (centre 9 cells) ────────────────────────── */
+.playfield_left,
+.playfield_center,
+.playfield_right,
+.arena_left, .arena_center, .arena_right, .arena_bottom {
+  background: var(--felt);
+}
+
+/* Subtle rim glow around the table perimeter */
+.playfield_left   { border-left: 1px solid rgba(0,255,184,0.18); border-top: 1px solid rgba(0,255,184,0.18); }
+.playfield_center { border-top: 1px solid rgba(0,255,184,0.25); }
+.playfield_right  { border-right: 1px solid rgba(0,255,184,0.18); border-top: 1px solid rgba(0,255,184,0.18); }
+.arena_left       { border-left: 1px solid rgba(0,255,184,0.10); }
+.arena_right      { border-right: 1px solid rgba(0,255,184,0.10); }
+
+/* ── Side panels ────────────────────────────────────────── */
+.playfield_bottom,
+.left_over,
+.right_over {
+  background: var(--panel-bg);
+  border-top: 1px solid rgba(0,255,184,0.15);
+}
+.left_over  { border-right: 1px solid rgba(0,255,184,0.08); }
+.right_over { border-left:  1px solid rgba(0,255,184,0.08); }
+
+/* ── Arena play zones — dashed ghost borders ────────────── */
+.arena_left, .arena_center, .arena_right, .arena_bottom {
+  position: relative;
+}
+.arena_left::after, .arena_center::after,
+.arena_right::after, .arena_bottom::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px dashed rgba(0,255,184,0.12);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* ── Arena card transforms (unchanged from original) ─────── */
+.arena_play_area_0 {
+  position: relative; left: 0%; top: 50%;
   transform: translate(0%, -50%) rotate(90deg);
 }
-
 .arena_play_area_1 {
-  position: relative;
-  left: 50%;
-  top: 0%;
+  position: relative; left: 50%; top: 0%;
   transform: translate(-50%, 0%) rotate(180deg);
 }
-
 .arena_play_area_2 {
-  position: relative;
-  left: 0%;
-  top: 50%;
+  position: relative; left: 0%; top: 50%;
   transform: translate(50%, -50%) rotate(270deg);
 }
-
 .arena_play_area_3 {
-  position: relative;
-  left: 50%;
-  top: 0%;
+  position: relative; left: 50%; top: 0%;
   transform: translate(-50%, 50%);
 }
 
+/* ── Player rotations ───────────────────────────────────── */
 .player_left {
-  position: relative;
-  left: 50%;
-  top: 50%;
+  position: relative; left: 50%; top: 50%;
   transform: translate(-50%, -50%) rotate(90deg);
 }
-
 .player_opposite {
-  position: relative;
-  left: 50%;
-  top: 50%;
+  position: relative; left: 50%; top: 50%;
   transform: translate(-50%, -50%) rotate(180deg);
 }
-
 .player_right {
-  position: relative;
-  left: 50%;
-  top: 50%;
+  position: relative; left: 50%; top: 50%;
   transform: translate(-50%, -50%) rotate(270deg);
 }
-
 .player_you {
-  position: relative;
-  left: 50%;
-  top: 50%;
+  position: relative; left: 50%; top: 50%;
   transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
 
-[data-rank]::before {
-    content: attr(data-rank);
-    margin-right: 5px;
+/* ── Seat panel ─────────────────────────────────────────── */
+.seat-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: box-shadow 200ms ease-out, border-color 200ms ease-out;
 }
 
-[data-ex-rank]::after {
-    content: " (ex-" attr(data-ex-rank) ")";
-    font-size: 0.75em;
-    opacity: 0.65;
+/* ── Avatar ─────────────────────────────────────────────── */
+.seat-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0,255,184,0.25);
+  background: radial-gradient(ellipse at 50% 35%, rgba(0,255,184,0.12) 0%, transparent 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-avatar::after {
+  content: '∴';
+  font-family: var(--font-h);
+  font-size: 15px;
+  color: var(--accent);
+  opacity: 0.65;
+  text-shadow: 0 0 8px var(--accent);
 }
 
-#start_game_button {
-    position: relative;
-    overflow: hidden;
-    background-color: #444;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    font-size: 16px;
-    cursor: pointer;
+/* ── Seat names ─────────────────────────────────────────── */
+.seat-name {
+  font-family: var(--font-h);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: nowrap;
+}
+.you-name {
+  font-size: 13px;
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent);
+  margin-bottom: 2px;
 }
 
-#start_game_button::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 0%;
-    background-color: rgba(255, 255, 255, 0.3); /* Progress fill color */
-    transition: width 5s linear;
-}
-
-#start_game_button.fill::before {
-    width: 100%;
-}
-
-/* Highlight the current player's turn */
+/* ── Active turn ────────────────────────────────────────── */
 .active-turn {
-    border: 5px solid red !important;
-    box-shadow: 0 0 10px red;
-    transition: border 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  box-shadow: var(--a-glow) !important;
+  border-color: var(--accent) !important;
+}
+
+/* ── Rank badges ────────────────────────────────────────── */
+[data-rank]::before {
+  content: attr(data-rank);
+  display: inline-block;
+  font-family: var(--font-b);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(0,255,184,0.25);
+  border-radius: 3px;
+  padding: 1px 6px;
+  background: rgba(0,255,184,0.06);
+  margin-right: 6px;
+}
+[data-ex-rank]::after {
+  content: " (ex-" attr(data-ex-rank) ")";
+  font-size: 0.75em;
+  opacity: 0.45;
+}
+
+/* ── Hand play area border override ─────────────────────── */
+.hand_play_area {
+  border-color: rgba(0,255,184,0.18) !important;
+  border-style: dashed !important;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+button {
+  font-family: var(--font-b);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  padding: 8px 18px;
+  border: none;
+}
+
+.btn-primary {
+  background: var(--btn);
+  color: var(--btn-text);
+  box-shadow: 0 0 12px rgba(0,255,184,0.35);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(0,255,184,0.65);
+  transform: scale(0.98);
+}
+.btn-primary:disabled {
+  background: rgba(0,255,184,0.15);
+  color: rgba(0,255,184,0.35);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid rgba(30,80,68,0.5);
+}
+.btn-ghost:hover {
+  color: var(--accent);
+  border-color: rgba(0,255,184,0.35);
+}
+
+.btn-danger { color: #FF4444; border-color: rgba(255,68,68,0.25); }
+.btn-danger:hover { border-color: rgba(255,68,68,0.55); box-shadow: 0 0 10px rgba(255,68,68,0.25); }
+
+.btn-sm { padding: 4px 10px; font-size: 9px; }
+
+/* ── Start game fill animation ──────────────────────────── */
+#start_game_button { position: relative; overflow: hidden; }
+#start_game_button::before {
+  content: "";
+  position: absolute; top: 0; left: 0;
+  height: 100%; width: 0%;
+  background: rgba(255,255,255,0.15);
+  transition: width 5s linear;
+}
+#start_game_button.fill::before { width: 100%; }
+
+/* ── Controls panel ─────────────────────────────────────── */
+.controls-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 16px 12px;
+  height: 100%;
+}
+
+/* ── AI select panel ────────────────────────────────────── */
+.ai-select-panel {
+  position: absolute;
+  bottom: 0; width: 100%;
+  padding: 6px 10px;
+  background: rgba(2,5,7,0.92);
+  border-top: 1px solid rgba(0,255,184,0.15);
+  display: flex; align-items: center; gap: 8px;
+}
+.ai-label {
+  font-family: var(--font-b);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ai-select {
+  flex: 1;
+  background: rgba(0,255,184,0.04);
+  border: 1px solid rgba(0,255,184,0.2);
+  color: var(--text);
+  font-family: var(--font-b);
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 3px 6px;
+}
+
+/* ── Compulsory pass overlay ────────────────────────────── */
+.pass-overlay-text {
+  font-family: var(--font-h);
+  font-size: 2em;
+  font-weight: 800;
+  color: var(--accent);
+  text-shadow: 0 0 20px var(--accent), 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* ── Stats panel text ───────────────────────────────────── */
+#stats-panel {
+  font-size: 0.8em;
+  color: var(--muted);
+  line-height: 1.6;
+}
+#stats-panel h1, #stats-panel h2, #stats-panel h3 {
+  font-family: var(--font-h);
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
 }
