@@ -1,3 +1,4 @@
+import threading
 import time
 
 from president.core.Episode import State
@@ -5,6 +6,7 @@ from president.core.GameMaster import GameMaster
 from president.core.GameRecord import GameRecord
 from president.core.Meld import Meld
 from president.core.PlayingCard import PlayingCard
+from president.core.PlayerRegistry import PlayerRegistry
 from president.players.AsyncPlayer import AsyncPlayer
 from president.players.PlayerHolder import PlayerHolder
 from president.players.PlayerSimple import PlayerSimple
@@ -13,7 +15,10 @@ from president.players.PlayerSplitter import PlayerSplitter
 
 class GameWrapper(GameMaster):
     def __init__(self, game_id, listener):
-        super().__init__()
+        registry = PlayerRegistry()
+        registry.register(PlayerSimple, "Simple")
+        super().__init__(registry=registry)
+        self._step_lock = threading.Lock()
         self.game_id = game_id
         self.add_listener(listener)
         self.high_score = 0
@@ -22,6 +27,9 @@ class GameWrapper(GameMaster):
         self.reserved_slots: dict[int, str] = {}
         # username → {"time": float, "timeout": 10|20, "notified": bool}
         self.disconnect_info: dict[str, dict] = {}
+        # seconds between scheduler steps (controls AI play speed)
+        self.step_interval: float = 1.0
+        self.last_step_at: float = 0.0
         record = GameRecord(self, game_id=str(game_id))
         self.set_record(record)
         self.add_listener(record)
@@ -50,13 +58,20 @@ class GameWrapper(GameMaster):
     def can_start(self):
         return not self.episode or self.episode.state == State.INITIALISED
 
+    def step(self) -> bool:
+        with self._step_lock:
+            return super().step()
+
+    def swap_player(self, old_player, new_player) -> int:
+        # Hold the step lock so the scheduler cannot observe a state where
+        # active_players already has new_player but PlayHistory still expects
+        # old_player — which produces the "expected X but got X" crash.
+        with self._step_lock:
+            return super().swap_player(old_player, new_player)
+
     def play(self, user_id, cards_data):
         if not self.episode:
             return 'Game not started'
-        if not self.episode.active_players:
-            return 'Round not started'
-        if self.episode.active_players[0].name != user_id:
-            return 'Not your turn'
 
         meld = Meld()
         if cards_data != 'PASSED':
@@ -64,10 +79,16 @@ class GameWrapper(GameMaster):
                 value, suit = card.split('_')
                 meld = Meld(PlayingCard(int(value) * 4 + int(suit)), meld)
 
-        for p in self.player_manager.players:
-            if p.name == user_id:
-                p.add_play(meld)
-        self.episode.step()
+        with self._step_lock:
+            if not self.episode or not self.episode.active_players:
+                return 'Round not started'
+            if self.episode.active_players[0].name != user_id:
+                return 'Not your turn'
+            for p in self.player_manager.players:
+                if p.name == user_id:
+                    p.add_play(meld)
+        # Deliberately NOT calling episode.step() here — the scheduler is the
+        # sole driver of episode progression, which keeps PlayHistory consistent.
         return None
 
     # -------------------------------------------------------------------------
