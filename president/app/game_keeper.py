@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from president.players.AsyncPlayer import AsyncPlayer
+
 
 class GamesKeeper:
     _instance = None
@@ -27,10 +29,11 @@ class GamesKeeper:
         self._games[game_id].add_player(player, position)
 
     def find_player(self, player_id) -> list[str]:
-        """Return a list of all the games the given player is in"""
+        """Return a list of all the games the given player is in as a live human."""
         game_list = []
         for gid, game in self._games.items():
-            if player_id in [p.name for p in game.player_manager.players if p]:
+            if any(isinstance(p, AsyncPlayer) and p.name == player_id
+                   for p in game.player_manager.players if p):
                 game_list.append(gid)
         return game_list
 

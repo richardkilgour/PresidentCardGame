@@ -274,24 +274,11 @@ class GameMaster:
         """
         fallback_name = self.fallback_player_name or self.registry.names()[0]
         fallback = self.registry.create(fallback_name, f"{player.name}[auto]")
-
-        seat = self.player_manager.players.index(player)
-        fallback._hand = player._hand[:]
-        self.player_manager.players[seat] = fallback
-
-        if player in self.episode.active_players:
-            i = self.episode.active_players.index(player)
-            self.episode.active_players[i] = fallback
-
-        if player in self.listener_list:
-            i = self.listener_list.index(player)
-            self.listener_list[i] = fallback
-
+        seat = self.swap_player(player, fallback)
         logger.warning(
             f"{player.name} disqualified at seat {seat}, "
             f"replaced with {fallback_name}."
         )
-        self.notify_listeners("notify_player_joined", fallback, seat)
 
     def _force_pass(self, player: AbstractPlayer) -> None:
         """Force a pass for a player who made an illegal play."""

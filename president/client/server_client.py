@@ -89,7 +89,8 @@ class ServerClient:
         def _(data):
             # Automatically fetch fresh state on every turn notification so
             # all clients (including non-active ones) see the latest board.
-            sio.emit('request_game_state', {})
+            if sio.connected:
+                sio.emit('request_game_state', {})
             if self.on_player_turn:
                 self.on_player_turn(data.get('player'))
 

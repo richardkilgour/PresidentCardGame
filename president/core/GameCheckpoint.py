@@ -240,7 +240,7 @@ class GameCheckpoint:
             gm.episode = episode
 
             # Verify discard checksum
-            actual = len(gm.player_manager.discarded_cards)
+            actual = len(episode.card_handler.discard_pile)
             expected = episode_data["discard_count"]
             if actual != expected:
                 logging.warning(

@@ -190,6 +190,8 @@ def start_game(data=None):
     game = GamesKeeper().get_game(game_id)
     if game.can_start():
         game.start()
+        for info in game.disconnect_info.values():
+            info['timeout'] = 0
 
 
 @socketio.on('request_game_state')

@@ -130,7 +130,7 @@ class GameRecord(CardGameListener):
 
     def _seat_of(self, player) -> int:
         try:
-            return self.players.index(player)
+            return self.game_master.player_manager.players.index(player)
         except ValueError:
             return -1
 
