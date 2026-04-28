@@ -135,12 +135,19 @@ def get_state_for_user(user_id, game_id=None):
     ]
     can_pass = any(not meld.cards for meld in options)
 
+    is_ai_controlled = user_id in game.reserved_slots.values()
+
     is_my_turn = (
+        not is_ai_controlled and
         game.episode is not None and
         game.episode.state == EpisodeState.PLAYING and
         bool(game.episode.active_players) and
         game.episode.active_players[0].name == user_id
     )
+
+    # When AI is in control, don't expose playable flags — hand is read-only
+    if is_ai_controlled:
+        playable_cards = [[v, s, False] for v, s, _ in playable_cards]
 
     return {
         "game_id": game_id,
@@ -151,6 +158,8 @@ def get_state_for_user(user_id, game_id=None):
         "opponent_cards": opponent_cards,
         "is_owner": (game_state["owner"] == user_id),
         "is_my_turn": is_my_turn,
+        "is_ai_controlled": is_ai_controlled,
+        "step_interval": game.step_interval,
         "possible_melds": possible_melds,
         "can_pass": can_pass,
         "stats": game_state["stats"],
