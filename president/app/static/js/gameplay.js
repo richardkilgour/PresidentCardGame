@@ -12,10 +12,23 @@ const CardGame = {
         this.setupSocketEvents();
         this.cardRenderer = new CardRenderer();
         this.cardRenderer.setPlayFunction(this.playCards.bind(this));
+        this.currentRoundRanks = {};   // player name → finish position (0=President…3=Scumbag)
+        this.lastHandWinner   = null;  // winner of the most recent trick
+        this.suppressPassOverlay = false;
+        this.isAiControlled = false;
 
         const startGameButton = document.getElementById("start_game_button");
         startGameButton.addEventListener("click", () => this.socket.emit("start_game"));
         startGameButton.disabled = true;
+    },
+
+    // Debounced state request — collapses bursts of events into one round-trip
+    requestGameState: function() {
+        if (this._gsTimer) clearTimeout(this._gsTimer);
+        this._gsTimer = setTimeout(() => {
+            this._gsTimer = null;
+            this.socket.emit("request_game_state");
+        }, 30);
     },
 
     setupSocketEvents: function() {
@@ -24,69 +37,76 @@ const CardGame = {
             this.socket.emit('request_game_state');
         });
         this.socket.on("current_game_state", (data) => this.handleGameState(data));
-        this.socket.on('notify_player_joined', () => this.socket.emit("request_game_state"));
+        this.socket.on('notify_player_joined', () => this.requestGameState());
         this.socket.on('notify_game_started', () => {
             this.disableStartButton();
-            this.socket.emit("request_game_state");
+            this.requestGameState();
         });
         this.socket.on('notify_cards_swapped', (data) => {
             const myName = document.getElementById('player_id').textContent.trim();
             if (data.player_good === myName || data.player_bad === myName) {
-                const iGave    = data.player_good === myName ? data.cards_to_bad  : data.cards_to_good;
+                const iGave     = data.player_good === myName ? data.cards_to_bad  : data.cards_to_good;
                 const iReceived = data.player_good === myName ? data.cards_to_good : data.cards_to_bad;
                 const otherName = data.player_good === myName ? data.player_bad    : data.player_good;
                 this.pendingSwap = { iGave, iReceived, otherName };
             }
         });
         this.socket.on('notify_hand_start', () => {
+            this.currentRoundRanks = {};
             if (this.pendingSwap) {
                 this.showSwapModal(this.pendingSwap);
                 this.pendingSwap = null;
             } else {
-                this.socket.emit("request_game_state");
+                this.requestGameState();
             }
         });
         this.socket.on('notify_hand_won', (data) => {
-            this.socket.emit("request_game_state");
+            this.requestGameState();
         });
         this.socket.on('notify_played_out', (data) => {
             const rankSymbols = ["👑", "🥈", "🥉", "💩"];
 
-            if (data.pos == 0) {
-                document.querySelectorAll("[data-ex-rank]").forEach(el => {
-                    el.removeAttribute("data-ex-rank");
-                });
+            // Record this player's finish position for status display
+            this.currentRoundRanks[data.player] = data.pos;
+
+            // When the first player plays out (new President), move every still-playing
+            // player's old rank badge to an ex-rank label
+            if (data.pos === 0) {
                 document.querySelectorAll("[data-rank]").forEach(el => {
                     el.setAttribute("data-ex-rank", el.getAttribute("data-rank"));
                     el.removeAttribute("data-rank");
                 });
             }
 
-            let playerElement
-            if (document.getElementById('opponent-1-name').textContent.trim() == data.player) {
-                playerElement = document.getElementById('opponent-1-name');
-            }
-            else if (document.getElementById('opponent-2-name').textContent.trim() == data.player) {
-                playerElement = document.getElementById('opponent-2-name');
-            }
-            else if (document.getElementById('opponent-3-name').textContent.trim() == data.player) {
-                playerElement = document.getElementById('opponent-3-name');
-            }
-            else if (document.getElementById('player_id').textContent.trim() == data.player) {
-                playerElement = document.getElementById('player_id');
-            }
-
+            // Set the new rank badge for the player who just played out and strip any
+            // ex-rank label they may have (they have a real rank now)
+            const playerElement = this._findNameElement(data.player);
             if (playerElement) {
                 playerElement.setAttribute("data-rank", rankSymbols[data.pos]);
+                playerElement.removeAttribute("data-ex-rank");
             }
-            this.socket.emit("request_game_state");
+
+            // Once the Scumbag is determined all positions are known — ex-ranks can go
+            if (data.pos === 3) {
+                document.querySelectorAll("[data-ex-rank]").forEach(el => {
+                    el.removeAttribute("data-ex-rank");
+                });
+            }
+
+            this.requestGameState();
         });
         this.socket.on('hand_won', (data) => {
-            this.socket.emit("request_game_state");
+            this.lastHandWinner = data.winner;
+            this.requestGameState();
         });
-        this.socket.on('notify_player_turn', (data) => this.highlightCurrentPlayerTurn(data));
+        this.socket.on('notify_player_turn', (data) => {
+            const myName = document.getElementById('player_id').textContent.trim();
+            if (data.player === myName) this.suppressPassOverlay = false;
+            this.highlightCurrentPlayerTurn(data);
+        });
         this.socket.on('card_played', (data) => {
-            this.socket.emit("request_game_state");
+            this.lastHandWinner = null;
+            this.requestGameState();
         });
 
         // Disconnection / replacement events
@@ -94,11 +114,11 @@ const CardGame = {
         this.socket.on('replace_available', (data) => this.showReplaceButton(data.username));
         this.socket.on('player_replaced', (data) => {
             this.clearDisconnectedState(data.username);
-            this.socket.emit("request_game_state");
+            this.requestGameState();
         });
         this.socket.on('player_quit', (data) => {
             this.clearDisconnectedState(data.username);
-            this.socket.emit("request_game_state");
+            this.requestGameState();
         });
         this.socket.on('quit_confirmed', () => {
             window.location.href = '/';
@@ -106,8 +126,16 @@ const CardGame = {
     },
 
     // -------------------------------------------------------------------------
-    // Disconnect / replace UI
+    // Helpers
     // -------------------------------------------------------------------------
+
+    _findNameElement: function(playerName) {
+        for (const id of ['opponent-1-name', 'opponent-2-name', 'opponent-3-name', 'player_id']) {
+            const el = document.getElementById(id);
+            if (el && el.textContent.trim() === playerName) return el;
+        }
+        return null;
+    },
 
     _playerPanels: function() {
         return [
@@ -117,6 +145,10 @@ const CardGame = {
             { nameId: 'opponent-3-name', playfieldId: 'playfield_right'  },
         ];
     },
+
+    // -------------------------------------------------------------------------
+    // Disconnect / replace UI
+    // -------------------------------------------------------------------------
 
     handlePlayerDisconnected: function(username) {
         for (const { nameId, playfieldId } of this._playerPanels()) {
@@ -194,8 +226,59 @@ const CardGame = {
     },
 
 
+    // -------------------------------------------------------------------------
+    // AI control toggle + speed
+    // -------------------------------------------------------------------------
+
+    toggleAiControl: function() {
+        if (this.isAiControlled) {
+            this.socket.emit('self_take_control');
+        } else {
+            this.socket.emit('self_play_as_ai');
+        }
+    },
+
+    // val: 1–20 slider position → seconds interval (log scale)
+    // val=1 → ~8s (very slow), val=10 → 1.0s (normal), val=20 → 0.1s (fast)
+    _sliderToInterval: function(val) {
+        return Math.pow(10, (10 - val) * 0.1);
+    },
+
+    _intervalToLabel: function(interval) {
+        if (interval >= 3)   return 'Very slow';
+        if (interval >= 1.5) return 'Slow';
+        if (interval >= 0.8) return 'Normal';
+        if (interval >= 0.3) return 'Fast';
+        return 'Very fast';
+    },
+
+    onSpeedSlider: function(val) {
+        const interval = this._sliderToInterval(parseInt(val, 10));
+        document.getElementById('speed-label-value').textContent = this._intervalToLabel(interval);
+        this.socket.emit('set_game_speed', { interval });
+    },
+
+    // Sync slider position from a server-provided interval value
+    _syncSpeedSlider: function(interval) {
+        // Invert: val = 10 - log10(interval) / 0.1
+        const val = Math.round(10 - Math.log10(interval) / 0.1);
+        const clamped = Math.max(1, Math.min(20, val));
+        const slider = document.getElementById('speed-slider');
+        if (slider && parseInt(slider.value, 10) !== clamped) {
+            slider.value = clamped;
+            document.getElementById('speed-label-value').textContent = this._intervalToLabel(interval);
+        }
+    },
+
     handleGameState: function(data) {
         console.log("Received full game state:", data);
+
+        const position_names = [
+            "President",
+            "Vice-President",
+            "Citizen",
+            "Scumbag",
+        ];
 
         let playerCount = data.player_names.filter(opponent => opponent !== null).length;
 
@@ -212,28 +295,33 @@ const CardGame = {
 
         this.updatePlayerHand(data.player_hand);
         this.updateStats(data.stats);
-        const mustPass = data.is_my_turn
+
+        // Sync AI-control button label
+        this.isAiControlled = !!data.is_ai_controlled;
+        const aiBtn = document.getElementById('ai-control-btn');
+        if (aiBtn) aiBtn.textContent = this.isAiControlled ? 'Take Control' : 'Play as AI';
+
+        // Sync speed slider without triggering another emit
+        if (data.step_interval !== undefined) this._syncSpeedSlider(data.step_interval);
+
+        const mustPass = !this.suppressPassOverlay
+            && data.is_my_turn
             && data.player_hand.length > 0
             && !data.player_hand.some(c => c[2]);
         const overlay = document.getElementById('compulsory-pass-overlay');
         overlay.style.display = mustPass ? 'flex' : 'none';
-        document.getElementById("player_id").innerHTML = data.player_names[0]
-
-        const position_names = [
-            "President",
-            "Vice-President",
-            "Citizen",
-            "Scumbag",
-        ];
+        document.getElementById("player_id").innerHTML = data.player_names[0];
 
         for (var i = 0; i < 4; i += 1) {
             if (typeof data.player_status[i] === "string") {
                 if (data.player_status[i] !== "Absent") {
-                    let position_index = data.player_positions.indexOf(data.player_names[i])
-                    if (position_index >= 0) {
-                        this.setStatus(data.player_names[i], "Finished as " + position_names[position_index] )
+                    const rankIndex = this.currentRoundRanks[data.player_names[i]];
+                    if (rankIndex !== undefined) {
+                        this.setStatus(data.player_names[i], "Finished as " + position_names[rankIndex]);
+                    } else if (data.player_status[i] === 'Waiting' && data.player_names[i] === this.lastHandWinner) {
+                        this.setStatus(data.player_names[i], 'Winner!');
                     } else {
-                        this.setStatus(data.player_names[i], data.player_status[i])
+                        this.setStatus(data.player_names[i], data.player_status[i]);
                     }
                 }
             }
@@ -270,7 +358,7 @@ const CardGame = {
                 document.getElementById(playerMap[key]).classList.add("active-turn");
             }
         });
-        this.socket.emit("request_game_state");
+        this.requestGameState();
     },
 
     findArena: function(playerId) {
@@ -361,8 +449,8 @@ const CardGame = {
     showSwapModal: function({ iGave, iReceived, otherName }) {
         const renderCards = (cards) => {
             const wrap = document.createElement('div');
-            const cardWidth = 11;
-            wrap.style.cssText = `position:relative; height:150px; width:${cards.length * 2 + cardWidth}em; margin:0 auto;`;
+            // Use fixed px so card_hit_area's 20pt font-size doesn't cause em-unit mismatch
+            wrap.style.cssText = 'position:relative; height:185px; width:420px; margin:0 auto;';
             cards.forEach(([value, suit], i) => {
                 const index = i - Math.floor(cards.length / 2);
                 wrap.appendChild(this.cardRenderer.renderCard(value, suit, index, false, false));
@@ -375,7 +463,7 @@ const CardGame = {
         overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:1000; display:flex; align-items:center; justify-content:center;';
 
         const box = document.createElement('div');
-        box.style.cssText = 'background:#222; color:#fff; border-radius:12px; padding:24px 32px; text-align:center; min-width:260px; max-width:480px;';
+        box.style.cssText = 'background:#222; color:#fff; border-radius:12px; padding:24px 32px; text-align:center; min-width:260px; max-width:520px;';
 
         const title = document.createElement('h2');
         title.textContent = 'Card Swap';
@@ -405,7 +493,7 @@ const CardGame = {
     dismissSwapModal: function() {
         const overlay = document.getElementById('swap-modal-overlay');
         if (overlay) overlay.remove();
-        this.socket.emit("request_game_state");
+        this.requestGameState();
     },
 
     updateStats: function(stats) {
@@ -441,9 +529,18 @@ const CardGame = {
 
     playCards: function(cards) {
         console.log("playCards: " + cards);
+        this.suppressPassOverlay = true;
+        this.lastHandWinner = null;
         this.lastPlayedRects = Array.isArray(cards)
             ? cards.map(id => { const el = document.getElementById(id); return el ? el.getBoundingClientRect() : null; })
             : null;
+        // Optimistically remove played cards from hand so the UI responds immediately
+        if (Array.isArray(cards)) {
+            cards.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.closest('.card_hit_area')?.remove();
+            });
+        }
         this.socket.emit('play_cards', {'cards': cards});
     },
 
@@ -564,4 +661,6 @@ document.addEventListener("DOMContentLoaded", function() {
     window.leaveGame = () => CardGame.leaveGame();
     window.readyToStart = () => CardGame.readyToStart();
     window.addAIPlayer = (opponentIndex) => CardGame.addAIPlayer(opponentIndex);
+    window.toggleAiControl = () => CardGame.toggleAiControl();
+    window.onSpeedSlider = (val) => CardGame.onSpeedSlider(val);
 });
