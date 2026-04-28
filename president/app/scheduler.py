@@ -16,8 +16,9 @@ def step_games(sc):
     finished_games = []
 
     for game_id, game_wrapper in list(GamesKeeper().get_games().items()):
-        # Advance game logic
-        if game_wrapper.episode:
+        # Advance game logic, respecting per-game speed setting
+        if game_wrapper.episode and (now - game_wrapper.last_step_at) >= game_wrapper.step_interval:
+            game_wrapper.last_step_at = now
             done = game_wrapper.step()
             if done:
                 finished_games.append(game_id)

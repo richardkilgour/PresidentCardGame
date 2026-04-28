@@ -57,6 +57,35 @@ class PlayHistory:
         """Seat a player at the given position."""
         self._players[position] = player
 
+    def replace_player(self, old_player, new_player) -> None:
+        """Rewrite every identity reference from old_player to new_player.
+
+        Must be called while holding any step lock so the scheduler cannot
+        observe a half-updated state between the active_players swap and
+        this memory patch.
+        """
+        # Seat list
+        for i, p in enumerate(self._players):
+            if p is old_player:
+                self._players[i] = new_player
+        # Current-turn pointer
+        if self._last_play_player is old_player:
+            self._last_play_player = new_player
+        # Finished players list
+        for i, p in enumerate(self._finished_players):
+            if p is old_player:
+                self._finished_players[i] = new_player
+        # Position dicts keyed by player object
+        if old_player in self._starting_positions:
+            self._starting_positions[new_player] = self._starting_positions.pop(old_player)
+        if old_player in self._final_positions:
+            self._final_positions[new_player] = self._final_positions.pop(old_player)
+        # Historical events — identity-based lookups (last_event_for, reconstruct_hand)
+        # must continue to resolve correctly for the same logical player.
+        for event in self._memory:
+            if event.player is old_player:
+                event.player = new_player
+
     @property
     def players(self):
         return self._players

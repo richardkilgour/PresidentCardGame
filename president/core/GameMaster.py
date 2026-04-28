@@ -256,13 +256,27 @@ class GameMaster:
         new_player.position_count = old_player.position_count[:]
         self.player_manager.players[seat] = new_player
 
-        if self.episode and old_player in self.episode.active_players:
-            i = self.episode.active_players.index(old_player)
-            self.episode.active_players[i] = new_player
+        if self.episode:
+            if old_player in self.episode.active_players:
+                i = self.episode.active_players.index(old_player)
+                self.episode.active_players[i] = new_player
+
+            # Patch episode rank lists so identity checks stay consistent
+            for rank_list in (self.episode.ranks, self.episode.starting_ranks):
+                for i, p in enumerate(rank_list):
+                    if p is old_player:
+                        rank_list[i] = new_player
 
         if old_player in self.listener_list:
             i = self.listener_list.index(old_player)
             self.listener_list[i] = new_player
+
+        # Rewrite all object-identity references in every listener's play history.
+        # This must happen before notify_player_joined so that no window exists
+        # where active_players has new_player but memory still expects old_player.
+        for listener in self.listener_list:
+            if hasattr(listener, 'memory'):
+                listener.memory.replace_player(old_player, new_player)
 
         self.notify_listeners("notify_player_joined", new_player, seat)
         return seat
