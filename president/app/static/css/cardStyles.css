@@ -8,8 +8,6 @@
   border-style: solid;
   font-size: 20pt;
   position: relative;
-  left: 50%;
-  transform: translate(-50%, 0%);
   width:  16em;
   height: 6em;
 }
