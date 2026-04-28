@@ -206,6 +206,45 @@ def send_game_state(data=None):
     emit_to_user(user_id, 'current_game_state', game_state)
 
 
+@socketio.on('self_play_as_ai')
+def handle_self_play_as_ai(data=None):
+    from president.app.game_persistence import save_game
+    user_id = session.get('user')
+    game_id = find_valid_game(user_id)
+    if not game_id:
+        return
+    game = GamesKeeper().get_game(game_id)
+    # Only swap if the user is currently an active human player (not already watching)
+    if user_id not in game.reserved_slots.values():
+        game.replace_human_with_ai(user_id, reserved=True)
+        save_game(game_id)
+    send_game_state()
+
+
+@socketio.on('self_take_control')
+def handle_self_take_control(data=None):
+    from president.app.game_persistence import save_game
+    user_id = session.get('user')
+    game_id = find_valid_game(user_id)
+    if not game_id:
+        return
+    game = GamesKeeper().get_game(game_id)
+    if game.restore_human_player(user_id):
+        save_game(game_id)
+    send_game_state()
+
+
+@socketio.on('set_game_speed')
+def handle_set_game_speed(data):
+    user_id = session.get('user')
+    game_id = find_valid_game(user_id)
+    if not game_id:
+        return
+    interval = float(data.get('interval', 1.0))
+    interval = max(0.05, min(8.0, interval))  # clamp to a sane range
+    GamesKeeper().get_game(game_id).step_interval = interval
+
+
 @socketio.on('play_cards')
 def handle_play_card(data):
     user_id = session.get('user')
