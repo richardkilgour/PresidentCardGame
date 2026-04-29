@@ -23,9 +23,7 @@ class AbstractPlayer(CardGameListener):
         self.name = name
         self._hand = []
         self._starting_hand = []
-        self.target_meld = None
         self.position_count = [0, 0, 0, 0]
-        self.last_played = None
         self.consecutive_president = 0
         self.max_consecutive_president = 0
 
@@ -54,17 +52,12 @@ class AbstractPlayer(CardGameListener):
     def notify_hand_start(self):
         super().notify_hand_start()
         self._starting_hand = list(self._hand)
-        self.target_meld = None
 
     def notify_hand_won(self, winner):
         super().notify_hand_won(winner)
-        self.target_meld = None
 
     def notify_play(self, player, meld):
         super().notify_play(player, meld)
-        # Ignore passes
-        if not self.target_meld or meld > self.target_meld:
-            self.target_meld = meld
 
     def notify_episode_end(self, final_ranks: list,
                            starting_ranks: list) -> None:

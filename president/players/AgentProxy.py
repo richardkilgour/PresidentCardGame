@@ -35,7 +35,7 @@ class AgentProxy(AbstractPlayer):
             self._awaiting_action = False
             assert self._chosen_meld in self._snapshot_plays, (
                 f"Agent submitted invalid meld {self._chosen_meld} "
-                f"(target={self.target_meld}); mask was not respected"
+                f"(options: {[s for s in self.valid_plays]}); mask was not respected"
             )
             return self._chosen_meld
 

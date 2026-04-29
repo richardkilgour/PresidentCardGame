@@ -26,13 +26,9 @@ class PlayerHolder(PlayerSplitter):
     def play(self, valid_plays):
         candidate = super().play(valid_plays)
 
-        # No target — defer to PlayerSplitter
-        if not self.target_meld:
-            return candidate
-
         # Forced pass — no choice
         if not candidate.cards:
-            logging.info(f'{self.name}: forced to pass against {self.target_meld}')
+            logging.info(f'{self.name}: forced to pass')
             return candidate
 
         # Instant winner — always play it
@@ -52,7 +48,7 @@ class PlayerHolder(PlayerSplitter):
             )
             return valid_plays[-1]  # Pass
 
-        logging.info(f'{self.name}: playing {candidate} against {self.target_meld}')
+        logging.info(f'{self.name}: playing {candidate}')
         return candidate
 
     def _should_conserve(self, candidate) -> bool:

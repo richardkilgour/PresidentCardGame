@@ -18,23 +18,21 @@ from president.players.PlayerSimple import PlayerSimple
 class PlayerSplitter(PlayerSimple):
 
     def play(self, valid_plays):
-        # No target — defer to PlayerSimple
-        if not self.target_meld:
-            return super().play(valid_plays)
-
         # Scan for the lowest safe (non-splitting) play
         for meld in valid_plays:
             if self._is_safe_to_play(meld):
                 if not meld.cards and len(valid_plays) > 1:
-                    # Passing is safe but we have other options —
+                    # Normally, pass, but consider splitting a pair to stay in
                     # split the highest card to stay in the round
                     # TODO: maybe not the _highest_, but median or some heuristic?
                     highest = valid_plays[-2]
-                    logging.info(
-                        f'{self.name}: choosing to split {highest} '
-                        f'rather than pass'
-                    )
-                    return highest
+                    # Do not split low cards (< 10)
+                    if highest.value() > 7:
+                        logging.info(
+                            f'{self.name}: choosing to split {highest} '
+                            f'rather than pass'
+                        )
+                        return highest
                 return meld
 
         # Should never reach here

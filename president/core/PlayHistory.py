@@ -263,6 +263,44 @@ class PlayHistory:
         )
         return starting_count - played
 
+    def get_player_status(self, player):
+        """Return the player's current status reconstructed from memory.
+
+        Returns:
+            None  — waiting / absent / about to lead after winning a round
+            Meld  — the meld they played (empty Meld means passed)
+            int   — rank index (0=President … 3=Scumbag) if they finished
+        """
+        event = self.last_event_for(player)
+        if event is None or event.event_type == EventType.ROUND_WON:
+            return None
+        if event.event_type == EventType.MELD:
+            return event.meld
+        if event.event_type == EventType.COMPLETE:
+            return event.meld  # stored as rank index
+        return None
+
+    def opponents_clockwise(self, player) -> list:
+        """Return the other players in clockwise order relative to player.
+
+        Raises:
+            ValueError: If the player is not seated at this table.
+        """
+        if player not in self._players:
+            raise ValueError(
+                f"{getattr(player, 'name', player)} is not seated "
+                f"at this table. "
+                f"Seated players: "
+                f"{[p.name for p in self._players if p is not None]}"
+            )
+        seat = self._players.index(player)
+        n = len(self._players)
+        return [
+            self._players[(seat + i) % n]
+            for i in range(1, n)
+            if self._players[(seat + i) % n] is not None
+        ]
+
     def previous_plays_generator(self, plays_to_skip: int = 0):
         """
         Generate events in reverse chronological order.

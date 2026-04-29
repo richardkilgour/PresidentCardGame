@@ -40,7 +40,7 @@ class PlayerRL(AbstractPlayer):
         self._model  = MaskablePPO.load(model_path, device=_device)
 
     def play(self, valid_plays) -> Meld:
-        obs  = encode_state(self._hand, self.target_meld).astype(np.float32)
+        obs  = encode_state(self._hand, self.memory.current_target()).astype(np.float32)
         mask = self._get_action_mask(valid_plays)
 
         with torch.no_grad():
@@ -58,7 +58,7 @@ class PlayerRL(AbstractPlayer):
 
         logging.warning(
             f"{self.name}: RL model predicted illegal meld, falling back. "
-            f"Hand: {self._hand}, target: {self.target_meld}"
+            f"Hand: {self._hand}, target: {[s for s in valid_plays]}"
         )
         return valid_plays[0]
 

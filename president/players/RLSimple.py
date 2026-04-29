@@ -64,7 +64,6 @@ class RLSimple(AbstractPlayer):
         best_play = net_out.argmax()
         best_meld = masked_argmax(net_out, valid_indices)
         if best_play != best_meld.item():
-            print(f"Target: {self.target_meld} Hand: {' '.join([c.__str__() for c in self._hand])}")
             print(f"Wanted to play {index_to_meld(best_play)}, but decided to play {index_to_meld(best_meld.item())}")
         meld = index_to_meld(best_meld)
         return meld

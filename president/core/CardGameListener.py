@@ -4,7 +4,7 @@
 A Card Game Listener is aware of all the goings-on in the game, and by default keeps a history of them.
 """
 from president.core.Meld import Meld
-from president.core.PlayHistory import PlayHistory, EventType
+from president.core.PlayHistory import PlayHistory
 
 
 class CardGameListener:
@@ -62,51 +62,3 @@ class CardGameListener:
     def notify_episode_end(self, final_ranks: list, starting_ranks: list) -> None:
         pass
 
-    def get_player_status(self, player):
-        """Return this player's current status reconstructed from memory.
-
-        Returns:
-            None          — waiting / absent / about to lead after winning a round
-            Meld          — the meld they played (empty Meld means passed)
-            int           — rank index (0=President … 3=Scumbag) if they finished
-        """
-        event = self.memory.last_event_for(player)
-        if event is None or event.event_type == EventType.ROUND_WON:
-            return None
-        if event.event_type == EventType.MELD:
-            return event.meld
-        if event.event_type == EventType.COMPLETE:
-            return event.meld  # stored as rank index
-        return None
-
-    def opponents_clockwise(self, player=None) -> list:
-        """
-        Return the other players in clockwise order relative to the given player.
-        If player is None, uses self as the reference point.
-        Can be called by any listener — not just the player themselves.
-
-        Args:
-            player: The player to use as the reference point.
-                    Defaults to self if None.
-
-        Returns:
-            List of the other players in clockwise order.
-
-        Raises:
-            ValueError: If the player is not seated at this table.
-        """
-        reference = player if player is not None else self
-        if reference not in self.players:
-            raise ValueError(
-                f"{getattr(reference, 'name', reference)} is not seated "
-                f"at this table. "
-                f"Seated players: "
-                f"{[p.name for p in self.players if p is not None]}"
-            )
-        seat = self.players.index(reference)
-        n = len(self.players)
-        return [
-            self.players[(seat + i) % n]
-            for i in range(1, n)
-            if self.players[(seat + i) % n] is not None
-        ]

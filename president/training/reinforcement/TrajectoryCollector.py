@@ -63,7 +63,7 @@ class TrajectoryCollector(CardGameListener):
                     and player not in self._players_to_track:
                 continue
             try:
-                opponents  = self.opponents_clockwise(player)
+                opponents  = self.memory.opponents_clockwise(player)
                 trajectory = self._encoder.encode(player, opponents)
                 self._store.append(trajectory)
             except RuntimeError as e:

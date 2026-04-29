@@ -78,9 +78,9 @@ class PlayerConsole(AbstractPlayer):
         """Print the current table state from this player's perspective."""
         print(f'\n{"═" * 40}')
 
-        for player in [self] + self.opponents_clockwise():
+        for player in [self] + self.memory.opponents_clockwise(self):
             you_str = "  ◄ you" if player == self else ""
-            status = self.get_player_status(player)
+            status = self.memory.get_player_status(player)
             if isinstance(status, int):
                 status_str = f'finished: {self.ranking_names[status]}'
             elif isinstance(status, Meld):

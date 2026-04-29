@@ -78,6 +78,6 @@ class PyGamePlayer(PlayerSimple):
         if m:
             self.next_action = None
             return m
-        print(f'INVALID CLICK; {self.next_action} is not better than {self.target_meld}')
+        print(f'INVALID CLICK; {self.next_action} is not a valid play')
         self.next_action = None
         return '␆'
