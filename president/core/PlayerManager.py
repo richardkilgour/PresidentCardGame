@@ -48,6 +48,17 @@ class PlayerManager:
         self.players[position] = player
         return position
 
+    def swap_player(self, old_player: AbstractPlayer, new_player: AbstractPlayer) -> int:
+        """
+        Replace old_player with new_player in their seat.
+
+        Returns:
+            The seat index of the replaced player.
+        """
+        seat = self.players.index(old_player)
+        self.players[seat] = new_player
+        return seat
+
     def find_card_holder(self, target_value: int, target_suit: int) -> AbstractPlayer | None:
         """
         Find the player holding a card with the given value and suit.

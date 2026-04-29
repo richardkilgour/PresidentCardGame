@@ -251,10 +251,11 @@ class GameMaster:
         Returns:
             The seat index of the replaced player.
         """
-        seat = self.player_manager.players.index(old_player)
         new_player._hand = old_player._hand[:]
+        new_player._starting_hand = old_player._starting_hand[:]
         new_player.position_count = old_player.position_count[:]
-        self.player_manager.players[seat] = new_player
+        new_player.memory = old_player.memory
+        seat = self.player_manager.swap_player(old_player, new_player)
 
         if self.episode:
             if old_player in self.episode.active_players:
