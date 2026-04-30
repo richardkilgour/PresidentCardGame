@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import threading
 import time
 
@@ -30,6 +32,8 @@ class GameWrapper(GameMaster):
         # seconds between scheduler steps (controls AI play speed)
         self.step_interval: float = 1.0
         self.last_step_at: float = 0.0
+        self.is_seeded: bool = False
+        self.seed_label: str | None = None
         record = GameRecord(self, game_id=str(game_id))
         self.set_record(record)
         self.add_listener(record)

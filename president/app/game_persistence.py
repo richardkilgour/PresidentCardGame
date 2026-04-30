@@ -25,9 +25,9 @@ def _make_restore_registry() -> PlayerRegistry:
 def save_game(game_id: str) -> None:
     """Serialise the current game trajectory to games.json."""
     game = GamesKeeper().get_game(game_id)
-    # Always write a fresh state snapshot so there is a valid restore point,
-    # even if notify_hand_start hasn't fired yet.
-    if game._record and game.episode:
+    if game.is_seeded:
+        return  # Seeded lobby games are ephemeral — recreated at startup, never persisted
+    if game._record:
         game._record._append_state("checkpoint")
     data = game._record.serialise()
     data["reserved_slots"] = {str(k): v for k, v in game.reserved_slots.items()}

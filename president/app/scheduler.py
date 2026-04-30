@@ -19,7 +19,12 @@ def step_games(sc):
         # Advance game logic, respecting per-game speed setting
         if game_wrapper.episode and (now - game_wrapper.last_step_at) >= game_wrapper.step_interval:
             game_wrapper.last_step_at = now
-            done = game_wrapper.step()
+            try:
+                done = game_wrapper.step()
+            except Exception:
+                import logging, traceback
+                logging.error(f"Unhandled error stepping game {game_id}:\n{traceback.format_exc()}")
+                done = False
             if done:
                 finished_games.append(game_id)
 

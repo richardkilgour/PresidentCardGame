@@ -120,7 +120,7 @@ def get_state_for_user(user_id, game_id=None):
     game = GamesKeeper().get_game(game_id)
     player = game.player_manager.players[player_index]
     open_card_index = game.open_card_index
-    options = PlayValidator.possible_plays(player._hand, player.target_meld, open_card_index)
+    options = PlayValidator.possible_plays(player._hand, player.memory.current_target(), open_card_index)
     playable_indices = {c.cards[-1].get_index() for c in options if c.cards}
 
     playable_cards = []

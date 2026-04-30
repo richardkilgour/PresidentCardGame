@@ -26,6 +26,7 @@ def send_game_list(data=None):
 
 @socketio.on('new_game')
 def create_game(data=None):
+    from president.app.game_persistence import save_game
     user = session.get('user')
 
     if not user:
@@ -41,6 +42,7 @@ def create_game(data=None):
     socketio.emit('game_created', {'game_id': game_id})
     print(f"New game created by {user}: {game_id}")
     add_human_player(user, game_id)
+    save_game(game_id)
 
 
 @socketio.on('join_game')
@@ -66,6 +68,12 @@ def handle_join_game(data):
     # Pre-game join: game hasn't started yet
     if not game.episode:
         add_human_player(user_id, game_id)
+        if game.is_seeded:
+            game.is_seeded = False  # graduate to a normal game before saving
+            game.start()
+            from president.app.game_defaults import seed_default_games
+            seed_default_games()
+        save_game(game_id)
         return
 
     # Mid-game join: take the first non-reserved AI seat
@@ -149,6 +157,7 @@ def handle_replace_with_ai(data):
 
 @socketio.on('add_ai_player')
 def add_ai_player(data):
+    from president.app.game_persistence import save_game
     user_id = session.get('user')
     game_id = GamesKeeper().find_owners_game(user_id)
 
@@ -169,6 +178,7 @@ def add_ai_player(data):
         new_ai = PlayerSplitter(tagged_name)
 
     GamesKeeper().add_player(game_id, new_ai, opponent_index)
+    save_game(game_id)
     send_game_state()
 
 
@@ -181,6 +191,7 @@ def view_game(data=None):
 # TODO: The timed start button hammers this.
 @socketio.on('start_game')
 def start_game(data=None):
+    from president.app.game_persistence import save_game
     player_id = session.get('user')
     game_id = GamesKeeper().find_owners_game(player_id)
 
@@ -190,6 +201,7 @@ def start_game(data=None):
     game = GamesKeeper().get_game(game_id)
     if game.can_start():
         game.start()
+        save_game(game_id)
         for info in game.disconnect_info.values():
             info['timeout'] = 0
 
