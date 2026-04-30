@@ -19,6 +19,11 @@ class Meld:
             # Sort ascending by card index
             self.cards = sorted(meld.cards + [card], key=lambda c: c.get_index())
 
+    def value(self):
+        if self.cards:
+            return self.cards[0].get_value()
+        return None
+
     def __len__(self):
         return len(self.cards)
 

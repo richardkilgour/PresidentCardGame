@@ -224,6 +224,8 @@ class Episode:
             self.active_players.remove(player)
             return
 
+        assert(player.memory.current_target() == current_target)
+
         valid_plays = PlayValidator.possible_plays(player._hand, current_target, self.open_card_index)
         if current_target is None:
             assert valid_plays, (
