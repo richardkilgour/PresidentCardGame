@@ -25,12 +25,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from absl.logging import LOG_DIR
+
 from president.core.CardGameListener import CardGameListener
 
 if TYPE_CHECKING:
     from president.core.GameMaster import GameMaster
     from president.core.PlayerRegistry import PlayerRegistry
 
+LOG_DIR = '../logs/'
 
 class GameRecord(CardGameListener):
 
@@ -231,6 +234,7 @@ class GameRecord(CardGameListener):
             )
 
         GameCheckpoint.restore_from_dict(snapshot, game_master, player_registry)
+        GameRecord._replay_hand_history(data, game_master)
 
         record = GameRecord(game_master, game_id=data.get("game_id"))
         record.started_at = data.get("started_at", _now())
@@ -241,6 +245,129 @@ class GameRecord(CardGameListener):
             f"({len(record.trajectory)} trajectory entries)"
         )
         return record
+
+    @staticmethod
+    def _replay_hand_history(data: dict, game_master: "GameMaster") -> None:
+        """
+        Replay trajectory play/pass/hand_won/played_out events from the current
+        hand into each player's PlayHistory.
+
+        The checkpoint snapshot captures mechanical state (hands, melds,
+        active_players) but not memory.  Replaying fills that gap so
+        player.memory.current_target() returns the correct value after restore,
+        satisfying the assertion in Episode.player_turn().
+        """
+        from president.core.Meld import Meld
+        from president.core.PlayingCard import PlayingCard
+        from president.core.PlayHistory import EventType, GameEvent
+
+        trajectory = data.get("trajectory", [])
+        if not trajectory:
+            return
+
+        player_by_name = {
+            p.name: p
+            for p in game_master.player_manager.players
+            if p is not None
+        }
+
+        # Index of the most-recent state entry (the checkpoint we restored from)
+        checkpoint_idx = next(
+            (i for i in range(len(trajectory) - 1, -1, -1)
+             if trajectory[i].get("type") == "state"),
+            None,
+        )
+        if checkpoint_idx is None:
+            return
+
+        # Index of the hand_start state immediately before the checkpoint
+        hand_start_idx = next(
+            (i for i in range(checkpoint_idx - 1, -1, -1)
+             if trajectory[i].get("type") == "state"
+             and trajectory[i].get("event") == "hand_start"),
+            None,
+        )
+        if hand_start_idx is None:
+            return  # Hand hasn't started yet (lobby save); nothing to replay
+
+        replay_entries = trajectory[hand_start_idx + 1 : checkpoint_idx]
+        if not replay_entries:
+            return
+
+        players = [p for p in game_master.player_manager.players if p is not None]
+
+        def _inject(event: "GameEvent") -> None:
+            for p in players:
+                p.memory._memory.append(event)
+
+        def _set_last(player) -> None:
+            for p in players:
+                p.memory._last_play_player = player
+
+        def _reset_last() -> None:
+            for p in players:
+                p.memory._last_play_player = None
+
+        def _mark_finished(player) -> None:
+            for p in players:
+                if player not in p.memory._finished_players:
+                    p.memory._finished_players.append(player)
+
+        for entry in replay_entries:
+            etype = entry.get("type")
+            actor = player_by_name.get(entry.get("player"))
+            if actor is None:
+                continue
+
+            if etype == "play":
+                meld = Meld()
+                meld.cards = [PlayingCard(idx) for idx in entry["cards"]]
+                remaining = len(entry["hand"]) - len(entry["cards"])
+                _inject(GameEvent(
+                    player=actor,
+                    event_type=EventType.MELD,
+                    meld=meld,
+                    remaining_cards=remaining,
+                    hand=[PlayingCard(idx) for idx in entry["hand"]],
+                ))
+                _set_last(actor)
+                if remaining == 0:
+                    _mark_finished(actor)
+
+            elif etype == "pass":
+                _inject(GameEvent(
+                    player=actor,
+                    event_type=EventType.MELD,
+                    meld=Meld(),          # empty Meld = pass
+                    remaining_cards=len(entry["hand"]),
+                    hand=[PlayingCard(idx) for idx in entry["hand"]],
+                ))
+                _set_last(actor)
+
+            elif etype == "hand_won":
+                _inject(GameEvent(
+                    player=actor,
+                    event_type=EventType.ROUND_WON,
+                    meld=None,
+                    remaining_cards=actor.report_remaining_cards(),
+                ))
+                _reset_last()
+
+            elif etype == "played_out":
+                rank = entry.get("rank", 0)
+                _inject(GameEvent(
+                    player=actor,
+                    event_type=EventType.COMPLETE,
+                    meld=rank,
+                    remaining_cards=0,
+                ))
+                for p in players:
+                    p.memory._final_positions[actor] = rank
+                _mark_finished(actor)
+
+        logging.info(
+            f"Replayed {len(replay_entries)} hand-history entries into PlayHistory"
+        )
 
     # -------------------------------------------------------------------------
     # Display
@@ -279,7 +406,7 @@ class GameRecord(CardGameListener):
     @staticmethod
     def stamped_path(stem: str) -> Path:
         stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        return Path(f"{stem}_{stamp}.json")
+        return Path(f"{LOG_DIR}{stem}_{stamp}.json")
 
 
 # ---------------------------------------------------------------------------
