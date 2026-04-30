@@ -14,6 +14,10 @@ import president.app.socket_auth  # noqa: F401
 from president.app.game_persistence import load_all_games
 load_all_games()
 
+# Ensure the three default seeded lobby games always exist.
+from president.app.game_defaults import seed_default_games
+seed_default_games()
+
 start_scheduler()
 
 if __name__ == '__main__':
