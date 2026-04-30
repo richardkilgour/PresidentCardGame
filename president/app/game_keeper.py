@@ -42,8 +42,23 @@ class GamesKeeper:
         return next((gid for gid, game in self._games.items() if game.player_manager.players[0].name == user_id), None)
 
     def game_list(self):
-        return [{"id": game_id, "players": [player.name for player in gm.player_manager.players if player]} for game_id, gm in
-                self._games.items()]
+        result = []
+        for game_id, gm in self._games.items():
+            seats = []
+            for player in gm.player_manager.players:
+                if player is None:
+                    seats.append(None)
+                elif isinstance(player, AsyncPlayer):
+                    seats.append({"type": "human", "name": player.name})
+                else:
+                    seats.append({"type": "ai", "name": player.name})
+            result.append({
+                "id": game_id,
+                "status": "live" if gm.episode else "waiting",
+                "seats": seats,
+                "players": [p.name for p in gm.player_manager.players if p],
+            })
+        return result
 
     def get_player_names(self, game_id):
         if game_id in self._games:

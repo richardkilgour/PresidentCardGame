@@ -496,6 +496,21 @@ const CardGame = {
         this.requestGameState();
     },
 
+    updateSeatAvatar: function(index, playerName) {
+        const el = document.getElementById(`opponent-${index}-avatar`);
+        if (!el) return;
+        el.innerHTML = '';
+        el.className = 'seat-avatar';
+        if (!playerName) return;
+        const isAI = playerName.endsWith(' (AI)');
+        if (isAI && typeof window.getAvatarSVG === 'function') {
+            el.innerHTML = window.getAvatarSVG(playerName, '#00FFB8', 32);
+        } else {
+            el.classList.add('human-avatar');
+            el.textContent = playerName.slice(0, 2).toUpperCase();
+        }
+    },
+
     updateStats: function(stats) {
         const panel = document.getElementById('stats-panel');
         if (!stats) { panel.innerHTML = ''; return; }
@@ -592,11 +607,14 @@ const CardGame = {
                 handElement.appendChild(this.cardRenderer.renderCard(-1, "", index, false, false));
             }
 
+            this.updateSeatAvatar(index, playerName);
+
             if (aiSelectElement) {
                 aiSelectElement.style.display = "none";
             }
         } else {
             nameElement.textContent = "Waiting for player to join...";
+            this.updateSeatAvatar(index, null);
             handElement.innerHTML = "";
             console.log("isOwner = " + isOwner);
             console.log("aiSelectElement = " + aiSelectElement);

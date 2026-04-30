@@ -1,50 +1,789 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>President Card Game</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script type="text/javascript" src="{{ url_for('static', filename='js/home.js') }}"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>President — Waiting Room</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script>
+  window.__INIT__ = {
+    username: {{ username | tojson }},
+    loggedIn: {{ (username is not none) | tojson }}
+  };
+</script>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { background: #030608; font-family: 'IBM Plex Mono', monospace; color: #D0EEE6; overflow-x: hidden; }
+
+  .scanlines {
+    position: fixed; inset: 0; z-index: 300; pointer-events: none;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.10) 3px, rgba(0,0,0,0.10) 4px);
+  }
+  .watermark {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28vw;
+    color: rgba(0,255,184,0.025); pointer-events: none; z-index: 0; user-select: none; line-height: 1;
+    white-space: nowrap;
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,255,184,0.2); border-radius: 2px; }
+</style>
 </head>
 <body>
-    <header>
-        <h1>Welcome to President</h1>
-    </header>
+<div class="scanlines"></div>
+<div class="watermark">∴</div>
+<div id="root"></div>
 
-    <main>
-        <!-- Ongoing Games Section -->
-        <section id="games">
-            <h2>Ongoing Games</h2>
-            <ul id="game-list">
-                <!-- Games will be dynamically inserted here -->
-            </ul>
-            <div id="game-actions">
-                <button id="new_game_button" style="display: none;">New Game</button>
-                <p id="login-message">Login to start a new game</p>
+{% raw %}<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── Themes ─────────────────────────────────────────────────────────────────
+const THEMES = {
+  ghost: {
+    name: 'Ghost Wire',
+    bg: '#030608', surface: '#060F18', rim: '#00FFB8',
+    accent: '#00FFB8', accentDim: 'rgba(0,255,184,0.12)',
+    accentBorder: 'rgba(0,255,184,0.3)',
+    gold: '#88B8A8', text: '#D0EEE6', muted: '#1E5044',
+    dimText: '#4A8070',
+    btn: '#00FFB8', btnText: '#020507',
+    glow: '0 0 0 1px #00FFB8, 0 0 20px rgba(0,255,184,0.4)',
+    cardGlow: '0 0 0 1px rgba(0,255,184,0.25), 0 4px 32px rgba(0,0,0,0.6)',
+  },
+  circuit: {
+    name: 'Circuit Lounge',
+    bg: '#04070D', surface: '#08121E', rim: '#C8962A',
+    accent: '#00E5FF', accentDim: 'rgba(0,229,255,0.10)',
+    accentBorder: 'rgba(0,229,255,0.25)',
+    gold: '#C8962A', text: '#F0E8D0', muted: '#3A5A70',
+    dimText: '#3A5A70',
+    btn: '#C8962A', btnText: '#040608',
+    glow: '0 0 0 1px #00E5FF, 0 0 20px rgba(0,229,255,0.4)',
+    cardGlow: '0 0 0 1px rgba(200,150,42,0.3), 0 4px 32px rgba(0,0,0,0.6)',
+  },
+  velvet: {
+    name: 'Velvet Static',
+    bg: '#070310', surface: '#110620', rim: '#E8C870',
+    accent: '#FF3399', accentDim: 'rgba(255,51,153,0.10)',
+    accentBorder: 'rgba(255,51,153,0.25)',
+    gold: '#E8C870', text: '#F0D8EC', muted: '#5A3A68',
+    dimText: '#5A3A68',
+    btn: '#FF3399', btnText: '#050110',
+    glow: '0 0 0 1px #FF3399, 0 0 20px rgba(255,51,153,0.4)',
+    cardGlow: '0 0 0 1px rgba(232,200,112,0.3), 0 4px 32px rgba(0,0,0,0.6)',
+  },
+};
+
+// ── Avatar SVGs ────────────────────────────────────────────────────────────
+const AvatarSVG = ({ id, color: c, size: s = 36 }) => {
+  switch(id) {
+    case 'VERA-7': return (
+      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <polygon points="24,3 43,13.5 43,34.5 24,45 5,34.5 5,13.5" fill={`${c}08`} stroke={c} strokeWidth="1.2" opacity="0.7"/>
+        <polygon points="24,10 37,17 37,31 24,38 11,31 11,17" fill={`${c}12`} stroke={`${c}44`} strokeWidth="0.8"/>
+        <circle cx="24" cy="22" r="5.5" fill={`${c}18`} stroke={c} strokeWidth="1.4"/>
+        <circle cx="24" cy="22" r="2.5" fill={c} opacity="0.9"/>
+        <circle cx="24" cy="22" r="1" fill="#fff" opacity="0.6"/>
+        <line x1="11" y1="22" x2="18" y2="22" stroke={c} strokeWidth="0.8" opacity="0.5"/>
+        <line x1="30" y1="22" x2="37" y2="22" stroke={c} strokeWidth="0.8" opacity="0.5"/>
+        <line x1="24" y1="3" x2="24" y2="10" stroke={c} strokeWidth="1" opacity="0.6"/>
+        <circle cx="24" cy="3" r="1.5" fill={c} opacity="0.8"/>
+        <rect x="20" y="32" width="8" height="1.5" rx="0.75" fill={c} opacity="0.4"/>
+      </svg>
+    );
+    case 'ECHO-9': return (
+      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="20" fill={`${c}06`} stroke={`${c}30`} strokeWidth="1"/>
+        <circle cx="24" cy="24" r="15" fill={`${c}08`} stroke={`${c}50`} strokeWidth="1"/>
+        <circle cx="24" cy="24" r="10" fill={`${c}10`} stroke={c} strokeWidth="1.2"/>
+        <line x1="24" y1="4" x2="24" y2="14" stroke={c} strokeWidth="0.9" opacity="0.5"/>
+        <line x1="24" y1="34" x2="24" y2="44" stroke={c} strokeWidth="0.9" opacity="0.5"/>
+        <line x1="4" y1="24" x2="14" y2="24" stroke={c} strokeWidth="0.9" opacity="0.5"/>
+        <line x1="34" y1="24" x2="44" y2="24" stroke={c} strokeWidth="0.9" opacity="0.5"/>
+        <polygon points="24,17 29,24 24,31 19,24" fill={c} opacity="0.85"/>
+        <polygon points="24,20 27,24 24,28 21,24" fill="#fff" opacity="0.25"/>
+      </svg>
+    );
+    case 'KAEL-3': return (
+      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <path d="M24 4 L40 12 L40 28 Q40 40 24 46 Q8 40 8 28 L8 12 Z" fill={`${c}0C`} stroke={c} strokeWidth="1.3" opacity="0.8"/>
+        <path d="M24 10 L35 16 L35 27 Q35 36 24 41 Q13 36 13 27 L13 16 Z" fill={`${c}10`} stroke={`${c}44`} strokeWidth="0.8"/>
+        <polyline points="18,30 24,16 30,30" fill="none" stroke={c} strokeWidth="2" strokeLinejoin="round"/>
+        <polyline points="20,25 24,16 28,25" fill={c} opacity="0.3"/>
+        <rect x="18" y="30" width="12" height="2" rx="1" fill={c} opacity="0.7"/>
+      </svg>
+    );
+    case 'APEX-1': return (
+      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <path d="M8 36 L8 26 L16 32 L24 14 L32 32 L40 26 L40 36 Z" fill={`${c}15`} stroke={c} strokeWidth="1.4"/>
+        <path d="M10 34 L10 27 L17 32.5 L24 17 L31 32.5 L38 27 L38 34 Z" fill={`${c}20`}/>
+        <circle cx="24" cy="14" r="2.5" fill={c} opacity="0.95"/>
+        <circle cx="8" cy="26" r="2" fill={c} opacity="0.7"/>
+        <circle cx="40" cy="26" r="2" fill={c} opacity="0.7"/>
+        <rect x="8" y="34" width="32" height="3" rx="1.5" fill={c} opacity="0.6"/>
+        <polygon points="24,19 25.5,23 29,23 26.5,25.5 27.5,29 24,27 20.5,29 21.5,25.5 19,23 22.5,23" fill={c} opacity="0.5"/>
+      </svg>
+    );
+    case 'NULL-0': return (
+      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <rect x="6" y="6" width="36" height="36" rx="2" fill={`${c}08`} stroke={`${c}40`} strokeWidth="1.2"/>
+        <rect x="6" y="14" width="20" height="3" fill={`${c}18`}/>
+        <rect x="6" y="28" width="14" height="2" fill={`${c}10`}/>
+        <line x1="17" y1="20" x2="21" y2="24" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.9"/>
+        <line x1="21" y1="20" x2="17" y2="24" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.9"/>
+        <line x1="27" y1="20" x2="31" y2="24" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.9"/>
+        <line x1="31" y1="20" x2="27" y2="24" stroke={c} strokeWidth="1.8" strokeLinecap="round" opacity="0.9"/>
+        <rect x="18" y="29" width="12" height="2" rx="1" fill={`${c}50`}/>
+        <path d="M6,10 L6,6 L10,6" stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="square" opacity="0.6"/>
+        <path d="M42,10 L42,6 L38,6" stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="square" opacity="0.6"/>
+        <path d="M6,38 L6,42 L10,42" stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="square" opacity="0.6"/>
+        <path d="M42,38 L42,42 L38,42" stroke={c} strokeWidth="1.5" fill="none" strokeLinecap="square" opacity="0.6"/>
+      </svg>
+    );
+    case 'WREN-X': return (
+      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <polygon points="17,4 31,4 44,17 44,31 31,44 17,44 4,31 4,17" fill={`${c}08`} stroke={`${c}55`} strokeWidth="1"/>
+        <polyline points="12,12 12,20 20,20" fill="none" stroke={c} strokeWidth="0.8" opacity="0.4"/>
+        <polyline points="36,12 36,20 28,20" fill="none" stroke={c} strokeWidth="0.8" opacity="0.4"/>
+        <polyline points="12,36 12,28 20,28" fill="none" stroke={c} strokeWidth="0.8" opacity="0.4"/>
+        <polyline points="36,36 36,28 28,28" fill="none" stroke={c} strokeWidth="0.8" opacity="0.4"/>
+        <circle cx="20" cy="20" r="1.5" fill={c} opacity="0.6"/>
+        <circle cx="28" cy="20" r="1.5" fill={c} opacity="0.6"/>
+        <circle cx="20" cy="28" r="1.5" fill={c} opacity="0.6"/>
+        <circle cx="28" cy="28" r="1.5" fill={c} opacity="0.6"/>
+        <circle cx="24" cy="24" r="5" fill={`${c}15`} stroke={c} strokeWidth="1.2"/>
+        <line x1="24" y1="19" x2="24" y2="29" stroke={c} strokeWidth="0.8" opacity="0.7"/>
+        <line x1="19" y1="24" x2="29" y2="24" stroke={c} strokeWidth="0.8" opacity="0.7"/>
+        <circle cx="24" cy="24" r="2" fill={c} opacity="0.85"/>
+      </svg>
+    );
+    default: return (
+      <svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="20" fill={`${c}10`} stroke={c} strokeWidth="1.2"/>
+        <text x="24" y="29" textAnchor="middle" fontFamily="monospace" fontSize="14" fill={c} fontWeight="600">AI</text>
+      </svg>
+    );
+  }
+};
+
+// ── Adapt server game data to UI shape ─────────────────────────────────────
+function adaptGame(g) {
+  const seats = (g.seats || []).map(s => {
+    if (!s) return null;
+    if (s.type === 'ai') {
+      const avatarId = s.name.replace(/ \(AI\)$/, '').trim();
+      return { type: 'ai', name: s.name, id: avatarId };
+    }
+    return { type: 'human', name: s.name, initials: s.name.slice(0, 2).toUpperCase() };
+  });
+  while (seats.length < 4) seats.push(null);
+  return {
+    id: g.id,
+    displayId: g.id.slice(0, 8).toUpperCase(),
+    status: g.status || 'waiting',
+    seats,
+  };
+}
+
+// ── Seat component ─────────────────────────────────────────────────────────
+const Seat = ({ player, th, canTakeOver, onTakeOver }) => {
+  const [hovered, setHovered] = useState(false);
+
+  if (!player) {
+    return (
+      <div style={{ width: 52, height: 68, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 4,
+          border: `1px dashed ${th.accentBorder}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <line x1="8" y1="3" x2="8" y2="13" stroke={th.dimText} strokeWidth="1.2"/>
+            <line x1="3" y1="8" x2="13" y2="8" stroke={th.dimText} strokeWidth="1.2"/>
+          </svg>
+        </div>
+        <span style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize: 9, color: th.dimText, letterSpacing: '0.05em' }}>OPEN</span>
+      </div>
+    );
+  }
+
+  if (player.type === 'human') {
+    return (
+      <div style={{ width: 52, height: 68, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+        <div style={{
+          width: 40, height: 40, borderRadius: 4,
+          background: `${th.accent}18`,
+          border: `1.5px solid ${th.accentBorder}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13,
+          color: th.accent, letterSpacing: '-0.02em',
+        }}>
+          {player.initials}
+        </div>
+        <span style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize: 9, color: th.text, letterSpacing: '0.02em', maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+          {player.name}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ width: 52, height: 68, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, position: 'relative' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div onClick={canTakeOver ? onTakeOver : undefined} style={{
+        width: 40, height: 40, borderRadius: 4,
+        background: `${th.accent}0A`,
+        border: `1px solid ${canTakeOver && hovered ? th.accent : th.accentBorder}`,
+        boxShadow: canTakeOver && hovered ? th.glow : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: canTakeOver ? 'pointer' : 'default',
+        transition: 'all 140ms ease-out',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <AvatarSVG id={player.id} color={canTakeOver && hovered ? th.accent : th.rim} size={32} />
+      </div>
+      <span style={{ fontFamily:"'IBM Plex Mono',monospace", fontSize: 9, color: canTakeOver ? th.muted : th.dimText, letterSpacing: '0.02em', maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+        {player.name}
+      </span>
+      {canTakeOver && (
+        <div style={{
+          position: 'absolute', top: 0, right: 0,
+          width: 8, height: 8, borderRadius: '50%',
+          background: th.accent, boxShadow: `0 0 6px ${th.accent}`,
+        }} />
+      )}
+    </div>
+  );
+};
+
+// ── Game Card ──────────────────────────────────────────────────────────────
+const GameCard = ({ game, th, onJoin, onTakeOver }) => {
+  const [hovered, setHovered] = useState(false);
+  const isLive = game.status === 'live';
+  const humanSlots = game.seats.filter(s => s && s.type === 'human').length;
+  const aiSlots    = game.seats.filter(s => s && s.type === 'ai').length;
+  const openSlots  = game.seats.filter(s => !s).length;
+
+  const statusColor = isLive ? th.accent : '#E8A020';
+  const statusLabel = isLive ? 'LIVE' : 'WAITING';
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: th.surface,
+        border: `1px solid ${hovered ? th.accentBorder : 'rgba(255,255,255,0.06)'}`,
+        boxShadow: hovered ? th.cardGlow : '0 2px 16px rgba(0,0,0,0.5)',
+        borderRadius: 6, padding: '20px 20px 18px',
+        transition: 'all 180ms ease-out',
+        display: 'flex', flexDirection: 'column', gap: 16,
+        position: 'relative', overflow: 'hidden',
+      }}
+    >
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+        background: isLive
+          ? `linear-gradient(90deg, ${th.accent}00, ${th.accent}, ${th.accent}00)`
+          : `linear-gradient(90deg, transparent, #E8A020, transparent)`,
+        opacity: hovered ? 1 : 0.4, transition: 'opacity 180ms',
+      }} />
+
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: th.dimText, letterSpacing: '0.08em' }}>
+            #{game.displayId}
+          </span>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10, color: th.dimText }}>
+            {humanSlots} human · {aiSlots} AI · {openSlots} open
+          </span>
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '3px 8px', borderRadius: 3,
+          border: `1px solid ${statusColor}40`,
+          background: `${statusColor}12`,
+        }}>
+          <div style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: statusColor,
+            boxShadow: isLive ? `0 0 6px ${statusColor}` : 'none',
+            animation: isLive ? 'pulse 1.8s ease-in-out infinite' : 'none',
+          }} />
+          <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: statusColor, fontWeight: 600, letterSpacing: '0.1em' }}>
+            {statusLabel}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', justifyContent: 'center' }}>
+        {game.seats.map((seat, i) => (
+          <Seat
+            key={i}
+            player={seat}
+            th={th}
+            canTakeOver={isLive && seat && seat.type === 'ai'}
+            onTakeOver={() => onTakeOver(game, seat)}
+          />
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
+        <div>
+          {!isLive && (
+            <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: th.dimText }}>
+              <span style={{ color: th.accent }}>{humanSlots}</span>/4 joined
+            </span>
+          )}
+        </div>
+
+        {!isLive && openSlots > 0 && (
+          <button onClick={() => onJoin(game)} style={{
+            background: th.btn, color: th.btnText,
+            border: 'none', borderRadius: 3, padding: '7px 16px',
+            fontFamily: "'IBM Plex Mono',monospace", fontWeight: 600,
+            fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
+            boxShadow: `0 0 12px ${th.btn}40`,
+          }}>JOIN GAME</button>
+        )}
+        {!isLive && openSlots === 0 && (
+          <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: '#E8A020', letterSpacing: '0.06em' }}>
+            STARTING SOON
+          </span>
+        )}
+        {isLive && aiSlots > 0 && (
+          <button onClick={() => onTakeOver(game, game.seats.find(s => s && s.type === 'ai'))}
+            style={{
+              background: 'transparent', color: th.accent,
+              border: `1px solid ${th.accentBorder}`, borderRadius: 3, padding: '7px 14px',
+              fontFamily: "'IBM Plex Mono',monospace", fontWeight: 600,
+              fontSize: 11, letterSpacing: '0.06em', cursor: 'pointer',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = th.accentDim; e.currentTarget.style.boxShadow = th.glow; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
+          >TAKE OVER AI</button>
+        )}
+        {isLive && aiSlots === 0 && (
+          <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: th.dimText, letterSpacing: '0.06em' }}>
+            SPECTATE ONLY
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+const Modal = ({ title, children, onClose, th }) => (
+  <div style={{
+    position: 'fixed', inset: 0, zIndex: 200,
+    background: 'rgba(0,0,0,0.75)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    backdropFilter: 'blur(4px)',
+  }} onClick={onClose}>
+    <div style={{
+      background: th.surface,
+      border: `1px solid ${th.accentBorder}`,
+      boxShadow: th.cardGlow,
+      borderRadius: 8, padding: '28px 32px',
+      width: 420, maxWidth: '92vw', position: 'relative',
+    }} onClick={e => e.stopPropagation()}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 18, color: th.text, letterSpacing: '-0.01em' }}>{title}</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: th.dimText, cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>✕</button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+const InputField = ({ label, value, onChange, type = 'text', th }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: th.dimText, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</label>
+    <input
+      type={type} value={value} onChange={e => onChange(e.target.value)}
+      style={{
+        background: `${th.accent}08`, border: `1px solid ${th.accentBorder}`,
+        borderRadius: 4, padding: '10px 12px',
+        fontFamily: "'IBM Plex Mono',monospace", fontSize: 13,
+        color: th.text, outline: 'none', width: '100%',
+      }}
+    />
+  </div>
+);
+
+const Btn = ({ onClick, children, variant = 'primary', th, style: extra = {} }) => (
+  <button onClick={onClick} style={{
+    background: variant === 'primary' ? th.btn : 'transparent',
+    color: variant === 'primary' ? th.btnText : th.accent,
+    border: variant === 'primary' ? 'none' : `1px solid ${th.accentBorder}`,
+    borderRadius: 4, padding: '10px 20px',
+    fontFamily: "'IBM Plex Mono',monospace", fontWeight: 600,
+    fontSize: 12, letterSpacing: '0.08em', cursor: 'pointer',
+    boxShadow: variant === 'primary' ? `0 0 16px ${th.btn}30` : 'none',
+    ...extra,
+  }}>{children}</button>
+);
+
+// ── App ────────────────────────────────────────────────────────────────────
+const App = () => {
+  const [themeName, setThemeName] = useState('ghost');
+  const th = THEMES[themeName];
+
+  const [tab,      setTab]      = useState('lobby');
+  const [loggedIn, setLoggedIn] = useState(window.__INIT__.loggedIn);
+  const [username, setUsername] = useState(window.__INIT__.username || '');
+  const [games,    setGames]    = useState([]);
+  const [modal,    setModal]    = useState(null);
+  const [modalData, setModalData] = useState(null);
+
+  const [loginUser,  setLoginUser]  = useState('');
+  const [loginPass,  setLoginPass]  = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  const [tweaksOpen, setTweaksOpen] = useState(false);
+  const socketRef = useRef(null);
+
+  useEffect(() => {
+    const socket = io.connect('http://' + document.domain + ':' + location.port);
+    socketRef.current = socket;
+
+    socket.on('connect', () => socket.emit('refresh_games'));
+
+    socket.on('update_game_list', data => {
+      setGames((data.games || []).map(adaptGame));
+    });
+
+    socket.on('notify_player_joined', data => {
+      window.location.href = '/game/' + data.game_id;
+    });
+
+    socket.on('joined_game', data => {
+      window.location.href = '/game/' + data.game_id;
+    });
+
+    socket.on('rejoin_game', data => {
+      window.location.href = '/game/' + data.game_id;
+    });
+
+    const editHandler = e => {
+      if (e.data?.type === '__activate_edit_mode')   setTweaksOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', editHandler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+
+    return () => {
+      socket.disconnect();
+      window.removeEventListener('message', editHandler);
+    };
+  }, []);
+
+  const lobbyGames = games.filter(g => g.status === 'waiting');
+  const liveGames  = games.filter(g => g.status === 'live');
+
+  const handleJoin = game => {
+    if (!loggedIn) { setModal('login'); return; }
+    setModalData(game); setModal('join');
+  };
+  const handleTakeOver = (game, seat) => {
+    if (!loggedIn) { setModal('login'); return; }
+    setModalData({ game, seat }); setModal('takeover');
+  };
+  const handleCreateGame = () => {
+    if (!loggedIn) { setModal('login'); return; }
+    setModal('new-game');
+  };
+
+  const confirmJoin = () => {
+    socketRef.current.emit('join_game', { game_id: modalData.id });
+    setModal(null);
+  };
+  const confirmTakeOver = () => {
+    socketRef.current.emit('join_game', { game_id: modalData.game.id });
+    setModal(null);
+  };
+  const confirmNewGame = () => {
+    socketRef.current.emit('new_game');
+    setModal(null);
+  };
+
+  const handleAuth = async action => {
+    if (!loginUser || !loginPass) return;
+    setLoginError('');
+    try {
+      const res  = await fetch('/' + action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginUser, password: loginPass }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLoggedIn(true);
+        setUsername(data.username || loginUser);
+        setModal(null);
+        socketRef.current.emit('refresh_games');
+      } else {
+        setLoginError(data.error || 'Authentication failed');
+      }
+    } catch {
+      setLoginError('Network error — please try again.');
+    }
+  };
+
+  const handleLogout = async () => {
+    if (socketRef.current) socketRef.current.emit('logout');
+    await fetch('/logout', { method: 'POST' });
+    window.location.href = '/';
+  };
+
+  const displayedGames = tab === 'lobby' ? lobbyGames : liveGames;
+
+  return (
+    <div style={{ minHeight: '100vh', background: th.bg, color: th.text, transition: 'background 200ms' }}>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .game-card-enter { animation: fadeIn 240ms ease-out; }
+      `}</style>
+
+      {/* Header */}
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: `${th.bg}F0`, backdropFilter: 'blur(12px)',
+        borderBottom: `1px solid rgba(255,255,255,0.06)`,
+        padding: '0 32px', height: 60,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <polygon points="14,2 26,8 26,20 14,26 2,20 2,8" fill={`${th.accent}15`} stroke={th.accent} strokeWidth="1.2"/>
+              <text x="14" y="19" textAnchor="middle" fontFamily="'Syne',sans-serif" fontWeight="800" fontSize="12" fill={th.accent}>∴</text>
+            </svg>
+            <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16, color: th.text, letterSpacing: '-0.02em' }}>
+              PRESIDENT
+            </span>
+          </div>
+
+          <nav style={{ display: 'flex', gap: 2, marginLeft: 16 }}>
+            {[['lobby', `LOBBY (${lobbyGames.length})`], ['live', `LIVE (${liveGames.length})`]].map(([key, label]) => (
+              <button key={key} onClick={() => setTab(key)} style={{
+                background: tab === key ? `${th.accent}15` : 'transparent',
+                border: tab === key ? `1px solid ${th.accentBorder}` : '1px solid transparent',
+                color: tab === key ? th.accent : th.dimText,
+                borderRadius: 4, padding: '5px 14px',
+                fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, fontWeight: 600,
+                letterSpacing: '0.08em', cursor: 'pointer', transition: 'all 140ms ease-out',
+              }}>{label}</button>
+            ))}
+          </nav>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {loggedIn ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 4,
+                  background: `${th.accent}20`, border: `1px solid ${th.accentBorder}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 10, color: th.accent,
+                }}>
+                  {username.slice(0, 2).toUpperCase()}
+                </div>
+                <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: th.text }}>{username}</span>
+              </div>
+              <button onClick={handleLogout} style={{
+                background: 'none', border: `1px solid rgba(255,255,255,0.08)`,
+                color: th.dimText, borderRadius: 3, padding: '4px 10px',
+                fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, cursor: 'pointer', letterSpacing: '0.06em',
+              }}>LOGOUT</button>
+            </>
+          ) : (
+            <button onClick={() => setModal('login')} style={{
+              background: th.btn, color: th.btnText, border: 'none', borderRadius: 4,
+              padding: '7px 16px', fontFamily: "'IBM Plex Mono',monospace",
+              fontWeight: 600, fontSize: 11, letterSpacing: '0.08em', cursor: 'pointer',
+            }}>LOGIN / REGISTER</button>
+          )}
+        </div>
+      </header>
+
+      {/* Main */}
+      <main style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px 80px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 22, color: th.text, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              {tab === 'lobby' ? 'Open Lobbies' : 'Live Games'}
+            </h2>
+            <p style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: th.dimText, marginTop: 4 }}>
+              {tab === 'lobby'
+                ? 'Waiting for players — join before the game starts'
+                : 'Games in progress — take over an AI seat'}
+            </p>
+          </div>
+          <button onClick={handleCreateGame} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: th.btn, color: th.btnText, border: 'none', borderRadius: 4,
+            padding: '10px 20px', fontFamily: "'IBM Plex Mono',monospace",
+            fontWeight: 600, fontSize: 12, letterSpacing: '0.08em', cursor: 'pointer',
+            boxShadow: `0 0 20px ${th.btn}30`,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <line x1="6" y1="1" x2="6" y2="11" stroke={th.btnText} strokeWidth="1.8" strokeLinecap="round"/>
+              <line x1="1" y1="6" x2="11" y2="6" stroke={th.btnText} strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+            NEW GAME
+          </button>
+        </div>
+
+        {displayedGames.length === 0 ? (
+          <div style={{
+            textAlign: 'center', padding: '64px 32px',
+            border: `1px dashed ${th.accentBorder}`, borderRadius: 8,
+            color: th.dimText, fontFamily: "'IBM Plex Mono',monospace", fontSize: 13,
+          }}>
+            No {tab === 'lobby' ? 'open lobbies' : 'live games'} right now.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+            {displayedGames.map(g => (
+              <div key={g.id} className="game-card-enter">
+                <GameCard game={g} th={th} onJoin={handleJoin} onTakeOver={handleTakeOver} />
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Modals */}
+      {modal === 'join' && modalData && (
+        <Modal title="Join Game" onClose={() => setModal(null)} th={th}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <p style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: th.muted, lineHeight: 1.6 }}>
+              Join game <span style={{ color: th.accent }}>#{modalData.displayId}</span> as{' '}
+              <span style={{ color: th.text }}>{username}</span>?
+              The game will start when all seats are filled or the host begins.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Btn onClick={confirmJoin} variant="primary" th={th} style={{ flex: 1 }}>CONFIRM JOIN</Btn>
+              <Btn onClick={() => setModal(null)} variant="ghost" th={th}>CANCEL</Btn>
             </div>
-        </section>
+          </div>
+        </Modal>
+      )}
 
-        <!-- Login / Register Section -->
-        <section id="login">
-            <div id="user-info">
-                <h2 id="user-status">Loading...</h2>
-                <a id="logout-btn" href="#" onclick="log_out(); return false;" style="display: none;">Logout</a>
+      {modal === 'takeover' && modalData && (
+        <Modal title="Take Over AI Seat" onClose={() => setModal(null)} th={th}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '16px', background: `${th.accent}08`, borderRadius: 6,
+              border: `1px solid ${th.accentBorder}`,
+            }}>
+              <AvatarSVG id={modalData.seat.id} color={th.accent} size={48} />
+              <div>
+                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 15, color: th.text }}>{modalData.seat.name}</div>
+                <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: th.muted, marginTop: 2 }}>AI · game #{modalData.game.displayId}</div>
+              </div>
             </div>
-
-            <div id="login-form" style="display: none;">
-                <h2>Login / Register</h2>
-                <form id="auth-form">
-                    <input type="text" id="username" placeholder="Username" required>
-                    <input type="password" id="password" placeholder="Password" required>
-                    <button type="submit" data-action="login">Login</button>
-                    <button type="submit" data-action="register">Register</button>
-                </form>
+            <p style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: th.muted, lineHeight: 1.6 }}>
+              You will take over {modalData.seat.name}'s seat mid-game. The hand dealt to this AI becomes yours.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Btn onClick={confirmTakeOver} variant="primary" th={th} style={{ flex: 1 }}>TAKE SEAT</Btn>
+              <Btn onClick={() => setModal(null)} variant="ghost" th={th}>CANCEL</Btn>
             </div>
-        </section>
-    </main>
+          </div>
+        </Modal>
+      )}
 
-    <footer>
-        <p>&copy; 2025 President Card Game</p>
-    </footer>
+      {modal === 'new-game' && (
+        <Modal title="Create New Game" onClose={() => setModal(null)} th={th}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <p style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: th.muted, lineHeight: 1.6 }}>
+              You'll be the host. Add AI players and start the game from the game lobby.
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <Btn onClick={confirmNewGame} variant="primary" th={th} style={{ flex: 1 }}>CREATE GAME</Btn>
+              <Btn onClick={() => setModal(null)} variant="ghost" th={th}>CANCEL</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {modal === 'login' && (
+        <Modal title="Login / Register" onClose={() => setModal(null)} th={th}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <InputField label="Username" value={loginUser} onChange={setLoginUser} th={th} />
+            <InputField label="Password" value={loginPass} onChange={setLoginPass} type="password" th={th} />
+            {loginError && (
+              <p style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: '#FF4444' }}>{loginError}</p>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <Btn onClick={() => handleAuth('login')}    variant="primary" th={th} style={{ flex: 1 }}>LOGIN</Btn>
+              <Btn onClick={() => handleAuth('register')} variant="ghost"   th={th} style={{ flex: 1 }}>REGISTER</Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Tweaks Panel */}
+      {tweaksOpen && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 400,
+          background: th.surface, border: `1px solid ${th.accentBorder}`,
+          borderRadius: 8, padding: '20px 22px', width: 240,
+          boxShadow: th.cardGlow, display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 13, color: th.text }}>Tweaks</span>
+            <button onClick={() => { setTweaksOpen(false); window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*'); }}
+              style={{ background: 'none', border: 'none', color: th.dimText, cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>✕</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: th.dimText, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Theme</label>
+            {Object.entries(THEMES).map(([key, t]) => (
+              <button key={key} onClick={() => setThemeName(key)} style={{
+                background: themeName === key ? `${t.accent}15` : 'transparent',
+                border: `1px solid ${themeName === key ? t.accent : th.accentBorder}`,
+                borderRadius: 4, padding: '7px 12px',
+                fontFamily: "'IBM Plex Mono',monospace", fontSize: 11,
+                color: themeName === key ? t.accent : th.dimText,
+                cursor: 'pointer', textAlign: 'left', transition: 'all 120ms',
+              }}>{t.name}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, color: th.dimText, letterSpacing: '0.1em', textTransform: 'uppercase' }}>View</label>
+            {[['lobby', 'Open Lobbies'], ['live', 'Live Games']].map(([key, label]) => (
+              <button key={key} onClick={() => setTab(key)} style={{
+                background: tab === key ? `${th.accent}15` : 'transparent',
+                border: `1px solid ${tab === key ? th.accentBorder : 'rgba(255,255,255,0.06)'}`,
+                borderRadius: 4, padding: '7px 12px',
+                fontFamily: "'IBM Plex Mono',monospace", fontSize: 11,
+                color: tab === key ? th.accent : th.dimText,
+                cursor: 'pointer', textAlign: 'left', transition: 'all 120ms',
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>{% endraw %}
 </body>
 </html>

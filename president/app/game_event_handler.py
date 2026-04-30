@@ -66,7 +66,8 @@ class GameEventHandler(CardGameListener):
 
     def notify_player_turn(self, player):
         """Notify all players whose turn it is."""
-        print(f"notify_player_turn: {player.name}'s turn in game {self.game_id} members {self.socketio.server.manager.rooms.get('/').get(self.game_id, [])}")
+        ns_rooms = self.socketio.server.manager.rooms.get('/') or {}
+        print(f"notify_player_turn: {player.name}'s turn in game {self.game_id} members {ns_rooms.get(self.game_id, [])}")
 
         self.socketio.emit('notify_player_turn', {
             "player": player.name,
