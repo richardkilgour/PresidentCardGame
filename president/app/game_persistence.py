@@ -3,7 +3,8 @@ from pathlib import Path
 
 from president.app.db import GAME_DB, load_data, save_data
 from president.app.game_keeper import GamesKeeper
-from president.core.GameRecord import GameRecord
+from president.core.EpisodeSave import EpisodeSave
+from president.core.GameSave import GameSave
 from president.core.PlayerRegistry import PlayerRegistry
 from president.players.AsyncPlayer import AsyncPlayer
 from president.players.PlayerHolder import PlayerHolder
@@ -23,14 +24,15 @@ def _make_restore_registry() -> PlayerRegistry:
 
 
 def save_game(game_id: str) -> None:
-    """Serialise the current game trajectory to games.json."""
+    """Serialise the current game and episode state to games.json."""
     game = GamesKeeper().get_game(game_id)
     if game.is_seeded:
         return  # Seeded lobby games are ephemeral — recreated at startup, never persisted
-    if game._record:
-        game._record._append_state("checkpoint")
-    data = game._record.serialise()
-    data["reserved_slots"] = {str(k): v for k, v in game.reserved_slots.items()}
+    data = {
+        "game_save": GameSave(game)._serialise(),
+        "episode_save": game._record.serialise() if game._record else None,
+        "reserved_slots": {str(k): v for k, v in game.reserved_slots.items()},
+    }
     games_data = load_data(GAME_DB)
     games_data[game_id] = data
     save_data(GAME_DB, games_data)
@@ -75,15 +77,8 @@ def load_all_games() -> None:
                 int(k): v for k, v in data.get("reserved_slots", {}).items()
             }
 
-            # Support both old format {"checkpoint": {...}} and new {"trajectory": [...]}
-            if "checkpoint" in data:
-                record = GameRecord.restore_from_dict(
-                    data["checkpoint"], wrapper, registry
-                )
-            else:
-                record_data = {k: v for k, v in data.items() if k != "reserved_slots"}
-                record = GameRecord.restore_from_dict(record_data, wrapper, registry)
-
+            GameSave.restore_from_dict(data["game_save"], wrapper, registry)
+            record = EpisodeSave.restore_from_dict(data["episode_save"], wrapper)
             wrapper.replace_record(record)
             wrapper.reserved_slots = reserved_slots
             GamesKeeper().add_game(game_id, wrapper)

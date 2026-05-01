@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 import threading
 import time
 
 from president.core.Episode import State
 from president.core.GameMaster import GameMaster
-from president.core.GameRecord import GameRecord
+from president.core.EpisodeSave import EpisodeSave
 from president.core.Meld import Meld
 from president.core.PlayingCard import PlayingCard
 from president.core.PlayerRegistry import PlayerRegistry
@@ -20,7 +21,7 @@ class GameWrapper(GameMaster):
         registry = PlayerRegistry()
         registry.register(PlayerSimple, "Simple")
         super().__init__(registry=registry)
-        self._step_lock = threading.Lock()
+        self._step_lock = threading.RLock()
         self.game_id = game_id
         self.add_listener(listener)
         self.high_score = 0
@@ -30,16 +31,16 @@ class GameWrapper(GameMaster):
         # username → {"time": float, "timeout": 10|20, "notified": bool}
         self.disconnect_info: dict[str, dict] = {}
         # seconds between scheduler steps (controls AI play speed)
-        self.step_interval: float = 1.0
+        self.step_interval: float = float(os.environ.get('PRESIDENT_STEP_INTERVAL', '1.0'))
         self.last_step_at: float = 0.0
         self.is_seeded: bool = False
         self.seed_label: str | None = None
-        record = GameRecord(self, game_id=str(game_id))
+        record = EpisodeSave(self, game_id=str(game_id))
         self.set_record(record)
         self.add_listener(record)
 
-    def replace_record(self, record: GameRecord) -> None:
-        """Swap in a restored GameRecord, removing the placeholder created at init."""
+    def replace_record(self, record: EpisodeSave) -> None:
+        """Swap in a restored EpisodeSave, removing the placeholder created at init."""
         if self._record is not None and self._record in self.listener_list:
             self.listener_list.remove(self._record)
         self.set_record(record)
