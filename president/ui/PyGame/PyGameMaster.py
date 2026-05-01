@@ -15,11 +15,13 @@ from president.core.IllegalPlayError import IllegalPlayError
 from president.core.Meld import Meld
 from president.ui.PyGame.PyGameCard import PyGameCard
 from president.ui.PyGame.GuiElements import PlayerNameLabel
+from president.players.HumanPlayer import HumanPlayer
 from president.players.PyGamePlayer import PyGamePlayer
 
 
-def player_is_human(player):
-    return isinstance(player, PyGamePlayer)
+def player_is_human(player) -> bool:
+    """True for any human-controlled player, not just PyGamePlayer."""
+    return isinstance(player, HumanPlayer)
 
 def find_pos(pos, dist, angle):
     """Get a pos, a length and an angle, return the relative position"""
@@ -77,7 +79,7 @@ class PyGameMaster(GameMaster):
         except IllegalPlayError:
             human = self.get_human_player()
             if human:
-                human.next_action = None
+                human.next_action = None  # PyGamePlayer-specific; safe here
 
         visible_cards = pygame.sprite.Group()
         visible_others = pygame.sprite.Group()

@@ -4,27 +4,17 @@
 PlayerConsole is a human-controlled player with console input/output.
 
 The play() function presents possible melds and waits for user input.
-Typing 'q' at any prompt saves a checkpoint and exits cleanly.
+Typing 'q' raises QuitGame — the game loop handles any saving.
 """
 from __future__ import annotations
 
 import logging
-import sys
 
-from president.core.AbstractPlayer import AbstractPlayer
-from president.core.GameRecord import GameRecord
 from president.core.Meld import Meld
+from president.players.HumanPlayer import HumanPlayer
 
 
-class PlayerConsole(AbstractPlayer):
-
-    def __init__(self, name):
-        super().__init__(name)
-        self._record: GameRecord | None = None
-
-    def set_record(self, record: GameRecord) -> None:
-        """Attach the GameRecord so the player can save and quit mid-game."""
-        self._record = record
+class PlayerConsole(HumanPlayer):
 
     # -------------------------------------------------------------------------
     # Listener callbacks
@@ -116,7 +106,7 @@ class PlayerConsole(AbstractPlayer):
         user_input = input("\nYour choice [default 0]: ").strip().lower()
 
         if user_input in ('q', 'quit'):
-            self._save_and_quit()
+            self.request_quit()
 
         if not user_input:
             logging.info(f'{self.name} selects default option 0: {options[0]}')
@@ -134,12 +124,3 @@ class PlayerConsole(AbstractPlayer):
         logging.info(f'{self.name} plays option {card_index}: {options[card_index]}')
         return options[card_index]
 
-    def _save_and_quit(self) -> None:
-        """Save the game record and exit cleanly."""
-        if self._record:
-            path = GameRecord.stamped_path("quit_save")
-            self._record.save(path)
-            print(f'\n  Game saved to {path}. Resume with: --restore {path}')
-        else:
-            print('\n  No record configured — progress will be lost.')
-        sys.exit(0)

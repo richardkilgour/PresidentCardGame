@@ -14,6 +14,7 @@ import argparse
 
 import pygame
 
+from president.players.HumanPlayer import QuitGame
 from president.ui.PyGame import menus, offline, online
 from president.ui.PyGame.app import (
     screen,
@@ -126,8 +127,11 @@ def main():
 
         # ------------------------------------------------------------------
         elif mode == OFFLINE:
-            offline.handle(events, mouse_pos)
-            offline.draw()
+            try:
+                offline.handle(events, mouse_pos)
+                offline.draw()
+            except QuitGame:
+                running = False
 
         # ------------------------------------------------------------------
         elif mode == ONLINE:
