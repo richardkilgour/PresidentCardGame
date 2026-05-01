@@ -23,3 +23,7 @@ class AsyncPlayer(AbstractPlayer):
         card_to_play = self.card_to_play
         self.card_to_play = '␆'
         return card_to_play
+
+    def notify_hand_won(self, winner):
+        super().notify_hand_won(winner)
+        self.card_to_play = '␆'  # discard any stale buffered play between hands
