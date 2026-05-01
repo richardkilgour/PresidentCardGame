@@ -111,4 +111,5 @@ __pycache__/
 president.egg-info/
 
 # Logs
-president/tournament.log
+president/logs/
+
