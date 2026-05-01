@@ -10,7 +10,7 @@ Responsibilities:
 
 Used by:
   - GameMaster:         create players by type name
-  - GameCheckpoint:     restore players from saved type names
+  - GameSave:           restore players from saved type names
   - EvaluationRunner:   create fresh instances per game
   - MatchupGenerator:   enumerate all registered types
 """

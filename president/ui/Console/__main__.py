@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import argparse
 
-from president.core.GameRecord import GameRecord
+from president.core.GameSave import GameSave
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
     args = parser.parse_args()
 
     if args.display:
-        print(GameRecord.display(args.display))
+        print(GameSave.display(args.display))
         return
 
     if args.server:

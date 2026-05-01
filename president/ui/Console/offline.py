@@ -3,8 +3,8 @@
 """
 Offline game mode for the console UI.
 
-Loads config, builds the GameMaster with the configured players, attaches a
-GameRecord for save/restore, then runs the step loop until the game is done.
+Loads config, builds the GameMaster with the configured players, attaches an
+EpisodeSave for trajectory recording, then runs the step loop until done.
 """
 from __future__ import annotations
 
@@ -13,13 +13,17 @@ from pathlib import Path
 
 import yaml
 
+import sys
+
+from president.core.EpisodeSave import EpisodeSave
 from president.core.GameMaster import GameMaster
-from president.core.GameRecord import GameRecord
+from president.core.GameSave import GameSave
 from president.core.PlayerRegistry import PlayerRegistry
+from president.players.HumanPlayer import QuitGame
 from president.players.PlayerConsole import PlayerConsole
 
 _CONFIG_PATH = Path(__file__).parents[2] / 'config' / 'config.yaml'
-_LOG_PATH    = Path(__file__).parents[2] / 'test.log'
+_LOG_PATH    = Path(__file__).parents[2] / 'logs' / 'test.log'
 
 
 def run_offline(args) -> None:
@@ -34,11 +38,13 @@ def run_offline(args) -> None:
 
     if args.restore:
         print(f"Restoring from {args.restore}...")
-        print(GameRecord.display(args.restore))
-        record = GameRecord.restore(args.restore, gm, registry)
+        print(GameSave.display(args.restore))
+        record = GameSave.restore_combined(args.restore, gm, registry)
+        gm.add_listener(record)
+        gm.set_record(record)
         print("Restore complete — resuming game.")
     else:
-        record = GameRecord(gm)
+        record = EpisodeSave(gm)
         for key in ['player1', 'player2', 'player3', 'player4']:
             p = config[key]
             if p.get('console', False):
@@ -46,18 +52,18 @@ def run_offline(args) -> None:
             else:
                 gm.make_player(p['type'], p['name'])
         gm.start(number_of_rounds=1000)
-
-    gm.add_listener(record)
-    gm.set_record(record)
-
-    for player in gm.player_manager.players:
-        if isinstance(player, PlayerConsole):
-            player.set_record(record)
+        gm.add_listener(record)
+        gm.set_record(record)
 
     done = False
     while not done:
-        done = gm.step()
+        try:
+            done = gm.step()
+        except QuitGame:
+            path = GameSave.stamped_path("quit_save")
+            GameSave(gm).save_combined(record, path)
+            print(f'\n  Game saved to {path}. Resume with: --restore {path}')
+            sys.exit(0)
 
-    record.mark_complete()
     print("Game complete.")
     print(gm.position_stats_str())

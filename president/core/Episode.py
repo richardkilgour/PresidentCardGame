@@ -9,7 +9,7 @@ Responsible for: state machine flow, turn management, rank assignment,
 and notifying listeners of all game events.
 
 Not responsible for: card movement mechanics (CardHandler),
-serialisation (GameCheckpoint - future).
+serialisation (EpisodeSave / GameSave).
 """
 from __future__ import annotations
 

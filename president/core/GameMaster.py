@@ -19,8 +19,7 @@ from president.core.CardGameListener import CardGameListener
 from president.core.CardHandler import CardHandler
 from president.core.DeckManager import DeckManager
 from president.core.Episode import Episode, State
-from president.core.GameCheckpoint import GameCheckpoint
-from president.core.GameRecord import GameRecord
+from president.core.EpisodeSave import EpisodeSave
 from president.core.IllegalPlayError import IllegalPlayError
 from president.core.PlayerManager import PlayerManager
 from president.core.PlayerRegistry import PlayerRegistry
@@ -60,9 +59,9 @@ class GameMaster:
         self.registry = registry or PlayerRegistry()
         self.policy = policy
         self.fallback_player_name = fallback_player_name
-        self._record: GameRecord | None = None
+        self._record: EpisodeSave | None = None
 
-    def set_record(self, record: GameRecord) -> None:
+    def set_record(self, record: EpisodeSave) -> None:
         self._record = record
 
     # -------------------------------------------------------------------------
@@ -201,7 +200,7 @@ class GameMaster:
             logger.error(f"Unexpected error during step: {e}", exc_info=True)
             if self._record:
                 self._record.save_on_error(
-                    GameRecord.stamped_path("crash")
+                    EpisodeSave.stamped_path("crash")
                 )
             raise
 
@@ -225,14 +224,14 @@ class GameMaster:
         if self.policy == IllegalPlayPolicy.TERMINATE:
             if self._record:
                 self._record.save_on_error(
-                    GameRecord.stamped_path("illegal_play")
+                    EpisodeSave.stamped_path("illegal_play")
                 )
             raise error
 
         elif self.policy == IllegalPlayPolicy.DISQUALIFY:
             if self._record:
                 self._record.save_on_error(
-                    GameRecord.stamped_path("illegal_play")
+                    EpisodeSave.stamped_path("illegal_play")
                 )
             self._disqualify_player(error.player)
             return False
