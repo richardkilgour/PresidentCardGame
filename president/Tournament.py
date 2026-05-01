@@ -232,7 +232,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logging.basicConfig(
-        handlers=[logging.FileHandler("tournament.log", "w", "utf-8")],
+        handlers=[logging.FileHandler("logs/tournament.log", "w", "utf-8")],
         level=logging.NOTSET,
     )
 
