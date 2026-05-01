@@ -120,7 +120,23 @@ def get_state_for_user(user_id, game_id=None):
     game = GamesKeeper().get_game(game_id)
     player = game.player_manager.players[player_index]
     open_card_index = game.open_card_index
-    options = PlayValidator.possible_plays(player._hand, player.memory.current_target(), open_card_index)
+    # Read episode_target and is_my_turn atomically under the step lock so they
+    # are always a consistent snapshot.  Without the lock there is a race where
+    # the scheduler can clear current_melds (HAND_WON → ROUND_STARTING) and
+    # advance active_players between the two reads, producing a stale target
+    # that makes the client believe it can pass when it must lead.
+    is_ai_controlled = user_id in game.reserved_slots.values()
+    with game._step_lock:
+        episode_target = game.episode.target_meld() if game.episode else None
+        is_my_turn = (
+            not is_ai_controlled and
+            game.episode is not None and
+            game.episode.state == EpisodeState.PLAYING and
+            bool(game.episode.active_players) and
+            game.episode.active_players[0].name == user_id
+        )
+
+    options = PlayValidator.possible_plays(player._hand, episode_target, open_card_index)
     playable_indices = {c.cards[-1].get_index() for c in options if c.cards}
 
     playable_cards = []
@@ -134,16 +150,6 @@ def get_state_for_user(user_id, game_id=None):
         for meld in options if meld.cards
     ]
     can_pass = any(not meld.cards for meld in options)
-
-    is_ai_controlled = user_id in game.reserved_slots.values()
-
-    is_my_turn = (
-        not is_ai_controlled and
-        game.episode is not None and
-        game.episode.state == EpisodeState.PLAYING and
-        bool(game.episode.active_players) and
-        game.episode.active_players[0].name == user_id
-    )
 
     # When AI is in control, don't expose playable flags — hand is read-only
     if is_ai_controlled:

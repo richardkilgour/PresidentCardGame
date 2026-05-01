@@ -1,6 +1,7 @@
 import os
 
 os.environ['PRESIDENT_SCHEDULER_INTERVAL'] = '0.05'
+os.environ['PRESIDENT_STEP_INTERVAL'] = '0.05'
 
 import threading
 import time

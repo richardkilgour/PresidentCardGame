@@ -38,8 +38,12 @@ class GamesKeeper:
         return game_list
 
     def find_owners_game(self, user_id):
-        # Find the game where the user is the owner
-        return next((gid for gid, game in self._games.items() if game.player_manager.players[0].name == user_id), None)
+        # Find the game where the user is the owner (seat 0)
+        return next(
+            (gid for gid, game in self._games.items()
+             if game.player_manager.players[0] and game.player_manager.players[0].name == user_id),
+            None,
+        )
 
     def game_list(self):
         result = []

@@ -188,13 +188,18 @@ class ServerClient:
     # Connection
     # -------------------------------------------------------------------------
 
-    def connect(self):
-        """Connect the SocketIO client, forwarding the HTTP session cookie."""
+    def connect(self, transports=None):
+        """Connect the SocketIO client, forwarding the HTTP session cookie.
+
+        Args:
+            transports: Optional list of transports to use, e.g. ['websocket'].
+                        Defaults to the python-socketio default (polling then upgrade).
+        """
         cookie_str = '; '.join(f'{k}={v}' for k, v in self._http.cookies.items())
-        self.sio.connect(
-            self.server_url,
-            headers={'Cookie': cookie_str},
-        )
+        kwargs = {'headers': {'Cookie': cookie_str}}
+        if transports is not None:
+            kwargs['transports'] = transports
+        self.sio.connect(self.server_url, **kwargs)
 
     def disconnect(self):
         if self.sio.connected:

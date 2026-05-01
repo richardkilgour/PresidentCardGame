@@ -25,7 +25,7 @@ class DummyClient:
 
     def setup(self):
         self.client.login_anonymous()
-        self.client.connect()
+        self.client.connect(transports=['websocket'])
 
     def teardown(self):
         self.client.disconnect()
@@ -63,4 +63,4 @@ class DummyClient:
 
     def reconnect(self):
         """Reconnect using the same HTTP session — server recognises the same user."""
-        self.client.connect()
+        self.client.connect(transports=['websocket'])

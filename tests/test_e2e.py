@@ -2,7 +2,7 @@ import time
 
 from tests.dummy_client import DummyClient
 
-BASE_URL = "http://localhost:5098"
+BASE_URL = "http://localhost:5099"
 
 
 def _start_game(n=4):
