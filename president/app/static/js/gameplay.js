@@ -53,6 +53,7 @@ const CardGame = {
         });
         this.socket.on('notify_hand_start', () => {
             this.currentRoundRanks = {};
+            this.suppressPassOverlay = false;
             if (this.pendingSwap) {
                 this.showSwapModal(this.pendingSwap);
                 this.pendingSwap = null;
@@ -100,11 +101,13 @@ const CardGame = {
             this.requestGameState();
         });
         this.socket.on('notify_player_turn', (data) => {
-            const myName = document.getElementById('player_id').textContent.trim();
-            if (data.player === myName) this.suppressPassOverlay = false;
             this.highlightCurrentPlayerTurn(data);
         });
         this.socket.on('card_played', (data) => {
+            const myName = document.getElementById('player_id').textContent.trim();
+            if (data.player_id !== myName && data.card_id && data.card_id.length > 0) {
+                this.suppressPassOverlay = false;
+            }
             this.lastHandWinner = null;
             this.requestGameState();
         });
