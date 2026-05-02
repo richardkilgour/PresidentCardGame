@@ -6,6 +6,7 @@ import numpy as np
 
 from president.core.Meld import Meld
 from president.core.CardGameListener import CardGameListener
+from president.core.PlayerView import PlayerView
 from president.core.PlayingCard import PlayingCard
 from president.core.PlayValidator import PlayValidator
 
@@ -26,6 +27,22 @@ class AbstractPlayer(CardGameListener):
         self.position_count = [0, 0, 0, 0]
         self.consecutive_president = 0
         self.max_consecutive_president = 0
+        self._player_views: dict = {}
+
+    def _view_of(self, player):
+        """Return self as-is; wrap any other player in a cached PlayerView."""
+        if player is self:
+            return self
+        if player not in self._player_views:
+            p = player  # capture for closures
+            self._player_views[player] = PlayerView(
+                p.name,
+                type(p).__name__,
+                p.report_remaining_cards,
+                lambda: self.memory.starting_position(self._player_views[p]),
+                lambda: self.memory.final_position(self._player_views[p]),
+            )
+        return self._player_views[player]
 
     def set_position(self, pos):
         self.position_count[pos] += 1

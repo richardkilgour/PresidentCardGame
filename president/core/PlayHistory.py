@@ -27,7 +27,6 @@ class GameEvent:
     event_type: EventType
     meld: Any               # Meld for MELD events; rank index for COMPLETE; None otherwise
     remaining_cards: int    # Hand size after the action
-    hand: list | None = None  # Full hand contents at decision time, acting player only
 
     def __str__(self):
         return (f"{self.event_type}\t{self.player=}\t"
@@ -129,7 +128,6 @@ class PlayHistory:
             event_type=EventType.MELD,
             meld=meld,
             remaining_cards=remaining_cards,
-            hand=list(player._hand),  # captured before cards are removed
         ))
         if remaining_cards == 0:
             self._handle_player_finished(player)
