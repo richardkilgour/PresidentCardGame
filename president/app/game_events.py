@@ -224,29 +224,24 @@ def send_game_state(data=None):
 
 @socketio.on('self_play_as_ai')
 def handle_self_play_as_ai(data=None):
-    from president.app.game_persistence import save_game
     user_id = session.get('user')
     game_id = find_valid_game(user_id)
     if not game_id:
         return
     game = GamesKeeper().get_game(game_id)
-    # Only swap if the user is currently an active human player (not already watching)
     if user_id not in game.reserved_slots.values():
-        game.replace_human_with_ai(user_id, reserved=True)
-        save_game(game_id)
+        game.queue_swap(user_id, to_ai=True)
     send_game_state()
 
 
 @socketio.on('self_take_control')
 def handle_self_take_control(data=None):
-    from president.app.game_persistence import save_game
     user_id = session.get('user')
     game_id = find_valid_game(user_id)
     if not game_id:
         return
     game = GamesKeeper().get_game(game_id)
-    if game.restore_human_player(user_id):
-        save_game(game_id)
+    game.queue_swap(user_id, to_ai=False)
     send_game_state()
 
 

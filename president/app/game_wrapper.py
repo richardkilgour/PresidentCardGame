@@ -35,6 +35,7 @@ class GameWrapper(GameMaster):
         self.last_step_at: float = 0.0
         self.is_seeded: bool = False
         self.seed_label: str | None = None
+        self._pending_swaps: list[dict] = []  # queued human↔AI swaps, applied between steps
         record = EpisodeSave(self, game_id=str(game_id))
         self.set_record(record)
         self.add_listener(record)
@@ -63,8 +64,33 @@ class GameWrapper(GameMaster):
     def can_start(self):
         return not self.episode or self.episode.state == State.INITIALISED
 
+    def queue_swap(self, user_id: str, to_ai: bool) -> None:
+        """Queue a human↔AI swap to be applied at the next step boundary."""
+        # Last request wins — drop any earlier pending swap for this user
+        self._pending_swaps = [s for s in self._pending_swaps if s['user_id'] != user_id]
+        self._pending_swaps.append({'user_id': user_id, 'to_ai': to_ai})
+
+    def _flush_pending_swaps(self) -> None:
+        """Apply all queued player swaps. Must be called with _step_lock held."""
+        from president.app.game_persistence import save_game
+        swaps, self._pending_swaps = self._pending_swaps, []
+        changed = False
+        for swap in swaps:
+            user_id, to_ai = swap['user_id'], swap['to_ai']
+            if to_ai:
+                if user_id not in self.reserved_slots.values():
+                    self.replace_human_with_ai(user_id, reserved=True)
+                    changed = True
+            else:
+                if self.restore_human_player(user_id):
+                    changed = True
+        if changed:
+            save_game(self.game_id)
+
     def step(self) -> bool:
         with self._step_lock:
+            if self._pending_swaps:
+                self._flush_pending_swaps()
             return super().step()
 
     def swap_player(self, old_player, new_player) -> int:
