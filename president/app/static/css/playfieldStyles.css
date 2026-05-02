@@ -478,6 +478,7 @@ body {
 /* ── Opponent face-down hand area ────────────────────────── */
 .opp-hand-area {
   position: relative;
+  z-index: 2;
   width: 234px;
   /* fixed height — acts as the layout anchor; cards overflow visually */
   height: 72px;
@@ -505,6 +506,7 @@ body {
 /* ── Meld section (opponent's last play or status) ───────── */
 .meld-section {
   position: relative;
+  z-index: 1;
   width: 234px;
   /* card_small is ~100 px tall; 130 px gives comfortable breathing room */
   height: 130px;
