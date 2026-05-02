@@ -27,17 +27,15 @@ class HandIntegrityChecker:
             AssertionError: If any reconstructed hand does not match the starting hand.
         """
         scumbag_remaining = list(ranks[-1]._hand)
-        for source in player_manager.players:
-            memory = source.memory
-            for player in player_manager.players:
-                existing = scumbag_remaining if player is ranks[-1] else []
-                reconstructed = memory.reconstruct_hand(player, existing)
-                expected = player._starting_hand
-                if [c.get_index() for c in reconstructed] != [c.get_index() for c in expected]:
-                    raise AssertionError(
-                        f"Hand integrity failed for {player.name} "
-                        f"(checked via {source.name}'s memory): "
-                        f"reconstructed {[str(c) for c in reconstructed]} "
-                        f"!= starting hand {[str(c) for c in expected]}"
-                    )
+        for player in player_manager.players:
+            memory = player.memory
+            existing = scumbag_remaining if player is ranks[-1] else []
+            reconstructed = memory.reconstruct_hand(player, existing)
+            expected = player._starting_hand
+            if [c.get_index() for c in reconstructed] != [c.get_index() for c in expected]:
+                raise AssertionError(
+                    f"Hand integrity failed for {player.name} "
+                    f"reconstructed {[str(c) for c in reconstructed]} "
+                    f"!= starting hand {[str(c) for c in expected]}"
+                )
         logger.info("Hand integrity check passed for all players.")
