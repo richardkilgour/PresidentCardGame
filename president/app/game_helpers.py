@@ -20,8 +20,18 @@ def _translate_player_status(raw):
 
 
 def add_human_player(user_id, game_id):
+    from flask import request as flask_request
+    from president.app.session_manager import socket_user_map
     player = AsyncPlayer(user_id)
-    for sid in user_socket_map[user_id]:
+    sids = set(user_socket_map.get(user_id, set()))
+    try:
+        sid = flask_request.sid
+        sids.add(sid)
+        user_socket_map.setdefault(user_id, set()).add(sid)
+        socket_user_map[sid] = user_id
+    except RuntimeError:
+        pass  # no request context (e.g. called from scheduler)
+    for sid in sids:
         join_room(game_id, sid)
     GamesKeeper().add_player(game_id, player)
     print(f"User {user_id} joined game {game_id}")

@@ -1,6 +1,6 @@
 import uuid
 
-from flask import session
+from flask import request, session
 from flask_socketio import join_room
 
 from president.app.extensions import socketio
@@ -42,6 +42,7 @@ def create_game(data=None):
     socketio.emit('game_created', {'game_id': game_id})
     print(f"New game created by {user}: {game_id}")
     add_human_player(user, game_id)
+    socketio.emit('joined_game', {'game_id': game_id}, to=request.sid)
     save_game(game_id)
 
 
@@ -68,6 +69,7 @@ def handle_join_game(data):
     # Pre-game join: game hasn't started yet
     if not game.episode:
         add_human_player(user_id, game_id)
+        socketio.emit('joined_game', {'game_id': game_id}, to=request.sid)
         if game.is_seeded:
             game.is_seeded = False  # graduate to a normal game before saving
             game.start()
@@ -88,8 +90,10 @@ def handle_join_game(data):
 
     old_player = game.player_manager.players[ai_seat]
     game.swap_player(old_player, AsyncPlayer(user_id))
-    for sid in user_socket_map.get(user_id, set()):
+    sids = set(user_socket_map.get(user_id, set())) | {request.sid}
+    for sid in sids:
         join_room(game_id, sid)
+    socketio.emit('joined_game', {'game_id': game_id}, to=request.sid)
     save_game(game_id)
 
 
