@@ -15,6 +15,15 @@ class GameEventHandler(CardGameListener):
         self.socketio = socketio
         self.game_id = str(game_id)  # Ensure game_id is a string for room name
 
+    def notify_player_replaced(self, old_player, new_player):
+        """Notify clients that a player has been swapped (e.g. human ↔ AI)."""
+        super().notify_player_replaced(old_player, new_player)
+        self.socketio.emit("player_replaced", {
+            "game_id": self.game_id,
+            "old_player": old_player.name,
+            "new_player": new_player.name,
+        }, room=self.game_id)
+
     def notify_player_joined(self, new_player, position=None):
         """Notify all players that a new player has joined the game."""
         print(f"notify_player_joined: {new_player.name} in game {self.game_id}")

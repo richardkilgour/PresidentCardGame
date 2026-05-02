@@ -63,6 +63,12 @@ class CardGameListener:
             num_cards,
         )
 
+    def notify_player_replaced(self, old_player, new_player):
+        self.memory.replace_player(
+            self._view_of(old_player),
+            self._view_of(new_player),
+        )
+
     def notify_illegal_play(self, player, action, reason: str):
         pass
 

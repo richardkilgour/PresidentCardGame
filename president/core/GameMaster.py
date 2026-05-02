@@ -271,14 +271,11 @@ class GameMaster:
             i = self.listener_list.index(old_player)
             self.listener_list[i] = new_player
 
-        # Rewrite all object-identity references in every listener's play history.
-        # This must happen before notify_player_joined so that no window exists
-        # where active_players has new_player but memory still expects old_player.
-        for listener in self.listener_list:
-            if hasattr(listener, 'memory'):
-                listener.memory.replace_player(old_player, new_player)
-
-        self.notify_listeners("notify_player_joined", new_player, seat)
+        # Rewrite all player references in every listener's play history.
+        # notify_player_replaced routes through each listener's _view_of so that
+        # player-facing memories (which store PlayerViews) and observer memories
+        # (which store AbstractPlayers) are both patched correctly.
+        self.notify_listeners("notify_player_replaced", old_player, new_player)
         return seat
 
     def _disqualify_player(self, player: AbstractPlayer) -> None:

@@ -38,6 +38,7 @@ class AbstractPlayer(CardGameListener):
             self._player_views[player] = PlayerView(
                 p.name,
                 type(p).__name__,
+                id(p),
                 p.report_remaining_cards,
                 lambda: self.memory.starting_position(self._player_views[p]),
                 lambda: self.memory.final_position(self._player_views[p]),
@@ -75,6 +76,17 @@ class AbstractPlayer(CardGameListener):
 
     def notify_play(self, player, meld):
         super().notify_play(player, meld)
+
+    def notify_player_replaced(self, old_player, new_player):
+        if new_player is self:
+            # GameMaster already transferred old_player.memory to us.
+            # Inherit the view cache so cached PlayerViews for opponents remain valid,
+            # then patch the self-reference directly with AbstractPlayer objects
+            # (no _view_of conversion — the slot was stored as an AbstractPlayer).
+            self._player_views = getattr(old_player, '_player_views', {})
+            self.memory.replace_player(old_player, new_player)
+        else:
+            super().notify_player_replaced(old_player, new_player)
 
     def notify_episode_end(self, final_ranks: list,
                            starting_ranks: list) -> None:

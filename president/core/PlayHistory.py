@@ -65,14 +65,14 @@ class PlayHistory:
         """
         # Seat list
         for i, p in enumerate(self._players):
-            if p is old_player:
+            if p == old_player:
                 self._players[i] = new_player
         # Current-turn pointer
-        if self._last_play_player is old_player:
+        if self._last_play_player == old_player:
             self._last_play_player = new_player
         # Finished players list
         for i, p in enumerate(self._finished_players):
-            if p is old_player:
+            if p == old_player:
                 self._finished_players[i] = new_player
         # Position dicts keyed by player object
         if old_player in self._starting_positions:
@@ -82,7 +82,7 @@ class PlayHistory:
         # Historical events — identity-based lookups (last_event_for, reconstruct_hand)
         # must continue to resolve correctly for the same logical player.
         for event in self._memory:
-            if event.player is old_player:
+            if event.player == old_player:
                 event.player = new_player
 
     @property
@@ -114,7 +114,7 @@ class PlayHistory:
     def add_play(self, player, meld: Meld):
         """Record a meld or pass. Validates clockwise order. Called before cards are removed."""
         expected = self._get_expected_next_player()
-        if expected is not None and player is not expected:
+        if expected is not None and player != expected:
             raise ValueError(
                 f"Clockwise order violation: expected "
                 f"{getattr(expected, 'name', expected)} but got "
@@ -209,7 +209,7 @@ class PlayHistory:
         """
         cards = list(existing_cards) if existing_cards else []
         for event in self._memory:
-            if (event.player is player
+            if (event.player == player
                     and event.event_type == EventType.MELD
                     and event.meld is not None
                     and event.meld.cards):
@@ -244,7 +244,7 @@ class PlayHistory:
         Returns None if the player has not yet acted this hand.
         """
         for event in reversed(self._memory):
-            if event.player is player and event.event_type != EventType.WAITING:
+            if event.player == player and event.event_type != EventType.WAITING:
                 return event
         return None
 

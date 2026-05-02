@@ -14,12 +14,14 @@ class PlayerView:
         self,
         name: str,
         player_type: str,
+        player_id: int,
         remaining_cards_fn: Callable[[], int],
         previous_position_fn: Callable[[], "int | None"],
         current_position_fn: Callable[[], "int | None"],
     ):
         self.name = name
         self.player_type = player_type
+        self.player_id = player_id  # id() of the underlying AbstractPlayer
         self._remaining_cards_fn = remaining_cards_fn
         self._previous_position_fn = previous_position_fn
         self._current_position_fn = current_position_fn
@@ -34,6 +36,14 @@ class PlayerView:
     def current_position(self) -> "int | None":
         """Rank index achieved so far this episode, or None if still playing."""
         return self._current_position_fn()
+
+    def __eq__(self, other):
+        if isinstance(other, PlayerView):
+            return self.player_id == other.player_id
+        return NotImplemented
+
+    def __hash__(self):
+        return hash(self.player_id)
 
     def __repr__(self):
         return f"PlayerView({self.name!r}, {self.player_type})"
