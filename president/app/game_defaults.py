@@ -2,8 +2,8 @@ import uuid
 
 _DEFAULT_CONFIGS = [
     # (seed_label, [(ai_name, difficulty_key), ...])  — slots 1-3; slot 0 left open for human
-    ("easy",  [("ECHO-9 (AI)", "simple"),   ("NULL-0 (AI)", "simple"),   ("WREN-X (AI)", "simple")]),
-    ("mixed", [("WREN-X (AI)", "simple"),   ("ECHO-9 (AI)", "holder"),   ("APEX-1 (AI)", "splitter")]),
+    ("easy",  [("GRUB-4 (AI)", "simple"),   ("FUZZ-8 (AI)", "simple"),   ("SLAB-6 (AI)", "simple")]),
+    ("mixed", [("ZIPZ-0 (AI)", "simple"),   ("ECHO-9 (AI)", "holder"),   ("RHEA-2 (AI)", "splitter")]),
     ("hard",  [("VERA-7 (AI)", "splitter"), ("KAEL-3 (AI)", "splitter"), ("APEX-1 (AI)", "splitter")]),
 ]
 
