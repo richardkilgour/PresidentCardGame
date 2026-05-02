@@ -16,10 +16,16 @@ const CardGame = {
         this.lastHandWinner   = null;  // winner of the most recent trick
         this.suppressPassOverlay = false;
         this.isAiControlled = false;
+        this.currentTurnPlayer = null; // name of whoever's turn it currently is
+        this.tutorialEnabled   = true; // centre hint text on/off
+        this.hintsEnabled      = true; // mouseover tooltips on/off
 
         const startGameButton = document.getElementById("start_game_button");
         startGameButton.addEventListener("click", () => this.socket.emit("start_game"));
         startGameButton.disabled = true;
+
+        this.initTooltip();
+        this.setupPlayfieldTooltips();
     },
 
     // Debounced state request — collapses bursts of events into one round-trip
@@ -298,6 +304,8 @@ const CardGame = {
 
         this.updatePlayerHand(data.player_hand);
         this.updateStats(data.stats);
+        this.updatePlayerAvatar(data.player_names[0]);
+        this.updateTutorialText(data);
 
         // Sync AI-control button label
         this.isAiControlled = !!data.is_ai_controlled;
@@ -341,10 +349,21 @@ const CardGame = {
             let index = i - Math.floor(cards.length / 2);
             handContainer.appendChild(this.cardRenderer.renderCard(card[0], card[1], index, true, card[2]));
         });
+        // Add tooltip hints to each card hit area
+        handContainer.querySelectorAll('.card_hit_area').forEach((hitArea, i) => {
+            if (!cards[i]) return;
+            const tip = cards[i][2]
+                ? 'Hover to lift · click to play this card'
+                : 'Cannot play — rank or count doesn\'t match the current lead';
+            hitArea.addEventListener('mouseenter', () => this.showTooltip(tip));
+            hitArea.addEventListener('mouseleave', () => this.hideTooltip());
+        });
     },
 
 
     highlightCurrentPlayerTurn: function(data) {
+        this.currentTurnPlayer = data.player; // track for tutorial text
+
         const playerMap = {
             'opponent-1-name': 'playfield_left',
             'opponent-2-name': 'playfield_center',
@@ -392,6 +411,24 @@ const CardGame = {
         arenaDiv.appendChild(passedElement);
     },
 
+    // Centre a group of .card_small elements horizontally inside arenaDiv.
+    // Must be called after all cards are appended but before animations fire.
+    _centerMeldSpread: function(arenaDiv) {
+        const cards = Array.from(arenaDiv.querySelectorAll('.card_small'));
+        if (cards.length === 0) return;
+        // card_small font-size is 15pt = 20 px; getComputedStyle for safety
+        const emPx  = parseFloat(getComputedStyle(cards[0]).fontSize);
+        const contW = arenaDiv.offsetWidth;          // px width of the meld box
+        const n     = cards.length;
+        // Spread width = (n-1) inter-card gaps of 1 em each + one card width (3.75 em)
+        const spreadW = ((n - 1) + 3.75) * emPx;
+        // Left pixel that centres the spread
+        const startPx = (contW - spreadW) / 2;
+        cards.forEach((card, i) => {
+            card.style.left = (startPx / emPx + i) + 'em';
+        });
+    },
+
     setPlayedCard: function(playerId, cardIds) {
         const arenaDivId = this.findArena(playerId);
         const arenaDiv = document.getElementById(arenaDivId);
@@ -422,29 +459,32 @@ const CardGame = {
             }
         }
 
-        cardIds.forEach((card, i) => {
+        // Pass 1 — render all cards into the DOM
+        const rendered = cardIds.map((card, i) => {
             const index = i - Math.floor(cardIds.length / 2);
             const cardElement = this.cardRenderer.renderCard(card[0], card[1], index, false, false);
             arenaDiv.appendChild(cardElement);
+            return { el: cardElement, rotation: 7 * index };
+        });
 
-            const rotation = 7 * index;
+        // Pass 2 — centre the spread so COG sits at the container's midpoint
+        this._centerMeldSpread(arenaDiv);
 
+        // Pass 3 — animate (uses final centred positions for rect calculations)
+        rendered.forEach(({ el, rotation }) => {
             if (isMyArena) {
-                const dest = cardElement.getBoundingClientRect();
+                const dest = el.getBoundingClientRect();
                 const dx = srcX != null ? srcX - (dest.left + dest.width  / 2) : 0;
                 const dy = srcY != null ? srcY - (dest.top  + dest.height / 2) : 180;
-                cardElement.animate([
+                el.animate([
                     { transform: `translate(${dx}px, ${dy}px) rotate(0deg)`, opacity: '0.85' },
                     { transform: `rotate(${rotation}deg)`,                    opacity: '1'    }
                 ], { duration: 420, easing: 'cubic-bezier(0.2, 0, 0.1, 1)' });
             } else {
-                const inner = cardElement.querySelector('.card_small');
-                if (inner) {
-                    inner.animate([
-                        { transform: 'perspective(300px) rotateY(90deg)', opacity: '0.6' },
-                        { transform: 'perspective(300px) rotateY(0deg)',   opacity: '1'   }
-                    ], { duration: 380, easing: 'ease-out' });
-                }
+                el.animate([
+                    { transform: 'perspective(300px) rotateY(90deg)', opacity: '0.6' },
+                    { transform: 'perspective(300px) rotateY(0deg)',   opacity: '1'   }
+                ], { duration: 380, easing: 'ease-out' });
             }
         });
     },
@@ -545,6 +585,100 @@ const CardGame = {
             </div>`;
     },
 
+    // -------------------------------------------------------------------------
+    // Player avatar (sidebar)
+    // -------------------------------------------------------------------------
+
+    updatePlayerAvatar: function(playerName) {
+        const el = document.getElementById('player-avatar');
+        if (!el) return;
+        el.innerHTML = '';
+        el.className = 'seat-avatar';
+        if (!playerName) return;
+        const isAI = playerName.endsWith(' (AI)');
+        if (isAI && typeof window.getAvatarSVG === 'function') {
+            el.innerHTML = window.getAvatarSVG(playerName, '#00FFB8', 28);
+        } else {
+            el.classList.add('human-avatar');
+            el.textContent = playerName.slice(0, 2).toUpperCase();
+        }
+    },
+
+    // -------------------------------------------------------------------------
+    // Centre tutorial / hint text
+    // -------------------------------------------------------------------------
+
+    updateTutorialText: function(data) {
+        const el     = document.getElementById('table-center-info');
+        const msgEl  = document.getElementById('center-msg');
+        if (!el || !msgEl) return;
+
+        if (!this.tutorialEnabled) {
+            el.style.display = 'none';
+            return;
+        }
+        el.style.display = 'flex';
+
+        let msg = '';
+
+        if (!data.player_hand || data.player_hand.length === 0) {
+            // Game hasn't started yet
+            const joined = (data.player_names || []).filter(Boolean).length;
+            msg = joined < 4 ? `Waiting for players… (${joined}/4)` : 'Ready — press Start Game';
+        } else if (data.is_my_turn) {
+            const playable = data.player_hand.filter(c => c[2]).length;
+            msg = playable > 0
+                ? '▲ Your turn — hover a card and click to play'
+                : '▲ Your turn — no playable cards, you must pass';
+        } else {
+            msg = this.currentTurnPlayer ? `${this.currentTurnPlayer}'s turn` : '';
+        }
+
+        msgEl.textContent = msg;
+    },
+
+    // -------------------------------------------------------------------------
+    // Floating tooltip
+    // -------------------------------------------------------------------------
+
+    initTooltip: function() {
+        this._tooltipEl = document.getElementById('game-tooltip');
+        document.addEventListener('mousemove', (e) => {
+            if (this._tooltipEl && this._tooltipEl.style.display !== 'none') {
+                // Keep tooltip 14px right/below cursor; flip left if near right edge
+                const gap  = 14;
+                const tw   = this._tooltipEl.offsetWidth;
+                const left = (e.clientX + gap + tw > window.innerWidth)
+                           ? e.clientX - tw - gap
+                           : e.clientX + gap;
+                this._tooltipEl.style.left = left + 'px';
+                this._tooltipEl.style.top  = (e.clientY + gap) + 'px';
+            }
+        });
+    },
+
+    showTooltip: function(text) {
+        if (!this.hintsEnabled || !this._tooltipEl || !text) return;
+        this._tooltipEl.textContent = text;
+        this._tooltipEl.style.display = 'block';
+    },
+
+    hideTooltip: function() {
+        if (this._tooltipEl) this._tooltipEl.style.display = 'none';
+    },
+
+    // Attach tooltip behaviour to any element carrying data-tooltip attribute.
+    // Called once on init; also handles dynamically-added elements via delegation.
+    setupPlayfieldTooltips: function() {
+        document.addEventListener('mouseover', (e) => {
+            const target = e.target.closest('[data-tooltip]');
+            if (target) this.showTooltip(target.getAttribute('data-tooltip'));
+        });
+        document.addEventListener('mouseout', (e) => {
+            if (e.target.closest('[data-tooltip]')) this.hideTooltip();
+        });
+    },
+
     playCards: function(cards) {
         console.log("playCards: " + cards);
         this.suppressPassOverlay = true;
@@ -622,7 +756,7 @@ const CardGame = {
             console.log("isOwner = " + isOwner);
             console.log("aiSelectElement = " + aiSelectElement);
             if (isOwner && aiSelectElement) {
-                aiSelectElement.style.display = "block";
+                aiSelectElement.style.display = "flex";
                 this.populateAIDropdown(index, existingPlayers);
 
                 const select = document.getElementById(`ai-opponent-${index}`);
@@ -677,11 +811,22 @@ const CardGame = {
 document.addEventListener("DOMContentLoaded", function() {
     CardGame.init();
 
-    window.playCards = (cards) => CardGame.playCards(cards);
-    window.logOut = () => CardGame.logOut();
-    window.leaveGame = () => CardGame.leaveGame();
-    window.readyToStart = () => CardGame.readyToStart();
-    window.addAIPlayer = (opponentIndex) => CardGame.addAIPlayer(opponentIndex);
-    window.toggleAiControl = () => CardGame.toggleAiControl();
-    window.onSpeedSlider = (val) => CardGame.onSpeedSlider(val);
+    window.playCards       = (cards) => CardGame.playCards(cards);
+    window.logOut          = ()      => CardGame.logOut();
+    window.leaveGame       = ()      => CardGame.leaveGame();
+    window.readyToStart    = ()      => CardGame.readyToStart();
+    window.addAIPlayer     = (i)     => CardGame.addAIPlayer(i);
+    window.toggleAiControl = ()      => CardGame.toggleAiControl();
+    window.onSpeedSlider   = (val)   => CardGame.onSpeedSlider(val);
+
+    // Toggle functions wired to the checkboxes in the controls panel
+    window.toggleTutorial = (enabled) => {
+        CardGame.tutorialEnabled = enabled;
+        const el = document.getElementById('table-center-info');
+        if (el) el.style.display = enabled ? 'flex' : 'none';
+    };
+    window.toggleTooltips = (enabled) => {
+        CardGame.hintsEnabled = enabled;
+        if (!enabled) CardGame.hideTooltip();
+    };
 });

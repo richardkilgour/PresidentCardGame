@@ -18,12 +18,24 @@
     <div class="scanlines" aria-hidden="true"></div>
     <div class="table-watermark" aria-hidden="true">∴</div>
 
+    <!-- Floating tooltip (follows cursor) -->
+    <div id="game-tooltip" class="game-tooltip" aria-hidden="true"></div>
+
     <div class="game-layout">
 
         <!-- ── Stats panel (left) ─────────────────────────── -->
         <aside class="side-panel stats-side">
             <div class="panel-rule"></div>
-            <div id="stats-panel"></div>
+
+            <!-- Player's own profile sits above the scoreboard -->
+            <div class="player-profile">
+                <div class="seat-avatar" id="player-avatar"></div>
+                <h2 class="seat-name you-name" id="player_id"></h2>
+            </div>
+
+            <div id="stats-panel"
+                 data-tooltip="Scoreboard — cumulative scores and longest President streak"></div>
+
             <div class="panel-rule"></div>
         </aside>
 
@@ -34,96 +46,108 @@
             <div class="felt-oval" aria-hidden="true"></div>
             <div class="table-glow"  aria-hidden="true"></div>
 
-            <div class="grid-container">
+            <!-- ── Opponent 1 — left (9 o'clock) ── -->
+            <div class="opp-block opp-left" id="playfield_left">
+                <div class="seat-panel"
+                     data-tooltip="Left opponent — hand size and last action shown below">
+                    <div class="avatar-wrap">
+                        <div class="seat-avatar" id="opponent-1-avatar"></div>
+                    </div>
+                    <h2 class="seat-name" id="opponent-1-name">Waiting…</h2>
+                    <div class="opp-hand-area"
+                         data-tooltip="Face-down cards — number shows how many remain in hand">
+                        <div id="opponent-1-hand"></div>
+                    </div>
+                    <div class="meld-section" id="arena_left"
+                         data-tooltip="What this opponent played or did this round (Passed / Waiting / cards)"></div>
+                </div>
+                <div id="opponent-1-ai-select" class="ai-select-panel" style="display:none;">
+                    <label class="ai-label" for="ai-opponent-1">Add AI</label>
+                    <select id="ai-opponent-1" class="ai-select"></select>
+                    <button class="btn-ghost btn-sm" onclick="addAIPlayer(1)">Add</button>
+                </div>
+            </div>
 
-                <!-- Left Player -->
-                <div class="playfield_left" id="playfield_left">
-                    <div class="player_left">
-                        <div class="seat-panel">
-                            <div class="seat-avatar" id="opponent-1-avatar"></div>
-                            <h2 class="seat-name" id="opponent-1-name">Waiting…</h2>
-                            <div class="hand_play_area">
-                                <div id="opponent-1-hand"></div>
-                            </div>
-                        </div>
+            <!-- ── Opponent 2 — top (12 o'clock) ── -->
+            <div class="opp-block opp-top" id="playfield_center">
+                <div class="seat-panel"
+                     data-tooltip="Top opponent — hand size and last action shown below">
+                    <div class="avatar-wrap">
+                        <div class="seat-avatar" id="opponent-2-avatar"></div>
                     </div>
-                    <div id="opponent-1-ai-select" class="ai-select-panel" style="display:none;">
-                        <label class="ai-label" for="ai-opponent-1">Add AI</label>
-                        <select id="ai-opponent-1" class="ai-select"></select>
-                        <button class="btn-ghost btn-sm" onclick="addAIPlayer(1)">Add</button>
+                    <h2 class="seat-name" id="opponent-2-name">Waiting…</h2>
+                    <div class="opp-hand-area"
+                         data-tooltip="Face-down cards — number shows how many remain in hand">
+                        <div id="opponent-2-hand"></div>
+                    </div>
+                    <div class="meld-section" id="arena_center"
+                         data-tooltip="What this opponent played or did this round (Passed / Waiting / cards)"></div>
+                </div>
+                <div id="opponent-2-ai-select" class="ai-select-panel" style="display:none;">
+                    <label class="ai-label" for="ai-opponent-2">Add AI</label>
+                    <select id="ai-opponent-2" class="ai-select"></select>
+                    <button class="btn-ghost btn-sm" onclick="addAIPlayer(2)">Add</button>
+                </div>
+            </div>
+
+            <!-- ── Opponent 3 — right (3 o'clock) ── -->
+            <div class="opp-block opp-right" id="playfield_right">
+                <div class="seat-panel"
+                     data-tooltip="Right opponent — hand size and last action shown below">
+                    <div class="avatar-wrap">
+                        <div class="seat-avatar" id="opponent-3-avatar"></div>
+                    </div>
+                    <h2 class="seat-name" id="opponent-3-name">Waiting…</h2>
+                    <div class="opp-hand-area"
+                         data-tooltip="Face-down cards — number shows how many remain in hand">
+                        <div id="opponent-3-hand"></div>
+                    </div>
+                    <div class="meld-section" id="arena_right"
+                         data-tooltip="What this opponent played or did this round (Passed / Waiting / cards)"></div>
+                </div>
+                <div id="opponent-3-ai-select" class="ai-select-panel" style="display:none;">
+                    <label class="ai-label" for="ai-opponent-3">Add AI</label>
+                    <select id="ai-opponent-3" class="ai-select"></select>
+                    <button class="btn-ghost btn-sm" onclick="addAIPlayer(3)">Add</button>
+                </div>
+            </div>
+
+            <!-- ── Centre: turn / tutorial hint ── -->
+            <div class="table-center-info" id="table-center-info">
+                <div class="center-msg" id="center-msg">Waiting for game to start…</div>
+            </div>
+
+            <!-- ── Player zone — bottom ── -->
+            <div class="playfield_bottom" id="playfield_bottom">
+
+                <!-- Player's own last meld / status for this round -->
+                <div class="player-meld" id="arena_bottom"
+                     data-tooltip="Cards you played this round, or your current status"></div>
+
+                <!-- Player's hand -->
+                <div class="hand_play_area" style="position:relative;"
+                     data-tooltip="Your hand — hover a card to lift it, then click to play">
+                    <div id="player-hand"></div>
+                    <!-- Shown only when ALL cards are unplayable (mandatory pass) -->
+                    <div id="compulsory-pass-overlay"
+                         onclick="playCards('PASSED')"
+                         style="display:none; position:absolute; inset:0;
+                                background:rgba(0,0,0,0.65); z-index:10; cursor:pointer;
+                                align-items:center; justify-content:center; border-radius:8px;">
+                        <span class="pass-overlay-text">Must Pass</span>
                     </div>
                 </div>
 
-                <!-- Opposite Player -->
-                <div class="playfield_center" id="playfield_center">
-                    <div class="player_opposite">
-                        <div class="seat-panel">
-                            <div class="seat-avatar" id="opponent-2-avatar"></div>
-                            <h2 class="seat-name" id="opponent-2-name">Waiting…</h2>
-                            <div class="hand_play_area">
-                                <div id="opponent-2-hand"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="opponent-2-ai-select" class="ai-select-panel" style="display:none;">
-                        <label class="ai-label" for="ai-opponent-2">Add AI</label>
-                        <select id="ai-opponent-2" class="ai-select"></select>
-                        <button class="btn-ghost btn-sm" onclick="addAIPlayer(2)">Add</button>
-                    </div>
-                </div>
+                <!-- Voluntary pass button (always present during your turn) -->
+                <button class="btn-ghost pass-btn"
+                        onclick="playCards('PASSED')"
+                        data-tooltip="Pass your turn voluntarily — skip without playing a card">Pass</button>
 
-                <!-- Right Player -->
-                <div class="playfield_right" id="playfield_right">
-                    <div class="player_right">
-                        <div class="seat-panel">
-                            <div class="seat-avatar" id="opponent-3-avatar"></div>
-                            <h2 class="seat-name" id="opponent-3-name">Waiting…</h2>
-                            <div class="hand_play_area">
-                                <div id="opponent-3-hand"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="opponent-3-ai-select" class="ai-select-panel" style="display:none;">
-                        <label class="ai-label" for="ai-opponent-3">Add AI</label>
-                        <select id="ai-opponent-3" class="ai-select"></select>
-                        <button class="btn-ghost btn-sm" onclick="addAIPlayer(3)">Add</button>
-                    </div>
-                </div>
+            </div><!-- .playfield_bottom -->
 
-                <!-- Bottom: Current Player -->
-                <div class="playfield_bottom" id="playfield_bottom">
-                    <h2 class="seat-name you-name" id="player_id"></h2>
-                    <div class="player_you">
-                        <div class="hand_play_area" style="position:relative;">
-                            <div id="player-hand"></div>
-                            <div id="compulsory-pass-overlay"
-                                 onclick="playCards('PASSED')"
-                                 style="display:none; position:absolute; inset:0; background:rgba(0,0,0,0.6); z-index:10; cursor:pointer; align-items:center; justify-content:center; border-radius:8px;">
-                                <span class="pass-overlay-text">Pass</span>
-                            </div>
-                        </div>
-                        <button class="btn-ghost" onclick="playCards('PASSED')">Pass</button>
-                    </div>
-                </div>
-
-                <!-- Arena zones (played cards) -->
-                <div class="arena_left">
-                    <div class="arena_play_area_0" id="arena_left"></div>
-                </div>
-                <div class="arena_center">
-                    <div class="arena_play_area_1" id="arena_center"></div>
-                </div>
-                <div class="arena_right">
-                    <div class="arena_play_area_2" id="arena_right"></div>
-                </div>
-                <div class="arena_bottom">
-                    <div class="arena_play_area_3" id="arena_bottom"></div>
-                </div>
-
-            </div><!-- .grid-container -->
         </div><!-- .table-wrapper -->
 
-        <!-- ── Ads + controls panel (right) ──────────────── -->
+        <!-- ── Controls + ads panel (right) ──────────────── -->
         <aside class="side-panel ads-side">
             <div class="panel-rule"></div>
 
@@ -132,11 +156,28 @@
                 <button class="btn-ghost"   id="ai-control-btn"    onclick="toggleAiControl()">Play as AI</button>
                 <button class="btn-ghost"   id="logout-btn"        onclick="logOut(); return false;">Logout</button>
                 <button class="btn-ghost btn-danger"               onclick="leaveGame()">Leave Game</button>
+
                 <div class="speed-control">
                     <label class="speed-label" for="speed-slider">Speed</label>
                     <input type="range" id="speed-slider" min="1" max="20" value="10"
                            oninput="onSpeedSlider(this.value)">
                     <span id="speed-label-value">Normal</span>
+                </div>
+
+                <!-- Tutorial / tooltip toggles -->
+                <div class="hint-toggles">
+                    <label class="toggle-row"
+                           title="Show or hide the hint text in the centre of the table">
+                        <input type="checkbox" id="tutorial-toggle" checked
+                               onchange="toggleTutorial(this.checked)">
+                        <span>Show hints</span>
+                    </label>
+                    <label class="toggle-row"
+                           title="Show or hide mouseover explanations for cards and zones">
+                        <input type="checkbox" id="tooltip-toggle" checked
+                               onchange="toggleTooltips(this.checked)">
+                        <span>Tooltips</span>
+                    </label>
                 </div>
             </div>
 

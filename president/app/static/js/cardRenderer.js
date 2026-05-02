@@ -26,26 +26,6 @@ class CardRenderer {
             cardId = `${value}__${suitIndex}`;
         }
 
-        const cardHitArea = document.createElement("div");
-        cardHitArea.className = "card_hit_area";
-        cardHitArea.style.left = `${index+6}em`;
-        cardHitArea.style.top = `${(index / 4) ** 2}em`;
-        cardHitArea.style.transform = `rotate(${7 * index}deg)`;
-
-        if (playable) {
-            const playableCards = [cardId];
-            for (let i = 0; i <= suitIndex; i++) {
-                const similarCardId = `${value}_${i}`;
-                const similarCard = document.getElementById(similarCardId);
-                if (similarCard) {
-                    playableCards.push(similarCardId);
-                }
-            }
-            // Use this.moveCardUp and this.moveCardDown with proper binding
-            cardHitArea.onmouseover = () => this.moveCardUp(...playableCards);
-            cardHitArea.onmouseout = () => this.moveCardDown(...playableCards);
-        }
-
         const card = document.createElement("div");
         card.className = playerCard ? "card" : "card_small";
         card.id = cardId;
@@ -146,8 +126,41 @@ class CardRenderer {
         }
 
         card.appendChild(front);
-        cardHitArea.appendChild(card);
 
+        // Non-player cards (opponent hands, meld sections): position the card
+        // directly and return it — no card_hit_area wrapper needed.
+        if (!playerCard) {
+            card.style.position  = 'absolute';
+            card.style.left      = `${index + 6}em`;
+            card.style.top       = `${(index / 4) ** 2}em`;
+            card.style.transform = `rotate(${7 * index}deg)`;
+            // Override the default .card_small bottom-anchor so the fan sits
+            // from the top of the container rather than the bottom.
+            card.style.transformOrigin = 'bottom center';
+            return card;
+        }
+
+        // Player cards: wrap in card_hit_area for hover/click handling.
+        const cardHitArea = document.createElement("div");
+        cardHitArea.className    = "card_hit_area";
+        cardHitArea.style.left   = `${index + 6}em`;
+        cardHitArea.style.top    = `${(index / 4) ** 2}em`;
+        cardHitArea.style.transform = `rotate(${7 * index}deg)`;
+
+        if (playable) {
+            const playableCards = [cardId];
+            for (let i = 0; i <= suitIndex; i++) {
+                const similarCardId = `${value}_${i}`;
+                const similarCard = document.getElementById(similarCardId);
+                if (similarCard) {
+                    playableCards.push(similarCardId);
+                }
+            }
+            cardHitArea.onmouseover = () => this.moveCardUp(...playableCards);
+            cardHitArea.onmouseout  = () => this.moveCardDown(...playableCards);
+        }
+
+        cardHitArea.appendChild(card);
         return cardHitArea;
     }
 

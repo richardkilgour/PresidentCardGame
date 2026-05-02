@@ -1,5 +1,5 @@
 /* Ghost Wire — Chrome Deco + Teal
-   Triple Point Design System
+   Triple Point Design System — Redesigned Layout (no rotations)
    ============================================================ */
 
 :root {
@@ -108,7 +108,18 @@ body {
 .panel-rule::before { opacity: 0.9; }
 .panel-rule::after  { opacity: 0.35; }
 
-/* ── Stats panel ─────────────────────────────────────────── */
+/* ── Player profile (top of stats panel) ─────────────────── */
+.player-profile {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 14px 12px;
+  border-bottom: 1px solid rgba(0,255,184,0.12);
+}
+
+/* ── Stats panel content ─────────────────────────────────── */
 #stats-panel {
   flex: 1;
   overflow-y: auto;
@@ -151,15 +162,62 @@ body {
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  padding: 12px 12px 8px;
+  padding: 12px 12px 10px;
   border-bottom: 1px solid rgba(0,255,184,0.08);
+}
+
+/* ── Tutorial / tooltip toggles ──────────────────────────── */
+.hint-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0,255,184,0.08);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-b);
+  font-size: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 150ms;
+}
+.toggle-row:hover { color: var(--text); }
+
+.toggle-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(0,255,184,0.35);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 150ms, border-color 150ms;
+}
+.toggle-row input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.toggle-row input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--btn-text);
+  clip-path: polygon(14% 44%, 0% 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
 }
 
 /* ── Ads area ────────────────────────────────────────────── */
 .ads-area {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -281,118 +339,50 @@ body {
   z-index: 0;
 }
 
-/* ══ Inner grid (player positions) ══════════════════════════ */
+/* ══ Opponent blocks — absolutely positioned around oval ═════ */
 
-.grid-container {
-  display: grid;
-  grid-template-columns: 20% 15% 30% 15% 20%;
-  grid-template-rows: 30% 15% 15% 40%;
-  width: 100%;
-  height: 100%;
-  position: relative;
-  z-index: 2;
-}
-
-/* ── Grid areas ─────────────────────────────────────────── */
-.playfield_left   { grid-area: 1 / 1 / span 3 / 2; position: relative; }
-.playfield_center { grid-area: 1 / 2 / span 1 / span 3; position: relative; }
-.playfield_right  { grid-area: 1 / 5 / span 3 / 6; position: relative; }
-.playfield_bottom { grid-area: 4 / 2 / 5 / 5; position: relative; }
-.arena_left       { grid-area: 2 / 2 / span 2 / 3; }
-.arena_center     { grid-area: 2 / 3 / span 1 / 4; }
-.arena_right      { grid-area: 2 / 4 / span 2 / 5; }
-.arena_bottom     { grid-area: 3 / 3 / 4 / 4; }
-
-/* ── Felt fill (table cells) ─────────────────────────────── */
-.playfield_left,
-.playfield_center,
-.playfield_right,
-.arena_left, .arena_center, .arena_right, .arena_bottom {
-  background: var(--felt);
-}
-
-/* Subtle rim borders on table edge cells */
-.playfield_left   { border-left: 1px solid rgba(0,255,184,0.12); border-top: 1px solid rgba(0,255,184,0.12); }
-.playfield_center { border-top:  1px solid rgba(0,255,184,0.18); }
-.playfield_right  { border-right: 1px solid rgba(0,255,184,0.12); border-top: 1px solid rgba(0,255,184,0.12); }
-.arena_left       { border-left:  1px solid rgba(0,255,184,0.08); }
-.arena_right      { border-right: 1px solid rgba(0,255,184,0.08); }
-
-/* bottom player zone */
-.playfield_bottom {
-  background: var(--panel-bg);
-  border-top: 1px solid rgba(0,255,184,0.12);
-}
-
-/* ── Arena play zones — dashed ghost borders ────────────── */
-.arena_left, .arena_center, .arena_right, .arena_bottom {
-  position: relative;
-}
-.arena_left::after, .arena_center::after,
-.arena_right::after, .arena_bottom::after {
-  content: '';
+.opp-block {
   position: absolute;
-  inset: 6px;
-  border: 1px dashed rgba(0,255,184,0.10);
-  border-radius: 4px;
-  pointer-events: none;
+  z-index: 10;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  /* allow meld cards to render beyond the block bounds */
+  overflow: visible;
 }
 
-/* ── Arena card transforms ───────────────────────────────── */
-.arena_play_area_0 {
-  position: relative; left: 0%; top: 50%;
-  transform: translate(0%, -50%) rotate(90deg);
-}
-.arena_play_area_1 {
-  position: relative; left: 50%; top: 0%;
-  transform: translate(-50%, 0%) rotate(180deg);
-}
-.arena_play_area_2 {
-  position: relative; left: 0%; top: 50%;
-  transform: translate(50%, -50%) rotate(270deg);
-}
-.arena_play_area_3 {
-  position: relative; left: 50%; top: 0%;
-  transform: translate(-50%, 50%);
-}
+/* Positions: left/right centred vertically, top centred horizontally */
+.opp-left  { left: 10px;  top: 50%; transform: translateY(-50%); }
+.opp-top   { top:  10px;  left: 50%; transform: translateX(-50%); }
+.opp-right { right: 10px; top: 50%; transform: translateY(-50%); }
 
-/* ── Player rotations ────────────────────────────────────── */
-.player_left {
-  position: relative; left: 50%; top: 50%;
-  transform: translate(-50%, -50%) rotate(90deg);
-}
-.player_opposite {
-  position: relative; left: 50%; top: 50%;
-  transform: translate(-50%, -50%) rotate(180deg);
-}
-.player_right {
-  position: relative; left: 50%; top: 50%;
-  transform: translate(-50%, -50%) rotate(270deg);
-}
-.player_you {
-  position: relative; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-}
-
-/* ── Seat panel ─────────────────────────────────────────── */
+/* ── Seat panel (card-like block) ───────────────────────── */
 .seat-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  padding: 10px 8px;
-  border-radius: 6px;
+  padding: 10px 8px 8px;
+  border-radius: 8px 8px 0 0;
   border: 1px solid transparent;
+  background: rgba(6,15,24,0.90);
   transition: box-shadow 200ms ease-out, border-color 200ms ease-out;
+  overflow: visible;
 }
 
 /* ── Avatar ─────────────────────────────────────────────── */
+.avatar-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
 .seat-avatar {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  border: 1.5px solid rgba(0,255,184,0.30);
+  border: 2px solid rgba(0,255,184,0.35);
   background: radial-gradient(ellipse at 50% 35%, rgba(0,255,184,0.14) 0%, transparent 70%);
   display: flex;
   align-items: center;
@@ -401,7 +391,7 @@ body {
   flex-shrink: 0;
 }
 
-/* Fallback ∴ glyph when no SVG is injected */
+/* Fallback ∴ when no avatar content is injected */
 .seat-avatar:empty::after {
   content: '∴';
   font-family: var(--font-h);
@@ -411,16 +401,17 @@ body {
   text-shadow: 0 0 8px var(--accent);
 }
 
-/* Human initials inside avatar */
 .seat-avatar.human-avatar {
   font-family: var(--font-h);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--accent);
   text-shadow: 0 0 8px var(--accent);
 }
 
-/* ── Seat names ─────────────────────────────────────────── */
+/* ── Seat name + rank badge ─────────────────────────────── */
+
+/* Default seat-name (used in sidebar player profile) */
 .seat-name {
   font-family: var(--font-h);
   font-size: 11px;
@@ -430,47 +421,242 @@ body {
   text-align: center;
   white-space: nowrap;
 }
+
 .you-name {
   font-size: 13px;
   color: var(--accent);
   text-shadow: 0 0 10px var(--accent);
-  margin-bottom: 2px;
 }
 
-/* ── Active turn ─────────────────────────────────────────── */
-.active-turn .seat-panel {
-  box-shadow: var(--a-glow);
-  border-color: var(--accent);
-}
-/* Keep backward-compat selector too */
-.active-turn {
-  box-shadow: var(--a-glow);
-  border-color: var(--accent);
+/* Inside a seat-panel: stack rank badge above the name text */
+.seat-panel .seat-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  /* default: small gap below avatar */
+  margin-top: 3px;
 }
 
-/* ── Rank badges ─────────────────────────────────────────── */
+/* When a rank badge is set, pull the whole h2 up so the badge
+   slightly overlaps the bottom of the avatar circle              */
+.seat-panel .seat-name[data-rank],
+.seat-panel .seat-name[data-ex-rank] {
+  margin-top: -10px;
+}
+
+/* Rank badge rendered via ::before pseudo-element */
 [data-rank]::before {
   content: attr(data-rank);
-  display: inline-block;
+  display: block;
   font-family: var(--font-b);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
   color: var(--accent);
-  border: 1px solid rgba(0,255,184,0.25);
-  border-radius: 3px;
-  padding: 1px 6px;
-  background: rgba(0,255,184,0.06);
-  margin-right: 6px;
+  border: 1px solid rgba(0,255,184,0.40);
+  border-radius: 10px;
+  padding: 1px 8px;
+  background: rgba(2,5,7,0.95);
+  box-shadow: 0 0 6px rgba(0,255,184,0.20);
+  white-space: nowrap;
 }
+
 [data-ex-rank]::after {
   content: " (ex-" attr(data-ex-rank) ")";
   font-size: 0.75em;
   opacity: 0.45;
 }
 
-/* ── Hand play area ──────────────────────────────────────── */
+/* In the sidebar player profile the badge stays inline */
+.player-profile [data-rank]::before {
+  display: inline-block;
+  margin-right: 4px;
+}
+
+/* ── Opponent face-down hand area ────────────────────────── */
+.opp-hand-area {
+  position: relative;
+  width: 234px;
+  /* fixed height — acts as the layout anchor; cards overflow visually */
+  height: 72px;
+  /* let cards fan outside the box */
+  overflow: visible;
+  border: 1px dashed rgba(0,255,184,0.14);
+  border-radius: 4px;
+}
+
+/* The inner div (opponent-N-hand) fills the area and acts as
+   the positioned ancestor for the card children               */
+.opp-hand-area > div {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Smaller cards for the face-down fan — keeps the spread compact */
+.opp-hand-area .card_small {
+  font-size: 12pt;
+}
+
+/* ── Meld section (opponent's last play or status) ───────── */
+.meld-section {
+  position: relative;
+  width: 234px;
+  /* card_small is ~100 px tall; 130 px gives comfortable breathing room */
+  height: 130px;
+  /* visible so rotated card corners don't get clipped */
+  overflow: visible;
+  border: 1px dashed rgba(0,255,184,0.10);
+  border-radius: 0 0 6px 6px;
+  background: rgba(3,6,8,0.55);
+}
+
+/* Status text (e.g. "Passed", "Waiting") injected by setStatus() */
+.meld-section h1 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-b);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 3px 10px;
+  border: 1px solid rgba(30,80,68,0.45);
+  border-radius: 3px;
+  background: rgba(2,5,7,0.75);
+}
+
+/* ── AI select panel ─────────────────────────────────────── */
+.ai-select-panel {
+  /* shown/hidden by JS; inherits width from opp-block */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(2,5,7,0.92);
+  border: 1px solid rgba(0,255,184,0.15);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+}
+
+.ai-label {
+  font-family: var(--font-b);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.ai-select {
+  flex: 1;
+  background: rgba(0,255,184,0.04);
+  border: 1px solid rgba(0,255,184,0.2);
+  color: var(--text);
+  font-family: var(--font-b);
+  font-size: 10px;
+  border-radius: 3px;
+  padding: 3px 6px;
+}
+
+/* ── Active turn highlight ───────────────────────────────── */
+.active-turn .seat-panel {
+  box-shadow: var(--a-glow);
+  border-color: var(--accent);
+}
+
+/* ══ Centre tutorial / hint text ════════════════════════════ */
+
+.table-center-info {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.center-msg {
+  font-family: var(--font-b);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px 22px;
+  border: 1px solid rgba(0,255,184,0.30);
+  border-radius: 4px;
+  background: rgba(2,5,7,0.80);
+  box-shadow: 0 0 18px rgba(0,255,184,0.15);
+  text-shadow: 0 0 10px var(--accent);
+  white-space: nowrap;
+  /* hide gracefully when empty */
+  min-width: 1px;
+}
+
+.center-msg:empty { display: none; }
+
+/* ══ Player zone — fixed at bottom ══════════════════════════ */
+
+.playfield_bottom {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 10px;
+  /* border lights up when it's the player's turn */
+  border: 1px solid transparent;
+  border-radius: 8px 8px 0 0;
+  transition: box-shadow 200ms ease-out, border-color 200ms ease-out;
+}
+
+.playfield_bottom.active-turn {
+  border-color: var(--accent);
+  box-shadow: var(--a-glow);
+}
+
+/* Player's own meld / status for this round */
+.player-meld {
+  position: relative;
+  /* wide enough for up to 4 played cards */
+  width: 430px;
+  height: 130px;
+  overflow: visible;
+}
+
+.player-meld h1 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-b);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Player hand area ────────────────────────────────────── */
 .hand_play_area {
   border: 2px dashed rgba(0,255,184,0.18) !important;
   border-radius: 4px;
@@ -480,7 +666,22 @@ body {
   height: 6em;
 }
 
-/* ── Buttons ─────────────────────────────────────────────── */
+/* ── Pass button (voluntary pass) ────────────────────────── */
+.pass-btn {
+  /* inherits .btn-ghost styles */
+}
+
+/* ── Compulsory pass overlay text ────────────────────────── */
+.pass-overlay-text {
+  font-family: var(--font-h);
+  font-size: 2em;
+  font-weight: 800;
+  color: var(--accent);
+  text-shadow: 0 0 20px var(--accent), 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* ══ Buttons ════════════════════════════════════════════════ */
+
 button {
   font-family: var(--font-b);
   font-size: 10px;
@@ -536,50 +737,12 @@ button {
 }
 #start_game_button.fill::before { width: 100%; }
 
-/* ── AI select panel ─────────────────────────────────────── */
-.ai-select-panel {
-  position: absolute;
-  bottom: 0; width: 100%;
-  padding: 6px 10px;
-  background: rgba(2,5,7,0.92);
-  border-top: 1px solid rgba(0,255,184,0.15);
-  display: flex; align-items: center; gap: 8px;
-}
-.ai-label {
-  font-family: var(--font-b);
-  font-size: 9px;
-  color: var(--muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.ai-select {
-  flex: 1;
-  background: rgba(0,255,184,0.04);
-  border: 1px solid rgba(0,255,184,0.2);
-  color: var(--text);
-  font-family: var(--font-b);
-  font-size: 10px;
-  border-radius: 3px;
-  padding: 3px 6px;
-}
-
-/* ── Compulsory pass overlay ─────────────────────────────── */
-.pass-overlay-text {
-  font-family: var(--font-h);
-  font-size: 2em;
-  font-weight: 800;
-  color: var(--accent);
-  text-shadow: 0 0 20px var(--accent), 0 2px 4px rgba(0,0,0,0.8);
-}
-
 /* ── Speed control ───────────────────────────────────────── */
 .speed-control {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 4px;
-  margin-top: 4px;
   padding-top: 8px;
   border-top: 1px solid rgba(0,255,184,0.08);
 }
@@ -624,4 +787,23 @@ button {
   background: var(--accent);
   border: none;
   cursor: pointer;
+}
+
+/* ══ Floating tooltip ═══════════════════════════════════════ */
+
+.game-tooltip {
+  position: fixed;
+  z-index: 500;
+  display: none;
+  max-width: 220px;
+  padding: 6px 10px;
+  background: rgba(2,5,7,0.96);
+  border: 1px solid rgba(0,255,184,0.35);
+  border-radius: 4px;
+  font-family: var(--font-b);
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--text);
+  pointer-events: none;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.65), 0 0 8px rgba(0,255,184,0.10);
 }
