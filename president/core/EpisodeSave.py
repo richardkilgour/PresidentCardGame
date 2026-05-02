@@ -333,7 +333,7 @@ class EpisodeSave(CardGameListener):
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def stamped_path(stem: str, directory: str = "../saves/") -> Path:
+    def stamped_path(stem: str, directory: str = "../logs/") -> Path:
         stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         return Path(f"{directory}{stem}_{stamp}.json")
 
