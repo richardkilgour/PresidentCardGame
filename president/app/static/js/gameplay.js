@@ -2,9 +2,9 @@
 const CardGame = {
     socket: null,
     aiOpponents: [
-        "Alexi (Easy)", "Jordan (Easy)", "Kai (Easy)",
-        "Samara (Medium)", "Quincy (Medium)", "Tian (Medium)",
-        "Eshaan (Hard)", "Amari (Hard)", "Riven (Hard)"
+        "GRUB-4 (Easy)", "FUZZ-8 (Easy)", "SLAB-6 (Easy)", "ZIPZ-0 (Easy)",
+        "NULL-0 (Medium)", "WREN-X (Medium)", "DUSK-5 (Medium)", "ECHO-9 (Medium)",
+        "VERA-7 (Hard)", "KAEL-3 (Hard)", "APEX-1 (Hard)", "RHEA-2 (Hard)"
     ],
 
     init: function() {
@@ -411,21 +411,23 @@ const CardGame = {
         arenaDiv.appendChild(passedElement);
     },
 
-    // Centre a group of .card_small elements horizontally inside arenaDiv.
+    // Centre a group of .card_small elements horizontally and vertically inside arenaDiv.
     // Must be called after all cards are appended but before animations fire.
     _centerMeldSpread: function(arenaDiv) {
         const cards = Array.from(arenaDiv.querySelectorAll('.card_small'));
         if (cards.length === 0) return;
         // card_small font-size is 15pt = 20 px; getComputedStyle for safety
         const emPx  = parseFloat(getComputedStyle(cards[0]).fontSize);
-        const contW = arenaDiv.offsetWidth;          // px width of the meld box
+        const contW = arenaDiv.offsetWidth;
+        const contH = arenaDiv.offsetHeight;
         const n     = cards.length;
         // Spread width = (n-1) inter-card gaps of 1 em each + one card width (3.75 em)
         const spreadW = ((n - 1) + 3.75) * emPx;
-        // Left pixel that centres the spread
         const startPx = (contW - spreadW) / 2;
+        const topPx   = (contH - cards[0].offsetHeight) / 2;
         cards.forEach((card, i) => {
             card.style.left = (startPx / emPx + i) + 'em';
+            card.style.top  = topPx + 'px';
         });
     },
 
