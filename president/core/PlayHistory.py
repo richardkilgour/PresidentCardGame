@@ -334,3 +334,11 @@ class PlayHistory:
         for i in range(0, 3):
             player = self._memory[3 - i].player if len(self._memory) >= (4 - i) else None
             yield player, None, f"{getattr(player, 'name', '<unknown>')} IS WAITING"
+
+    def get_previous_melds(self, plays_to_skip: int = 0):
+        # Construct a list of previous melds - use previous_plays_generator
+        prev_plays = []
+        for p in self.previous_plays_generator(plays_to_skip):
+            if isinstance(p[1], Meld):
+                prev_plays.append(p[1])
+        return prev_plays
